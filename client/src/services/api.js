@@ -25,6 +25,7 @@ api.interceptors.request.use((config) => {
   // If the first path segment is not a global route and not a static file, assume it's a tenant slug
   if (pathParts.length > 0 && !globalRoutes.includes(pathParts[0]) && !pathParts[0].includes('.')) {
     tenantSlug = pathParts[0];
+    localStorage.setItem('tenantSlug', tenantSlug);
   }
 
   config.headers['X-Tenant-Slug'] = tenantSlug;

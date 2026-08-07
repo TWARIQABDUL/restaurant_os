@@ -52,6 +52,7 @@ export function AuthProvider({ children }) {
   function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('tenantSlug');
     setUser(null);
     disconnectSocket();
   }
