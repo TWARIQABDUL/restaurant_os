@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import api from '../services/api';
 
 export default function Home() {
@@ -8,6 +8,13 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [notFound, setNotFound] = useState(false);
+  const { tenantSlug } = useParams();
+
+  // Protect against SPA fallback matching static assets like /favicon.ico
+  if (tenantSlug && tenantSlug.includes('.')) {
+    return null;
+  }
 
   useEffect(() => {
     fetchData();
@@ -24,9 +31,23 @@ export default function Home() {
       setItems(itemsRes.data.items);
     } catch (err) {
       console.error('Failed to load menu', err);
+      if (err.response?.status === 404) {
+        setNotFound(true);
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  if (notFound) {
+    return (
+      <div className="page flex flex-col items-center justify-center text-center" style={{ minHeight: '60vh' }}>
+        <h1 style={{ fontSize: '3rem', marginBottom: '1rem', color: 'var(--color-secondary)' }}>404</h1>
+        <h2>Restaurant Not Found</h2>
+        <p className="text-secondary mt-2 mb-6">We couldn't find a restaurant at this URL.</p>
+        <Link to="/" className="btn btn-primary">Return to Homepage</Link>
+      </div>
+    );
   }
 
   return (

@@ -7,6 +7,7 @@ const supabase = require('../config/supabase');
 async function resolveTenant(req, res, next) {
   try {
     const slug = req.headers['x-tenant-slug'] || req.params.tenantSlug;
+    console.log("RESOLVING TENANT SLUG:", slug);
 
     let query = supabase
       .from('tenants')
