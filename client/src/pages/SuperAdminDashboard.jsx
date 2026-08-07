@@ -7,7 +7,13 @@ export default function SuperAdminDashboard() {
 
   // Form state for new tenant
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: '', slug: '' });
+  const [formData, setFormData] = useState({ 
+    restaurantName: '', 
+    slug: '', 
+    adminName: '', 
+    adminEmail: '', 
+    adminPassword: '' 
+  });
 
   const fetchTenants = async () => {
     try {
@@ -27,12 +33,12 @@ export default function SuperAdminDashboard() {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/tenants', formData);
-      setFormData({ name: '', slug: '' });
+      await api.post('/auth/register-tenant', formData);
+      setFormData({ restaurantName: '', slug: '', adminName: '', adminEmail: '', adminPassword: '' });
       setShowForm(false);
       fetchTenants();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to create tenant');
+      alert(err.response?.data?.error || 'Failed to create tenant and admin');
     }
   };
 
@@ -59,33 +65,76 @@ export default function SuperAdminDashboard() {
 
       {showForm && (
         <div className="card mb-8 bg-gray-50 border-gray-200">
-          <h3 className="mb-4">Create New Tenant</h3>
-          <form onSubmit={handleCreate} className="flex gap-4 items-end">
-            <div className="form-group mb-0 flex-1">
-              <label className="form-label">Restaurant Name</label>
-              <input 
-                type="text" 
-                className="form-input" 
-                required 
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-              />
+          <h3 className="mb-4">Provision New Restaurant Space</h3>
+          <form onSubmit={handleCreate} className="flex flex-col gap-4">
+            
+            <div className="flex gap-4">
+              <div className="form-group mb-0 flex-1">
+                <label className="form-label">Restaurant Name</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  required 
+                  value={formData.restaurantName}
+                  onChange={(e) => setFormData({...formData, restaurantName: e.target.value})}
+                />
+              </div>
+              <div className="form-group mb-0 flex-1">
+                <label className="form-label">URL Slug (e.g. burger-king)</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  required 
+                  pattern="^[a-z0-9-]+$"
+                  title="Lowercase alphanumeric and hyphens only"
+                  value={formData.slug}
+                  onChange={(e) => setFormData({...formData, slug: e.target.value})}
+                />
+              </div>
             </div>
-            <div className="form-group mb-0 flex-1">
-              <label className="form-label">URL Slug (e.g. my-restaurant)</label>
-              <input 
-                type="text" 
-                className="form-input" 
-                required 
-                pattern="^[a-z0-9-]+$"
-                title="Lowercase alphanumeric and hyphens only"
-                value={formData.slug}
-                onChange={(e) => setFormData({...formData, slug: e.target.value})}
-              />
+
+            <div className="border-t border-gray-200 pt-4 mt-2">
+              <h4 className="mb-3 text-sm uppercase text-secondary">Initial Admin Account</h4>
+              <div className="flex gap-4">
+                <div className="form-group mb-0 flex-1">
+                  <label className="form-label">Admin Name</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    required 
+                    value={formData.adminName}
+                    onChange={(e) => setFormData({...formData, adminName: e.target.value})}
+                  />
+                </div>
+                <div className="form-group mb-0 flex-1">
+                  <label className="form-label">Admin Email</label>
+                  <input 
+                    type="email" 
+                    className="form-input" 
+                    required 
+                    value={formData.adminEmail}
+                    onChange={(e) => setFormData({...formData, adminEmail: e.target.value})}
+                  />
+                </div>
+                <div className="form-group mb-0 flex-1">
+                  <label className="form-label">Admin Password</label>
+                  <input 
+                    type="password" 
+                    className="form-input" 
+                    required 
+                    minLength={6}
+                    value={formData.adminPassword}
+                    onChange={(e) => setFormData({...formData, adminPassword: e.target.value})}
+                  />
+                </div>
+              </div>
             </div>
-            <button type="submit" className="btn btn-primary" style={{ height: '42px' }}>
-              Create
-            </button>
+
+            <div className="flex justify-end mt-2">
+              <button type="submit" className="btn btn-primary px-8 py-2">
+                Provision Tenant & Admin
+              </button>
+            </div>
           </form>
         </div>
       )}

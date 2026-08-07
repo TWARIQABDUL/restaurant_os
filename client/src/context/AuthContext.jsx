@@ -29,6 +29,12 @@ export function AuthProvider({ children }) {
     const { data } = await api.post('/auth/login', { email, password });
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
+    
+    // Update tenantSlug dynamically if returned from login
+    if (data.user?.tenants?.slug) {
+      localStorage.setItem('tenantSlug', data.user.tenants.slug);
+    }
+    
     setUser(data.user);
     connectSocket(data.token);
     return data.user;
