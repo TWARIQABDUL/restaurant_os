@@ -25,7 +25,8 @@ export default function Register() {
     setError(null);
     try {
       await register(formData.name, formData.email, formData.password, formData.phone);
-      navigate('/');
+      const slug = localStorage.getItem('tenantSlug');
+      navigate(slug ? `/${slug}` : '/');
     } catch (err) {
       setError(err.response?.data?.errors?.[0]?.msg || err.response?.data?.error || 'Registration failed.');
     } finally {

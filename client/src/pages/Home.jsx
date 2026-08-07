@@ -99,7 +99,7 @@ export default function Home() {
       ) : (
         <div className="grid grid-3">
           {items.map((item) => (
-            <Link to={`/menu/${item.id}`} key={item.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+            <Link to={`/${tenantSlug}/menu/${item.id}`} key={item.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
               {item.image_url ? (
                 <img src={item.image_url} alt={item.name} className="card-image" />
               ) : (

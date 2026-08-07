@@ -4,7 +4,7 @@ import api from '../services/api';
 import { useCart } from '../context/CartContext';
 
 export default function MenuDetail() {
-  const { id } = useParams();
+  const { id, tenantSlug } = useParams();
   const navigate = useNavigate();
   const { addItem } = useCart();
   
@@ -70,7 +70,7 @@ export default function MenuDetail() {
 
   const handleAddToCart = () => {
     addItem(item, quantity, Object.values(selectedAddOns));
-    navigate('/cart');
+    navigate(`/${tenantSlug}/cart`);
   };
 
   if (loading) {

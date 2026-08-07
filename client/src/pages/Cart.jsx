@@ -1,9 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 
 export default function Cart() {
   const { items, removeItem, updateQuantity, getTotal, clearCart } = useCart();
   const navigate = useNavigate();
+  const { tenantSlug } = useParams();
 
   if (items.length === 0) {
     return (
@@ -11,7 +12,7 @@ export default function Cart() {
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>🛒</div>
         <h3>Your cart is empty</h3>
         <p className="mb-6">Looks like you haven't added anything to your cart yet.</p>
-        <Link to="/" className="btn btn-primary">Browse Menu</Link>
+        <Link to={`/${tenantSlug}`} className="btn btn-primary">Browse Menu</Link>
       </div>
     );
   }
@@ -110,11 +111,11 @@ export default function Cart() {
 
         <button 
           className="btn btn-primary btn-lg btn-full"
-          onClick={() => navigate('/checkout')}
+          onClick={() => navigate(`/${tenantSlug}/checkout`)}
         >
           Proceed to Checkout
         </button>
-        <Link to="/" className="btn btn-secondary btn-full mt-4" style={{ display: 'block', textAlign: 'center' }}>
+        <Link to={`/${tenantSlug}`} className="btn btn-secondary btn-full mt-4" style={{ display: 'block', textAlign: 'center' }}>
           Continue Shopping
         </Link>
       </div>

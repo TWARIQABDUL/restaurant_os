@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import api from '../services/api';
@@ -8,6 +8,7 @@ export default function Checkout() {
   const { user } = useAuth();
   const { items, getTotal, clearCart } = useCart();
   const navigate = useNavigate();
+  const { tenantSlug } = useParams();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -23,9 +24,9 @@ export default function Checkout() {
 
   useEffect(() => {
     if (items.length === 0) {
-      navigate('/cart');
+      navigate(`/${tenantSlug}/cart`);
     }
-  }, [items, navigate]);
+  }, [items, navigate, tenantSlug]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -59,7 +60,7 @@ export default function Checkout() {
 
       const { data } = await api.post('/orders', orderData);
       clearCart();
-      navigate(`/track?code=${data.order.tracking_code}`);
+      navigate(`/${tenantSlug}/track?code=${data.order.tracking_code}`);
     } catch (err) {
       setError(err.response?.data?.errors?.[0]?.msg || err.response?.data?.error || 'Failed to place order');
     } finally {

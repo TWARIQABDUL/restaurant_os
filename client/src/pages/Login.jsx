@@ -21,7 +21,11 @@ export default function Login() {
       if (user.role === 'admin') navigate('/admin');
       else if (user.role === 'manager') navigate('/manager');
       else if (user.role === 'delivery') navigate('/delivery');
-      else navigate('/');
+      else if (user.role === 'super_admin') navigate('/super-admin');
+      else {
+        const slug = localStorage.getItem('tenantSlug');
+        navigate(slug ? `/${slug}` : '/');
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
     } finally {
