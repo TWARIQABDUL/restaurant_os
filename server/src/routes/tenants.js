@@ -1,0 +1,130 @@
+const express = require('express');
+const { body, validationResult } = require('express-validator');
+const supabase = require('../config/supabase');
+const { authenticate, superAdminOnly } = require('../middleware/auth');
+
+const router = express.Router();
+
+// POST /api/tenants — Create tenant (Super Admin)
+router.post(
+  '/',
+  authenticate,
+  superAdminOnly,
+  [
+    body('name').trim().notEmpty().withMessage('Restaurant name is required'),
+    body('slug').trim().notEmpty().withMessage('Slug is required')
+      .matches(/^[a-z0-9-]+$/).withMessage('Slug must be lowercase alphanumeric with hyphens'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { name, slug, logo_url, settings } = req.body;
+
+      const { data: tenant, error } = await supabase
+        .from('tenants')
+        .insert({
+          name,
+          slug,
+          logo_url: logo_url || null,
+          settings: settings || {},
+          active: true,
+        })
+        .select('*')
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          return res.status(409).json({ error: 'Slug already taken' });
+        }
+        return res.status(500).json({ error: 'Failed to create tenant' });
+      }
+
+      res.status(201).json({ tenant });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// GET /api/tenants — List all tenants (Super Admin)
+router.get('/', authenticate, superAdminOnly, async (req, res) => {
+  try {
+    const { data: tenants, error } = await supabase
+      .from('tenants')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch tenants' });
+    }
+
+    res.json({ tenants: tenants || [] });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/tenants/:id — Update tenant (Super Admin)
+router.put('/:id', authenticate, superAdminOnly, async (req, res) => {
+  try {
+    const updates = {};
+    const allowedFields = ['name', 'slug', 'logo_url', 'settings'];
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    const { data: tenant, error } = await supabase
+      .from('tenants')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select('*')
+      .single();
+
+    if (error || !tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    res.json({ tenant });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/tenants/:id/toggle — Activate/deactivate (Super Admin)
+router.patch('/:id/toggle', authenticate, superAdminOnly, async (req, res) => {
+  try {
+    const { data: current } = await supabase
+      .from('tenants')
+      .select('active')
+      .eq('id', req.params.id)
+      .single();
+
+    if (!current) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    const { data: tenant, error } = await supabase
+      .from('tenants')
+      .update({ active: !current.active })
+      .eq('id', req.params.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to toggle tenant' });
+    }
+
+    res.json({ tenant });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+module.exports = router;
