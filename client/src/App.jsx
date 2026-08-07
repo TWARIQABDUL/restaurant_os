@@ -3,6 +3,7 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
+import LandingPage from './pages/LandingPage';
 import Home from './pages/Home';
 import MenuDetail from './pages/MenuDetail';
 import Cart from './pages/Cart';
@@ -24,18 +25,21 @@ function App() {
       <Navbar />
       <div className="container">
         <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Home />} />
-          <Route path="/menu/:id" element={<MenuDetail />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/track" element={<TrackOrder />} />
+          {/* Global SaaS Routes */}
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Customer Routes */}
+          {/* Tenant Storefront Routes */}
+          <Route path="/:tenantSlug" element={<Home />} />
+          <Route path="/:tenantSlug/menu/:id" element={<MenuDetail />} />
+          <Route path="/:tenantSlug/cart" element={<Cart />} />
+          <Route path="/:tenantSlug/checkout" element={<Checkout />} />
+          <Route path="/:tenantSlug/track" element={<TrackOrder />} />
+
+          {/* Customer Protected Routes */}
           <Route 
-            path="/orders" 
+            path="/:tenantSlug/orders" 
             element={
               <ProtectedRoute roles={['customer']}>
                 <OrderTracking />

@@ -100,10 +100,23 @@ export default function Navbar() {
 
   const dashLink = getDashboardLink();
 
+  // Extract tenant slug from URL to determine if we are in a storefront
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const globalRoutes = ['login', 'register', 'manager', 'admin', 'delivery', 'super-admin'];
+  
+  let currentSlug = null;
+  if (pathParts.length > 0 && !globalRoutes.includes(pathParts[0])) {
+    currentSlug = pathParts[0];
+  }
+
+  // Helper to resolve paths relative to current storefront
+  const getPath = (path) => currentSlug ? `/${currentSlug}${path}` : path;
+  const basePath = currentSlug ? `/${currentSlug}` : '/';
+
   return (
     <nav className="navbar">
       <div className="navbar-inner">
-        <Link to="/" className="navbar-brand">
+        <Link to={basePath} className="navbar-brand">
           Restaurant<span>OS</span>
         </Link>
 
@@ -116,18 +129,22 @@ export default function Navbar() {
         </button>
 
         <ul className={`navbar-links ${menuOpen ? 'open' : ''}`}>
-          <li><Link to="/" className={isActive('/')} onClick={() => setMenuOpen(false)}>Menu</Link></li>
+          {currentSlug && (
+            <>
+              <li><Link to={basePath} className={isActive(basePath)} onClick={() => setMenuOpen(false)}>Menu</Link></li>
 
-          <li>
-            <Link to="/cart" className={isActive('/cart')} onClick={() => setMenuOpen(false)}>
-              Cart{itemCount > 0 && ` (${itemCount})`}
-            </Link>
-          </li>
+              <li>
+                <Link to={getPath('/cart')} className={isActive(getPath('/cart'))} onClick={() => setMenuOpen(false)}>
+                  Cart{itemCount > 0 && ` (${itemCount})`}
+                </Link>
+              </li>
 
-          <li><Link to="/track" className={isActive('/track')} onClick={() => setMenuOpen(false)}>Track Order</Link></li>
+              <li><Link to={getPath('/track')} className={isActive(getPath('/track'))} onClick={() => setMenuOpen(false)}>Track Order</Link></li>
 
-          {user && user.role === 'customer' && (
-            <li><Link to="/orders" className={isActive('/orders')} onClick={() => setMenuOpen(false)}>My Orders</Link></li>
+              {user && user.role === 'customer' && (
+                <li><Link to={getPath('/orders')} className={isActive(getPath('/orders'))} onClick={() => setMenuOpen(false)}>My Orders</Link></li>
+              )}
+            </>
           )}
 
           {dashLink && (

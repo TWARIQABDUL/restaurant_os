@@ -148,6 +148,7 @@ export default function SuperAdminDashboard() {
               <tr>
                 <th>Restaurant Name</th>
                 <th>Slug</th>
+                <th>Store Link</th>
                 <th>Status</th>
                 <th>Created At</th>
                 <th className="text-right">Actions</th>
@@ -158,6 +159,24 @@ export default function SuperAdminDashboard() {
                 <tr key={tenant.id}>
                   <td style={{ fontWeight: 500 }}>{tenant.name}</td>
                   <td className="text-secondary">{tenant.slug}</td>
+                  <td>
+                    <div className="flex gap-2 items-center">
+                      <span className="text-sm font-mono bg-gray-100 px-2 py-1 rounded border">
+                        /{tenant.slug}
+                      </span>
+                      <button 
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => {
+                          const url = `${window.location.origin}/${tenant.slug}`;
+                          navigator.clipboard.writeText(url);
+                          alert('Copied to clipboard!');
+                        }}
+                        style={{ padding: '2px 8px', fontSize: '12px' }}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </td>
                   <td>
                     <span className={`badge ${tenant.active ? 'badge-approved' : 'badge-rejected'}`}>
                       {tenant.active ? 'Active' : 'Suspended'}

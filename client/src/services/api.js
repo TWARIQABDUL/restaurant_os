@@ -17,7 +17,16 @@ api.interceptors.request.use((config) => {
   }
 
   // Attach tenant slug
-  const tenantSlug = localStorage.getItem('tenantSlug') || 'demo';
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  const globalRoutes = ['login', 'register', 'manager', 'admin', 'delivery', 'super-admin'];
+  
+  let tenantSlug = localStorage.getItem('tenantSlug') || 'demo';
+  
+  // If the first path segment is not a global route, assume it's a tenant slug storefront
+  if (pathParts.length > 0 && !globalRoutes.includes(pathParts[0])) {
+    tenantSlug = pathParts[0];
+  }
+
   config.headers['X-Tenant-Slug'] = tenantSlug;
 
   return config;
