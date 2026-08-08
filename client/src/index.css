@@ -595,6 +595,22 @@ tr:nth-child(even) {
 .p-6 { padding: var(--space-6); }
 .text-center { text-align: center; }
 .w-full { width: 100%; }
+.whitespace-nowrap { white-space: nowrap; }
+.rounded { border-radius: var(--radius-md); }
+.border { border: 1px solid var(--color-border); }
+.border-gray-200 { border-color: var(--color-border); }
+.bg-gray-50 { background: var(--color-bg-alt); }
+.bg-red-50 { background: var(--color-error-light); }
+.text-red-700 { color: var(--color-error); }
+.bg-yellow-50 { background: var(--color-warning-light); }
+.text-yellow-800 { color: var(--color-warning); }
+.border-yellow-200 { border-color: var(--color-warning); }
+
+/* Responsive row: stacks on mobile, sits side-by-side from tablet up.
+   Named to match the md:flex-row usage already written in the JSX. */
+@media (min-width: 769px) {
+  .md\:flex-row { flex-direction: row; }
+}
 
 /* Loading spinner */
 .spinner {
@@ -661,7 +677,7 @@ tr:nth-child(even) {
   position: absolute;
   top: -4px;
   right: -6px;
-  background-color: var(--color-danger);
+  background-color: var(--color-error);
   color: white;
   font-size: 0.65rem;
   font-weight: bold;
@@ -773,4 +789,186 @@ tr:nth-child(even) {
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ================================================
+   LANDING PAGE
+   ================================================ */
+
+.hero-section {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: var(--space-12);
+  align-items: center;
+  padding: var(--space-16) 0;
+}
+
+@media (max-width: 768px) {
+  .hero-section {
+    grid-template-columns: 1fr;
+    padding: var(--space-8) 0;
+    gap: var(--space-8);
+  }
+}
+
+.kicker {
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-accent);
+  margin-bottom: var(--space-4);
+}
+
+.hero-visual {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-6);
+}
+
+.hero-visual svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.section-header {
+  max-width: 640px;
+  margin: 0 auto var(--space-12);
+  text-align: center;
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-text-inverse);
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--space-4);
+}
+
+.feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  margin-bottom: var(--space-4);
+}
+
+.role-card {
+  border-left: 3px solid var(--color-accent);
+}
+
+.cta-band {
+  background: var(--color-text);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-xl);
+  padding: var(--space-12) var(--space-8);
+  text-align: center;
+  margin: var(--space-16) 0;
+}
+
+.cta-band p {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.cta-band .btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.cta-band .btn-primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.site-footer {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-8) 0;
+  margin-top: var(--space-8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 768px) {
+  .site-footer {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+/* ================================================
+   MANAGER DASHBOARD — KANBAN BOARD
+   ================================================ */
+
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(280px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+@media (max-width: 1200px) {
+  .kanban-board {
+    grid-template-columns: repeat(4, 300px);
+  }
+}
+
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-1) var(--space-2);
+  border-bottom: 2px solid var(--color-border);
+  margin-bottom: var(--space-1);
+}
+
+.kanban-count {
+  background: var(--color-bg-alt);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+}
+
+.kanban-empty {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  padding: var(--space-4);
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
 }

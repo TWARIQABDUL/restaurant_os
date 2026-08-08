@@ -10,15 +10,13 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [notFound, setNotFound] = useState(false);
   const { tenantSlug } = useParams();
-
-  // Protect against SPA fallback matching static assets like /favicon.ico
-  if (tenantSlug && tenantSlug.includes('.')) {
-    return null;
-  }
+  const isStaticAssetPath = tenantSlug && tenantSlug.includes('.');
 
   useEffect(() => {
+    // Protect against SPA fallback matching static assets like /favicon.ico
+    if (isStaticAssetPath) return;
     fetchData();
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, isStaticAssetPath]);
 
   async function fetchData() {
     try {
@@ -39,10 +37,14 @@ export default function Home() {
     }
   }
 
+  if (isStaticAssetPath) {
+    return null;
+  }
+
   if (notFound) {
     return (
       <div className="page flex flex-col items-center justify-center text-center" style={{ minHeight: '60vh' }}>
-        <h1 style={{ fontSize: '3rem', marginBottom: '1rem', color: 'var(--color-secondary)' }}>404</h1>
+        <h1 style={{ fontSize: '3rem', marginBottom: '1rem', color: 'var(--color-text-secondary)' }}>404</h1>
         <h2>Restaurant Not Found</h2>
         <p className="text-secondary mt-2 mb-6">We couldn't find a restaurant at this URL.</p>
         <Link to="/" className="btn btn-primary">Return to Homepage</Link>

@@ -330,8 +330,11 @@ router.patch(
       await notificationService.notifyOrderApproved(order);
 
       const io = req.app.get('io');
-      if (io && order.customer_id) {
-        io.to(`user:${order.customer_id}`).emit('orderApproved', { orderId: order.id });
+      if (io) {
+        if (order.customer_id) {
+          io.to(`user:${order.customer_id}`).emit('orderApproved', { orderId: order.id });
+        }
+        io.to(`tenant:${req.tenant.id}:managers`).emit('orderApproved', { orderId: order.id });
       }
 
       res.json({ order });
@@ -371,8 +374,11 @@ router.patch(
       await notificationService.notifyOrderRejected(order, reason);
 
       const io = req.app.get('io');
-      if (io && order.customer_id) {
-        io.to(`user:${order.customer_id}`).emit('orderRejected', { orderId: order.id, reason });
+      if (io) {
+        if (order.customer_id) {
+          io.to(`user:${order.customer_id}`).emit('orderRejected', { orderId: order.id, reason });
+        }
+        io.to(`tenant:${req.tenant.id}:managers`).emit('orderRejected', { orderId: order.id, reason });
       }
 
       res.json({ order });
@@ -458,10 +464,14 @@ router.patch(
       const notificationService = require('../services/notificationService');
       await notificationService.notifyOrderReady(order, req.tenant.id);
 
-      // Notify admins
+      // Notify admins and managers
       const io = req.app.get('io');
       if (io) {
         io.to(`tenant:${req.tenant.id}:admins`).emit('orderReady', {
+          orderId: order.id,
+          trackingCode: order.tracking_code,
+        });
+        io.to(`tenant:${req.tenant.id}:managers`).emit('orderReady', {
           orderId: order.id,
           trackingCode: order.tracking_code,
         });
@@ -553,6 +563,10 @@ router.patch(
         if (assign_type === 'internal' && driverDetails.id) {
           io.to(`user:${driverDetails.id}`).emit('newDelivery', { orderId: order.id });
         }
+        io.to(`tenant:${req.tenant.id}:managers`).emit('deliveryAssigned', {
+          orderId: order.id,
+          driver: driverDetails,
+        });
       }
 
       res.json({ order, driver: driverDetails });
@@ -588,8 +602,11 @@ router.patch(
       await notificationService.notifyOrderDelivered(order);
 
       const io = req.app.get('io');
-      if (io && order.customer_id) {
-        io.to(`user:${order.customer_id}`).emit('orderDelivered', { orderId: order.id });
+      if (io) {
+        if (order.customer_id) {
+          io.to(`user:${order.customer_id}`).emit('orderDelivered', { orderId: order.id });
+        }
+        io.to(`tenant:${req.tenant.id}:managers`).emit('orderDelivered', { orderId: order.id });
       }
 
       res.json({ order });

@@ -11,8 +11,8 @@ const getIcon = (iconName) => {
     case 'ShoppingBag': return <ShoppingBag size={20} style={{ color: 'var(--color-info)' }} />;
     case 'UtensilsCrossed': return <UtensilsCrossed size={20} style={{ color: 'var(--color-accent)' }} />;
     case 'CheckCircle': return <CheckCircle size={20} style={{ color: 'var(--color-success)' }} />;
-    case 'XCircle': return <XCircle size={20} style={{ color: 'var(--color-danger)' }} />;
-    case 'Bike': return <Bike size={20} style={{ color: 'var(--color-primary)' }} />;
+    case 'XCircle': return <XCircle size={20} style={{ color: 'var(--color-error)' }} />;
+    case 'Bike': return <Bike size={20} style={{ color: 'var(--color-info)' }} />;
     case 'PartyPopper': return <PartyPopper size={20} style={{ color: '#eab308' }} />;
     default: return <Bell size={20} />;
   }
