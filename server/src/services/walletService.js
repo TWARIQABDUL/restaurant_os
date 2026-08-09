@@ -21,7 +21,11 @@ async function recordMomoTransaction({ referenceId, type, purpose, tenantId, ord
     .select('*')
     .single();
 
-  if (error) throw new Error(`Failed to record momo_transaction: ${error.message}`);
+  if (error) {
+    console.error(`[DEBUG] Failed to record momo_transaction:`, error.message);
+    throw new Error(`Failed to record momo_transaction: ${error.message}`);
+  }
+  console.log(`[DEBUG] Recorded MoMo transaction ${data.id} for order ${orderId} (Ref: ${referenceId})`);
   return data;
 }
 
@@ -57,7 +61,9 @@ async function handleCollectionResult(txn, result) {
       p_order_id: txn.order_id,
       p_amount: txn.amount,
     });
+    console.log(`[DEBUG] Order ${txn.order_id} marked as PAID and wallet credited`);
   } else if (result.status === 'FAILED') {
+    console.log(`[DEBUG] handleCollectionResult: FAILED for order ${txn.order_id}`, result);
     await updateMomoTransactionResult(txn.id, {
       status: 'failed',
       momoStatusRaw: result.status,
@@ -116,6 +122,8 @@ async function initiateOrderPayment(order) {
     amount: order.total_amount,
   });
 
+  console.log(`[DEBUG] initiateOrderPayment: Attempting requestToPay for order ${order.id} with phone ${phone} and amount ${order.total_amount}`);
+
   try {
     await momoClient.requestToPay({
       amount: order.total_amount,
@@ -125,12 +133,17 @@ async function initiateOrderPayment(order) {
       payeeNote: `Payment for order ${order.tracking_code}`,
       callbackUrl: momoConfig.callbackUrlBase ? `${momoConfig.callbackUrlBase}/api/momo/callback/collection/${referenceId}` : undefined,
     });
+    console.log(`[DEBUG] initiateOrderPayment: requestToPay accepted by MTN for order ${order.id}`);
   } catch (err) {
+    console.error(`[DEBUG] initiateOrderPayment: requestToPay threw error:`, err.message);
     await updateMomoTransactionResult(txn.id, { status: 'failed', failureReason: err.message });
     return { status: 'FAILED', reason: err.message, momoTransactionId: txn.id };
   }
 
+  console.log(`[DEBUG] initiateOrderPayment: Polling for result...`);
   const result = await momoClient.pollUntilResolved(() => momoClient.getRequestToPayStatus(referenceId));
+  console.log(`[DEBUG] initiateOrderPayment: Polling finished with status: ${result.status}`);
+  
   await handleCollectionResult(txn, result);
   return { status: result.status, momoTransactionId: txn.id, referenceId };
 }

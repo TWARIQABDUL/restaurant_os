@@ -186,8 +186,11 @@ router.post(
             // throws), so this is safe to leave unawaited. The client
             // polls GET /orders/track/:code (by tracking_code) to see the
             // result land, so we don't need to hand back a reference id here.
-            walletService.initiateOrderPayment({ ...order, guest_phone: payerPhone }).catch(err => {
-              console.error(`Background MoMo initiation failed for order ${order.id}:`, err.message);
+            console.log(`[DEBUG] orders.js: Calling initiateOrderPayment in background for order ${order.id}...`);
+            walletService.initiateOrderPayment({ ...order, guest_phone: payerPhone }).then(res => {
+              console.log(`[DEBUG] orders.js: MoMo initiation for order ${order.id} resolved:`, res);
+            }).catch(err => {
+              console.error(`[DEBUG] orders.js: MoMo initiation for order ${order.id} failed:`, err);
             });
           }
         } catch (err) {
