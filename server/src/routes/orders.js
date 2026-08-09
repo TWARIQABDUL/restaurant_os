@@ -25,6 +25,7 @@ router.post(
     body('items.*.menu_item_id').notEmpty().withMessage('menu_item_id is required'),
     body('items.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
     body('payment_method').isIn(['cash_on_delivery', 'mobile_money', 'bank_transfer']).withMessage('Invalid payment method'),
+    body('payment_phone').optional().trim(),
     body('delivery_notes').optional().trim(),
     // Guest fields (required if not authenticated)
     body('guest_name').if((value, { req }) => !req.user).notEmpty().withMessage('Name is required for guest orders'),
@@ -40,7 +41,7 @@ router.post(
       }
 
       const tenantId = req.tenant.id;
-      const { items, payment_method, delivery_notes, guest_name, guest_phone, guest_address, guest_email } = req.body;
+      const { items, payment_method, payment_phone, delivery_notes, guest_name, guest_phone, guest_address, guest_email } = req.body;
 
       // Calculate total — fetch prices from DB to prevent client-side manipulation
       let totalAmount = 0;
@@ -156,6 +157,48 @@ router.post(
         }
       }
 
+      // For mobile_money orders, payment goes through the platform's own
+      // MoMo account (Collections API) rather than being collected by the
+      // restaurant directly. The initial request-to-pay call is awaited
+      // (fast — MoMo just acks with 202), but waiting for the CUSTOMER to
+      // actually approve it on their phone can take a while, so that part
+      // runs in the background rather than holding this response open.
+      // The client polls GET /orders/track/:code to see payment_status
+      // flip to 'paid' once it resolves; if the tab closes before that,
+      // the settlement scheduler's reconciliation sweep still catches it.
+      let paymentInfo = { status: 'not_applicable' };
+      if (payment_method === 'mobile_money') {
+        const walletService = require('../services/walletService');
+        const momoConfigCheck = require('../config/momo');
+
+        try {
+          momoConfigCheck.assertConfigured('collection');
+          const payerPhone = payment_phone || order.guest_phone || (req.user && req.user.phone) || null;
+
+          if (!payerPhone) {
+            paymentInfo = { status: 'UNAVAILABLE', reason: 'No phone number on file to charge' };
+          } else {
+            paymentInfo = { status: 'PENDING' };
+
+            // Fire the actual MoMo call + resolution in the background so
+            // order creation itself stays fast. Errors are caught and
+            // logged inside initiateOrderPayment's own try/catch (it never
+            // throws), so this is safe to leave unawaited. The client
+            // polls GET /orders/track/:code (by tracking_code) to see the
+            // result land, so we don't need to hand back a reference id here.
+            walletService.initiateOrderPayment({ ...order, guest_phone: payerPhone }).catch(err => {
+              console.error(`Background MoMo initiation failed for order ${order.id}:`, err.message);
+            });
+          }
+        } catch (err) {
+          // MoMo isn't configured on this deployment yet — don't fail the
+          // whole order, just surface it so the frontend can tell the
+          // customer payment collection isn't available right now.
+          console.error('MoMo not configured:', err.message);
+          paymentInfo = { status: 'UNAVAILABLE', reason: 'Mobile money payment is not configured on this server yet' };
+        }
+      }
+
       // Send confirmation email and write to DB
       const notificationService = require('../services/notificationService');
       await notificationService.notifyOrderPlaced(order, req.user, { guest_name, guest_email, guest_phone });
@@ -184,6 +227,7 @@ router.post(
           payment_method,
           payment_status: order.payment_status,
         },
+        payment: paymentInfo,
       });
     } catch (err) {
       console.error('Order error:', err.message);
@@ -370,6 +414,32 @@ router.patch(
         return res.status(400).json({ error: 'Order not found or cannot be rejected' });
       }
 
+      // If this was already paid via MoMo, the restaurant declining it
+      // means the customer needs their money back — automatically, not
+      // via a separate refund request they'd have to know to submit.
+      if (order.payment_method === 'mobile_money' && order.payment_status === 'paid' && order.settlement_status === 'pending') {
+        const walletService = require('../services/walletService');
+        supabase
+          .from('refund_requests')
+          .insert({
+            order_id: order.id,
+            reason: `Auto-refund: order rejected by restaurant (${reason || 'no reason given'})`,
+            status: 'pending',
+          })
+          .select('id')
+          .single()
+          .then(({ data: refundRequest, error: refundErr }) => {
+            if (refundErr || !refundRequest) {
+              console.error(`Failed to create auto-refund request for rejected order ${order.id}:`, refundErr?.message);
+              return;
+            }
+            return walletService.approveRefund({ refundRequestId: refundRequest.id, reviewerUserId: req.user.id });
+          })
+          .catch(err => {
+            console.error(`Auto-refund failed for rejected order ${order.id}:`, err.message);
+          });
+      }
+
       const notificationService = require('../services/notificationService');
       await notificationService.notifyOrderRejected(order, reason);
 
@@ -395,9 +465,26 @@ router.patch(
   authorize('manager', 'admin'),
   async (req, res) => {
     try {
+      const { data: existing } = await supabase
+        .from('orders')
+        .select('id, payment_method, payment_status')
+        .eq('id', req.params.id)
+        .eq('tenant_id', req.tenant.id)
+        .single();
+
+      if (!existing) {
+        return res.status(400).json({ error: 'Order not found' });
+      }
+
+      if (existing.payment_method === 'mobile_money') {
+        return res.status(400).json({
+          error: 'Mobile money orders are confirmed automatically once MoMo payment succeeds and cannot be marked paid manually.',
+        });
+      }
+
       const { data: order, error } = await supabase
         .from('orders')
-        .update({ payment_status: 'paid', updated_at: new Date().toISOString() })
+        .update({ payment_status: 'paid', paid_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq('id', req.params.id)
         .eq('tenant_id', req.tenant.id)
         .select('*')
@@ -610,6 +697,79 @@ router.patch(
       }
 
       res.json({ order });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// POST /api/orders/:id/refund-request — customer (or guest, via tracking
+// code as proof of ownership) or staff requests a refund on an order.
+// A pending request here blocks the settlement scheduler from releasing
+// that order's funds until staff reviews it (see refunds.js).
+router.post(
+  '/:id/refund-request',
+  optionalAuth,
+  [
+    body('reason').trim().notEmpty().withMessage('A reason is required'),
+    body('tracking_code').optional().trim(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { data: order } = await supabase
+        .from('orders')
+        .select('id, tenant_id, tracking_code, customer_id, payment_status, settlement_status')
+        .eq('id', req.params.id)
+        .eq('tenant_id', req.tenant.id)
+        .single();
+
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      // Ownership check: either you're the authenticated customer on this
+      // order, staff on this tenant, or you know the tracking code (the
+      // same "password" guests already use to check order status).
+      const isOwner = req.user && (req.user.id === order.customer_id || ['manager', 'admin'].includes(req.user.role));
+      const knowsTrackingCode = req.body.tracking_code && req.body.tracking_code.toUpperCase() === order.tracking_code;
+
+      if (!isOwner && !knowsTrackingCode) {
+        return res.status(403).json({ error: 'Not authorized to request a refund on this order' });
+      }
+
+      if (order.payment_status !== 'paid') {
+        return res.status(400).json({ error: 'This order has not been paid yet, so there is nothing to refund' });
+      }
+
+      const { data: refundRequest, error } = await supabase
+        .from('refund_requests')
+        .insert({ order_id: order.id, requested_by: req.user ? req.user.id : null, reason: req.body.reason })
+        .select('*')
+        .single();
+
+      if (error) {
+        if (error.code === '23505') {
+          return res.status(409).json({ error: 'A refund request is already pending for this order' });
+        }
+        return res.status(500).json({ error: 'Failed to submit refund request' });
+      }
+
+      // Give an honest heads-up if this order already left escrow — the
+      // request still gets recorded for staff to review, but it can't
+      // automatically block money that's already moved.
+      const alreadySettled = order.settlement_status === 'released';
+
+      res.status(201).json({
+        refund_request: refundRequest,
+        note: alreadySettled
+          ? 'This order was already settled to the restaurant, so this refund will need manual handling by staff rather than being caught automatically.'
+          : undefined,
+      });
     } catch (err) {
       res.status(500).json({ error: 'Internal server error' });
     }

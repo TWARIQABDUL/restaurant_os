@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const supabase = require('../config/supabase');
-const { authenticate, superAdminOnly } = require('../middleware/auth');
+const { authenticate, authorize, superAdminOnly } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -96,6 +96,82 @@ router.put('/:id', authenticate, superAdminOnly, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// GET /api/tenants/me/payment-settings — read back current settlement mode + payout phone
+router.get('/me/payment-settings', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { data: tenant, error } = await supabase
+      .from('tenants')
+      .select('id, name, settings')
+      .eq('id', req.user.tenant_id)
+      .single();
+
+    if (error || !tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    res.json({
+      payment_settings: {
+        settlementMode: tenant.settings?.payments?.settlementMode || 'manual',
+        payoutPhone: tenant.settings?.payments?.payoutPhone || '',
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/tenants/me/payment-settings — tenant admin configures their OWN
+// settlement mode + payout number. Scoped via the authenticated user's own
+// tenant_id (not superAdminOnly) since this route group isn't slug-resolved.
+router.patch(
+  '/me/payment-settings',
+  authenticate,
+  authorize('admin'),
+  async (req, res) => {
+    try {
+      const { settlementMode, payoutPhone } = req.body;
+
+      if (settlementMode !== undefined && !['manual', 'auto'].includes(settlementMode)) {
+        return res.status(400).json({ error: 'settlementMode must be "manual" or "auto"' });
+      }
+
+      const { data: current, error: fetchErr } = await supabase
+        .from('tenants')
+        .select('settings')
+        .eq('id', req.user.tenant_id)
+        .single();
+
+      if (fetchErr || !current) {
+        return res.status(404).json({ error: 'Tenant not found' });
+      }
+
+      const nextSettings = {
+        ...current.settings,
+        payments: {
+          ...(current.settings?.payments || {}),
+          ...(settlementMode !== undefined ? { settlementMode } : {}),
+          ...(payoutPhone !== undefined ? { payoutPhone } : {}),
+        },
+      };
+
+      const { data: tenant, error } = await supabase
+        .from('tenants')
+        .update({ settings: nextSettings })
+        .eq('id', req.user.tenant_id)
+        .select('id, name, settings')
+        .single();
+
+      if (error) {
+        return res.status(500).json({ error: 'Failed to update payment settings' });
+      }
+
+      res.json({ tenant });
+    } catch (err) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
 
 // PATCH /api/tenants/:id/toggle — Activate/deactivate (Super Admin)
 router.patch('/:id/toggle', authenticate, superAdminOnly, async (req, res) => {

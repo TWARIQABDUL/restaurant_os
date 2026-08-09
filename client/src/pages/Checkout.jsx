@@ -12,6 +12,8 @@ export default function Checkout() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState(null); // null | 'waiting' | 'paid' | 'timeout'
+  const [trackingCode, setTrackingCode] = useState(null);
 
   const [formData, setFormData] = useState({
     guest_name: '',
@@ -19,23 +21,37 @@ export default function Checkout() {
     guest_phone: '',
     guest_address: '',
     payment_method: 'cash_on_delivery',
+    payment_phone: '',
     delivery_notes: ''
   });
 
   useEffect(() => {
-    if (items.length === 0) {
-      navigate(`/${tenantSlug}/cart`);
+    if (user && user.phone && !formData.payment_phone) {
+      setFormData(prev => ({ ...prev, payment_phone: user.phone }));
     }
-  }, [items, navigate, tenantSlug]);
+  }, [user, formData.payment_phone]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === 'guest_phone' && !prev.payment_phone) {
+        next.payment_phone = value;
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+
+    if (formData.payment_method === 'mobile_money' && !formData.payment_phone) {
+      setError('Please provide a MoMo phone number.');
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const orderData = {
@@ -48,6 +64,7 @@ export default function Checkout() {
           }))
         })),
         payment_method: formData.payment_method,
+        payment_phone: formData.payment_phone,
         delivery_notes: formData.delivery_notes
       };
 
@@ -60,7 +77,14 @@ export default function Checkout() {
 
       const { data } = await api.post('/orders', orderData);
       clearCart();
-      navigate(`/${tenantSlug}/track?code=${data.order.tracking_code}`);
+
+      if (formData.payment_method === 'mobile_money' && data.payment?.status === 'PENDING') {
+        setTrackingCode(data.order.tracking_code);
+        setPaymentStatus('waiting');
+        pollPaymentStatus(data.order.tracking_code);
+      } else {
+        navigate(`/${tenantSlug}/track?code=${data.order.tracking_code}`);
+      }
     } catch (err) {
       setError(err.response?.data?.errors?.[0]?.msg || err.response?.data?.error || 'Failed to place order');
     } finally {
@@ -68,7 +92,61 @@ export default function Checkout() {
     }
   };
 
+  // Poll the (already-public) tracking endpoint for up to ~60s waiting for
+  // the customer to approve the MoMo prompt on their phone. If it's still
+  // pending after that, the order still exists and the backend keeps
+  // reconciling it in the background — the customer just isn't blocked
+  // waiting on this screen forever.
+  const pollPaymentStatus = async (code, attempt = 0) => {
+    const maxAttempts = 30;
+    try {
+      const { data } = await api.get(`/orders/track/${code}`);
+      if (data.order.payment_status === 'paid') {
+        setPaymentStatus('paid');
+        setTimeout(() => navigate(`/${tenantSlug}/track?code=${code}`), 1200);
+        return;
+      }
+    } catch {
+      // transient network hiccup — keep trying rather than aborting
+    }
+
+    if (attempt >= maxAttempts) {
+      setPaymentStatus('timeout');
+      return;
+    }
+    setTimeout(() => pollPaymentStatus(code, attempt + 1), 2000);
+  };
+
   if (items.length === 0) return null;
+
+  if (paymentStatus) {
+    return (
+      <div className="page" style={{ maxWidth: '440px', margin: '0 auto' }}>
+        <div className="card p-8 text-center">
+          {paymentStatus === 'waiting' && (
+            <>
+              <div className="spinner" style={{ margin: '0 auto var(--space-4)' }} />
+              <h3 className="mb-2">Check your phone</h3>
+              <p className="text-secondary">We've sent a MoMo payment request to your phone. Approve it there to confirm your order.</p>
+            </>
+          )}
+          {paymentStatus === 'paid' && (
+            <>
+              <h3 className="mb-2">Payment confirmed!</h3>
+              <p className="text-secondary">Taking you to your order…</p>
+            </>
+          )}
+          {paymentStatus === 'timeout' && (
+            <>
+              <h3 className="mb-2">Still waiting on confirmation</h3>
+              <p className="text-secondary mb-4">This is taking longer than expected, but your order has been placed — we'll keep checking in the background. You can come back to this any time.</p>
+              <Link to={`/${tenantSlug}/track?code=${trackingCode}`} className="btn btn-primary">View Order Status</Link>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page grid grid-2" style={{ maxWidth: '1000px', margin: '0 auto', gap: 'var(--space-8)' }}>
@@ -126,7 +204,13 @@ export default function Checkout() {
 
           <div className="card mb-8">
             <h3 className="mb-4">Payment Method</h3>
-            <p className="text-sm text-secondary mb-4">Note: Your payment will be verified manually by our staff.</p>
+            <p className="text-sm text-secondary mb-4">
+              {formData.payment_method === 'mobile_money'
+                ? "You'll get a MoMo payment prompt on your phone as soon as you place the order."
+                : formData.payment_method === 'cash_on_delivery'
+                ? 'Pay in cash when your order arrives.'
+                : 'Your payment will be verified manually by our staff.'}
+            </p>
 
             <div className="form-group">
               <select name="payment_method" className="form-select" value={formData.payment_method} onChange={handleChange}>
@@ -135,6 +219,21 @@ export default function Checkout() {
                 <option value="bank_transfer">Bank Transfer</option>
               </select>
             </div>
+
+            {formData.payment_method === 'mobile_money' && (
+              <div className="form-group mt-4">
+                <label className="form-label">MoMo Phone Number</label>
+                <input 
+                  type="tel" 
+                  name="payment_phone" 
+                  className="form-input" 
+                  required 
+                  value={formData.payment_phone} 
+                  onChange={handleChange} 
+                  placeholder="e.g. 0780000000"
+                />
+              </div>
+            )}
           </div>
 
           <button type="submit" className="btn btn-primary btn-lg btn-full" disabled={loading}>

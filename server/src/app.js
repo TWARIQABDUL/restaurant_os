@@ -10,6 +10,9 @@ const deliveryRoutes = require('./routes/delivery');
 const analyticsRoutes = require('./routes/analytics');
 const tenantsRoutes = require('./routes/tenants');
 const notificationsRoutes = require('./routes/notifications');
+const walletRoutes = require('./routes/wallet');
+const refundsRoutes = require('./routes/refunds');
+const momoWebhookRoutes = require('./routes/momoWebhook');
 
 const app = express();
 
@@ -28,6 +31,10 @@ app.get('/api/health', (req, res) => {
 // Tenant routes (super admin — no tenant scoping)
 app.use('/api/tenants', tenantsRoutes);
 
+// MoMo callback — no tenant scoping (identified by reference id) and no
+// auth (MTN calls this directly, not a logged-in user).
+app.use('/api/momo', momoWebhookRoutes);
+
 // All other routes require tenant resolution
 app.use('/api/auth', resolveTenant, authRoutes);
 app.use('/api/menu', resolveTenant, menuRoutes);
@@ -36,6 +43,8 @@ app.use('/api/orders', resolveTenant, ordersRoutes);
 app.use('/api/delivery', resolveTenant, deliveryRoutes);
 app.use('/api/analytics', resolveTenant, analyticsRoutes);
 app.use('/api/notifications', resolveTenant, notificationsRoutes);
+app.use('/api/wallet', resolveTenant, walletRoutes);
+app.use('/api/refunds', resolveTenant, refundsRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -4,6 +4,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const app = require('./app');
 const { setupSocketHandlers } = require('./socket/handler');
+const settlementScheduler = require('./services/settlementScheduler');
 
 const PORT = process.env.PORT || 5000;
 
@@ -24,6 +25,12 @@ app.set('io', io);
 
 // Set up socket handlers
 setupSocketHandlers(io);
+
+// Settlement scheduler: reconciles pending MoMo transactions and releases
+// escrowed order funds once their hold window elapses. Safe to run even
+// if MoMo env vars aren't configured yet — it just won't find anything to
+// reconcile (no mobile_money orders will exist without collection creds).
+settlementScheduler.start();
 
 // Start server
 server.listen(PORT, () => {

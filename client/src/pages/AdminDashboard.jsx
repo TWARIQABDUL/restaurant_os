@@ -26,11 +26,23 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [dispatchState, setDispatchState] = useState({});
 
+  // Wallet State
+  const [wallet, setWallet] = useState(null);
+  const [ledger, setLedger] = useState([]);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [paymentSettings, setPaymentSettings] = useState({ settlementMode: 'manual', payoutPhone: '' });
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawPhone, setWithdrawPhone] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+
   useEffect(() => {
     if (activeTab === 'analytics') {
       fetchAnalytics();
     } else if (activeTab === 'delivery') {
       fetchDeliveryData();
+    } else if (activeTab === 'wallet') {
+      fetchWallet();
     }
   }, [activeTab]);
 
@@ -87,6 +99,61 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchWallet = async () => {
+    setLoading(true);
+    try {
+      const [walletRes, ledgerRes, withdrawalsRes, settingsRes] = await Promise.all([
+        api.get('/wallet'),
+        api.get('/wallet/ledger'),
+        api.get('/wallet/withdrawals'),
+        api.get('/tenants/me/payment-settings'),
+      ]);
+      setWallet(walletRes.data.wallet);
+      setLedger(ledgerRes.data.ledger);
+      setWithdrawals(withdrawalsRes.data.withdrawals);
+      setPaymentSettings(settingsRes.data.payment_settings);
+      setWithdrawPhone(settingsRes.data.payment_settings.payoutPhone || '');
+    } catch (err) {
+      console.error('Failed to load wallet', err);
+      toast.error('Failed to load wallet data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!withdrawPhone.trim()) {
+      toast.error('A payout phone number is required');
+      return;
+    }
+    setWithdrawing(true);
+    try {
+      await api.post('/wallet/withdraw', {
+        amount: withdrawAmount ? parseFloat(withdrawAmount) : undefined,
+        phone: withdrawPhone.trim(),
+      });
+      toast.success('Withdrawal submitted');
+      setWithdrawAmount('');
+      fetchWallet();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Withdrawal failed');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setSavingSettings(true);
+    try {
+      await api.patch('/tenants/me/payment-settings', paymentSettings);
+      toast.success('Payment settings saved');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const assignDriver = async (orderId, payload) => {
     try {
       await api.patch(`/orders/${orderId}/assign`, payload);
@@ -125,6 +192,12 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab('delivery')}
           >
             Dispatch & Delivery
+          </button>
+          <button 
+            className={`btn ${activeTab === 'wallet' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('wallet')}
+          >
+            Wallet
           </button>
           <button 
             className={`btn ${activeTab === 'menu' ? 'btn-primary' : 'btn-secondary'}`}
@@ -311,6 +384,161 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+      )}
+
+      {!loading && activeTab === 'wallet' && wallet && (
+        <>
+          <div className="stats-grid mb-8">
+            <div className="stat-card">
+              <div className="stat-card-label">Available to withdraw</div>
+              <div className="stat-card-value text-accent">${parseFloat(wallet.available_balance).toFixed(2)}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-label">Pending (in hold window)</div>
+              <div className="stat-card-value">${parseFloat(wallet.pending_balance).toFixed(2)}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-2 mb-8">
+            <div className="card">
+              <h3 className="mb-4">Withdraw funds</h3>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="form-label">Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-input"
+                    placeholder={`Full available balance ($${parseFloat(wallet.available_balance).toFixed(2)})`}
+                    value={withdrawAmount}
+                    onChange={e => setWithdrawAmount(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label">MoMo phone number</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. 25078xxxxxxx"
+                    value={withdrawPhone}
+                    onChange={e => setWithdrawPhone(e.target.value)}
+                  />
+                </div>
+                <button
+                  className="btn btn-primary"
+                  disabled={withdrawing || parseFloat(wallet.available_balance) <= 0}
+                  onClick={handleWithdraw}
+                >
+                  {withdrawing ? 'Processing…' : 'Request Withdrawal'}
+                </button>
+                {parseFloat(wallet.available_balance) <= 0 && (
+                  <p className="text-xs text-muted">No available balance yet — paid orders clear their hold window before they can be withdrawn.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="card">
+              <h3 className="mb-4">Payment settings</h3>
+              <div className="flex flex-col gap-3">
+                <div>
+                  <label className="form-label">Settlement mode</label>
+                  <select
+                    className="form-select"
+                    value={paymentSettings.settlementMode}
+                    onChange={e => setPaymentSettings(prev => ({ ...prev, settlementMode: e.target.value }))}
+                  >
+                    <option value="manual">Manual — I'll request withdrawals myself</option>
+                    <option value="auto">Automatic — pay out as soon as funds clear</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Default payout phone</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. 25078xxxxxxx"
+                    value={paymentSettings.payoutPhone}
+                    onChange={e => setPaymentSettings(prev => ({ ...prev, payoutPhone: e.target.value }))}
+                  />
+                </div>
+                <button className="btn btn-secondary" disabled={savingSettings} onClick={handleSaveSettings}>
+                  {savingSettings ? 'Saving…' : 'Save Settings'}
+                </button>
+                {paymentSettings.settlementMode === 'auto' && !paymentSettings.payoutPhone && (
+                  <p className="text-xs text-yellow-800">Automatic mode needs a default payout phone to actually pay out — add one above.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <h3 className="mb-4">Recent withdrawals</h3>
+            {withdrawals.length === 0 ? (
+              <div className="card text-center p-8 text-secondary">No withdrawals yet.</div>
+            ) : (
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Amount</th>
+                      <th>Phone</th>
+                      <th>Status</th>
+                      <th>Initiated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {withdrawals.map(w => (
+                      <tr key={w.id}>
+                        <td>{new Date(w.requested_at).toLocaleString()}</td>
+                        <td>${parseFloat(w.amount).toFixed(2)}</td>
+                        <td>{w.phone_number}</td>
+                        <td>
+                          <span className={`badge ${w.status === 'completed' ? 'badge-delivered' : w.status === 'failed' || w.status === 'rejected' ? 'badge-rejected' : 'badge-pending'}`}>
+                            {w.status}
+                          </span>
+                        </td>
+                        <td className="text-secondary text-sm">{w.initiated_by}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="mb-4">Ledger</h3>
+            {ledger.length === 0 ? (
+              <div className="card text-center p-8 text-secondary">No transactions yet.</div>
+            ) : (
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledger.map(entry => (
+                      <tr key={entry.id}>
+                        <td className="text-sm">{new Date(entry.created_at).toLocaleString()}</td>
+                        <td className="text-sm">{entry.entry_type.replace(/_/g, ' ')}</td>
+                        <td className={parseFloat(entry.amount) < 0 ? 'text-red-700' : ''}>
+                          {parseFloat(entry.amount) >= 0 ? '+' : ''}{parseFloat(entry.amount).toFixed(2)}
+                        </td>
+                        <td className="text-sm text-secondary">{entry.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {!loading && activeTab === 'menu' && (
