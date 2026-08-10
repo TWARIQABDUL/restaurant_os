@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import MenuManagement from '../components/MenuManagement';
 import StaffManagement from '../components/StaffManagement';
+import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
 
 const COLORS = ['#e8890c', '#2563eb', '#2d8a4e', '#c53030', '#8b5cf6'];
@@ -210,7 +211,13 @@ export default function AdminDashboard() {
             className={`btn ${activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('staff')}
           >
-            Staff Management
+            Staff
+          </button>
+          <button 
+            className={`btn ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('complaints')}
+          >
+            Complaints
           </button>
         </div>
       </div>
@@ -554,6 +561,10 @@ export default function AdminDashboard() {
 
       {!loading && activeTab === 'staff' && (
         <StaffManagement />
+      )}
+
+      {!loading && activeTab === 'complaints' && (
+        <ComplaintsManagement />
       )}
     </div>
   );

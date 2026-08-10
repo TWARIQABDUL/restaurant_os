@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { getSocket } from '../services/socket';
 import MenuManagement from '../components/MenuManagement';
+import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
 import { Clock, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -338,6 +339,12 @@ export default function ManagerDashboard() {
           >
             Menu Management
           </button>
+          <button 
+            className={`btn ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('complaints')}
+          >
+            Complaints
+          </button>
         </div>
       </div>
 
@@ -411,6 +418,10 @@ export default function ManagerDashboard() {
 
       {activeTab === 'menu' && (
         <MenuManagement />
+      )}
+
+      {activeTab === 'complaints' && (
+        <ComplaintsManagement />
       )}
     </div>
   );

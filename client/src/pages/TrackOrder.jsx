@@ -12,6 +12,12 @@ export default function TrackOrder() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Complaint State
+  const [showComplaintForm, setShowComplaintForm] = useState(false);
+  const [complaintType, setComplaintType] = useState('missing_item');
+  const [complaintDesc, setComplaintDesc] = useState('');
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
 
   const fetchOrder = async (code) => {
     if (!code) return;
@@ -89,6 +95,29 @@ export default function TrackOrder() {
     };
     return `badge ${map[status] || ''}`;
   };
+
+  const submitComplaint = async (e) => {
+    e.preventDefault();
+    if (!complaintDesc.trim()) return toast.error('Please provide a description');
+    
+    setSubmittingComplaint(true);
+    try {
+      await api.post('/complaints', {
+        tracking_code: order.tracking_code,
+        issue_type: complaintType,
+        description: complaintDesc
+      });
+      toast.success('Your issue has been reported. We will contact you soon.');
+      setShowComplaintForm(false);
+      setComplaintDesc('');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to submit complaint');
+    } finally {
+      setSubmittingComplaint(false);
+    }
+  };
+
+  const canComplain = order && ['delivered', 'ready', 'assigned'].includes(order.status);
 
   return (
     <div className="page" style={{ maxWidth: '600px', margin: '0 auto' }}>
@@ -171,10 +200,71 @@ export default function TrackOrder() {
             ))}
           </div>
           
-          <div className="flex justify-between items-center pt-4 border-t">
+          <div className="flex justify-between items-center pt-4 border-t mb-6">
             <span style={{ fontWeight: 600 }}>Total</span>
             <span style={{ fontWeight: 700 }}>${parseFloat(order.total_amount).toFixed(2)}</span>
           </div>
+
+          {canComplain && (
+            <div className="pt-4 border-t">
+              {!showComplaintForm ? (
+                <button 
+                  className="btn btn-secondary w-full"
+                  onClick={() => setShowComplaintForm(true)}
+                  style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
+                >
+                  Report an Issue with this Order
+                </button>
+              ) : (
+                <form onSubmit={submitComplaint} className="p-4 bg-red-50 rounded-lg border border-red-100">
+                  <h4 className="text-red-800 mb-3">Report an Issue</h4>
+                  <div className="mb-3">
+                    <label className="form-label text-red-900">Issue Type</label>
+                    <select 
+                      className="form-select" 
+                      value={complaintType}
+                      onChange={(e) => setComplaintType(e.target.value)}
+                    >
+                      <option value="missing_item">Missing Item</option>
+                      <option value="wrong_item">Wrong Item Received</option>
+                      <option value="late_delivery">Delivery is too late</option>
+                      <option value="quality_issue">Food Quality Issue</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div className="mb-3">
+                    <label className="form-label text-red-900">Description</label>
+                    <textarea 
+                      className="form-input" 
+                      rows="3"
+                      value={complaintDesc}
+                      onChange={(e) => setComplaintDesc(e.target.value)}
+                      placeholder="Please describe the issue..."
+                      required
+                    ></textarea>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setShowComplaintForm(false)}
+                      disabled={submittingComplaint}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary btn-sm"
+                      style={{ background: 'var(--color-error)' }}
+                      disabled={submittingComplaint}
+                    >
+                      {submittingComplaint ? 'Submitting...' : 'Submit Issue'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
