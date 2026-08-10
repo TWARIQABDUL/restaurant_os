@@ -17,7 +17,27 @@ router.get('/', authenticate, authorize('admin', 'manager'), async (req, res) =>
         status, 
         resolution_notes, 
         created_at,
-        orders ( id, tracking_code )
+        orders ( 
+          id, 
+          tracking_code,
+          total_amount,
+          payment_method,
+          payment_status,
+          status,
+          guest_name,
+          guest_phone,
+          customer:users!orders_customer_id_fkey ( phone ),
+          created_at,
+          order_items (
+            quantity,
+            unit_price,
+            menu_item:menu_items ( name ),
+            order_item_addons (
+              quantity,
+              add_on:add_ons ( name )
+            )
+          )
+        )
       `)
       .eq('tenant_id', req.tenant.id)
       .order('created_at', { ascending: false });
