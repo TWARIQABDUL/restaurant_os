@@ -216,6 +216,28 @@ router.get('/me', authenticate, async (req, res) => {
   res.json({ user: req.user });
 });
 
+// GET /api/auth/staff — Admin list staff members
+router.get('/staff', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { data: staff, error } = await supabase
+      .from('users')
+      .select('id, name, email, role, phone, plate_number, created_at')
+      .eq('tenant_id', req.tenant.id)
+      .in('role', ['admin', 'manager', 'delivery'])
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Fetch staff error:', error);
+      return res.status(500).json({ error: 'Failed to fetch staff members' });
+    }
+
+    res.json({ staff });
+  } catch (err) {
+    console.error('Fetch staff error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/auth/create-staff — Admin creates manager/delivery accounts
 router.post(
   '/create-staff',
