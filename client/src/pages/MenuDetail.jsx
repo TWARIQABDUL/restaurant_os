@@ -2,26 +2,39 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 export default function MenuDetail() {
   const { id, tenantSlug } = useParams();
   const navigate = useNavigate();
   const { addItem } = useCart();
+  const { user } = useAuth();
   
   const [item, setItem] = useState(null);
   const [availableAddOns, setAvailableAddOns] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // State for user selections
   const [quantity, setQuantity] = useState(1);
   const [selectedAddOns, setSelectedAddOns] = useState({});
 
+  // State for new review
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+
   useEffect(() => {
     async function fetchItem() {
       try {
-        const { data } = await api.get(`/menu/${id}`);
-        setItem(data.item);
-        setAvailableAddOns(data.addOns || []);
+        const [{ data: itemData }, { data: reviewsData }] = await Promise.all([
+          api.get(`/menu/${id}`),
+          api.get(`/reviews/menu/${id}`)
+        ]);
+        setItem(itemData.item);
+        setAvailableAddOns(itemData.addOns || []);
+        setReviews(reviewsData.reviews || []);
       } catch (err) {
         console.error('Failed to load item detail', err);
       } finally {
@@ -71,6 +84,27 @@ export default function MenuDetail() {
   const handleAddToCart = () => {
     addItem(item, quantity, Object.values(selectedAddOns));
     navigate(`/${tenantSlug}/cart`);
+  };
+
+  const submitReview = async (e) => {
+    e.preventDefault();
+    if (!user) return;
+    setSubmittingReview(true);
+    try {
+      const { data } = await api.post('/reviews', {
+        menu_item_id: id,
+        rating: reviewRating,
+        comment: reviewComment
+      });
+      setReviews(prev => [data.review, ...prev]);
+      setReviewRating(5);
+      setReviewComment('');
+      toast.success('Review submitted successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
   };
 
   if (loading) {
@@ -199,6 +233,82 @@ export default function MenuDetail() {
               Add to Cart • ${calculateTotal().toFixed(2)}
             </button>
           </div>
+        </div>
+      </div>
+
+      <div className="card mt-8">
+        <h3 className="mb-4">Customer Reviews</h3>
+        
+        {user ? (
+          <form onSubmit={submitReview} className="mb-8 p-4" style={{ background: 'var(--color-bg)', borderRadius: 'var(--radius-md)' }}>
+            <h4 className="mb-3">Leave a Review</h4>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="form-label">Rating</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '24px',
+                        cursor: 'pointer',
+                        color: star <= reviewRating ? 'var(--color-accent)' : 'var(--color-border)'
+                      }}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="form-label">Comment (Optional)</label>
+                <textarea 
+                  className="form-input" 
+                  rows="3"
+                  value={reviewComment}
+                  onChange={e => setReviewComment(e.target.value)}
+                  placeholder="What did you think about this item?"
+                ></textarea>
+              </div>
+              <div className="flex justify-end">
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={submittingReview}
+                >
+                  {submittingReview ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </div>
+            </div>
+          </form>
+        ) : (
+          <div className="mb-8 p-4 text-center" style={{ background: 'var(--color-bg)', borderRadius: 'var(--radius-md)' }}>
+            <p className="text-secondary mb-3">Log in to leave a review</p>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/${tenantSlug}/login`)}>Log In</button>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-4">
+          {reviews.length === 0 ? (
+            <p className="text-secondary text-center py-4">No reviews yet. Be the first to review this item!</p>
+          ) : (
+            reviews.map(review => (
+              <div key={review.id} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
+                <div className="flex justify-between items-center mb-2">
+                  <div className="font-bold">{review.users?.name || 'Anonymous'}</div>
+                  <div className="text-sm text-secondary">{new Date(review.created_at).toLocaleDateString()}</div>
+                </div>
+                <div className="mb-2" style={{ color: 'var(--color-accent)' }}>
+                  {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                </div>
+                {review.comment && <p className="text-secondary m-0">{review.comment}</p>}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

@@ -188,3 +188,20 @@ CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 
 CREATE POLICY "Allow Uploads" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'blog-images' );
 CREATE POLICY "Allow Updates" ON storage.objects FOR UPDATE USING ( bucket_id = 'blog-images' );
 CREATE POLICY "Allow Deletes" ON storage.objects FOR DELETE USING ( bucket_id = 'blog-images' );
+
+-- ============================================
+-- REVIEWS
+-- ============================================
+CREATE TABLE reviews (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  menu_item_id UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  comment TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_reviews_tenant ON reviews(tenant_id);
+CREATE INDEX idx_reviews_menu_item ON reviews(menu_item_id);
+CREATE INDEX idx_reviews_customer ON reviews(customer_id);

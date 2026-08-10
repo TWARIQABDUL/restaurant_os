@@ -13,6 +13,7 @@ const notificationsRoutes = require('./routes/notifications');
 const walletRoutes = require('./routes/wallet');
 const refundsRoutes = require('./routes/refunds');
 const momoWebhookRoutes = require('./routes/momoWebhook');
+const reviewsRoutes = require('./routes/reviews');
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use('/api/analytics', resolveTenant, analyticsRoutes);
 app.use('/api/notifications', resolveTenant, notificationsRoutes);
 app.use('/api/wallet', resolveTenant, walletRoutes);
 app.use('/api/refunds', resolveTenant, refundsRoutes);
+app.use('/api/reviews', resolveTenant, reviewsRoutes);
 
 // 404 handler
 app.use((req, res) => {
