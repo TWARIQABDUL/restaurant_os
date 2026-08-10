@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
 export default function ComplaintsManagement() {
+  const { user } = useAuth();
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState('all');
   
   const [resolvingId, setResolvingId] = useState(null);
   const [resolutionNotes, setResolutionNotes] = useState('');
+  
+  const [escalatingId, setEscalatingId] = useState(null);
+  const [escalationReason, setEscalationReason] = useState('');
+  
   const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
@@ -41,6 +48,27 @@ export default function ComplaintsManagement() {
     }
   };
 
+  const handleEscalate = async (id) => {
+    try {
+      await api.patch(`/complaints/${id}/escalate`, {
+        escalation_reason: escalationReason
+      });
+      toast.success('Complaint escalated to Admin');
+      setEscalatingId(null);
+      setEscalationReason('');
+      fetchComplaints();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to escalate complaint');
+    }
+  };
+
+  const filteredComplaints = complaints.filter(c => {
+    if (filterStatus === 'all') return true;
+    if (filterStatus === 'escalated') return c.is_escalated;
+    if (filterStatus === 'open') return c.status === 'open' && !c.is_escalated;
+    return c.status === filterStatus;
+  });
+
   if (loading && complaints.length === 0) {
     return <div className="text-center p-8">Loading complaints...</div>;
   }
@@ -48,7 +76,19 @@ export default function ComplaintsManagement() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex justify-between items-center">
-        <h2>Order Complaints</h2>
+        <div className="flex gap-4 items-center">
+          <h2>Order Complaints</h2>
+          <select 
+            className="form-input form-input-sm" 
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="all">All Complaints</option>
+            <option value="open">Open</option>
+            <option value="escalated">Escalated</option>
+            <option value="resolved">Resolved</option>
+          </select>
+        </div>
         <button className="btn btn-secondary" onClick={fetchComplaints}>Refresh</button>
       </div>
 
@@ -69,7 +109,7 @@ export default function ComplaintsManagement() {
                 </tr>
               </thead>
               <tbody>
-                {complaints.map((complaint) => (
+                {filteredComplaints.map((complaint) => (
                   <React.Fragment key={complaint.id}>
                     <tr style={{ background: expandedId === complaint.id ? 'var(--color-bg-alt)' : 'transparent', cursor: 'pointer' }} onClick={(e) => {
                       if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'TEXTAREA') {
@@ -96,15 +136,28 @@ export default function ComplaintsManagement() {
                         <span className={`badge ${complaint.status === 'resolved' ? 'badge-delivered' : 'badge-rejected'}`}>
                           {complaint.status}
                         </span>
+                        {complaint.is_escalated && (
+                          <span className="badge badge-rejected ml-2">Escalated</span>
+                        )}
                       </td>
                       <td>
-                        {complaint.status === 'open' && resolvingId !== complaint.id && (
-                          <button 
-                            className="btn btn-primary btn-sm"
-                            onClick={(e) => { e.stopPropagation(); setResolvingId(complaint.id); }}
-                          >
-                            Resolve
-                          </button>
+                        {complaint.status === 'open' && resolvingId !== complaint.id && escalatingId !== complaint.id && (
+                          <div className="flex gap-2">
+                            <button 
+                              className="btn btn-primary btn-sm"
+                              onClick={(e) => { e.stopPropagation(); setResolvingId(complaint.id); }}
+                            >
+                              Resolve
+                            </button>
+                            {user?.role === 'manager' && !complaint.is_escalated && (
+                              <button 
+                                className="btn btn-secondary btn-sm border-red-500 text-red-500 hover:bg-red-50"
+                                onClick={(e) => { e.stopPropagation(); setEscalatingId(complaint.id); }}
+                              >
+                                Escalate
+                              </button>
+                            )}
+                          </div>
                         )}
                         
                         {resolvingId === complaint.id && (
@@ -133,6 +186,37 @@ export default function ComplaintsManagement() {
                                 onClick={(e) => { e.stopPropagation(); handleResolve(complaint.id); }}
                               >
                                 Save
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {escalatingId === complaint.id && (
+                          <div className="flex flex-col gap-2 mt-2" style={{ minWidth: '200px' }}>
+                            <textarea
+                              className="form-input form-input-sm border-red-300 focus:border-red-500"
+                              rows="2"
+                              placeholder="Reason for escalation..."
+                              value={escalationReason}
+                              onChange={(e) => setEscalationReason(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                            ></textarea>
+                            <div className="flex gap-2">
+                              <button 
+                                className="btn btn-secondary btn-sm flex-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEscalatingId(null);
+                                  setEscalationReason('');
+                                }}
+                              >
+                                Cancel
+                              </button>
+                              <button 
+                                className="btn btn-primary btn-sm flex-1 bg-red-600 hover:bg-red-700 border-red-600"
+                                onClick={(e) => { e.stopPropagation(); handleEscalate(complaint.id); }}
+                              >
+                                Submit
                               </button>
                             </div>
                           </div>
@@ -269,6 +353,20 @@ export default function ComplaintsManagement() {
                                         {complaint.resolution_notes && (
                                           <div className="text-gray-700 bg-gray-50 p-2 rounded border mt-1">
                                             {complaint.resolution_notes}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {complaint.is_escalated && (
+                                    <div className="flex items-start gap-3 mt-4">
+                                      <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0"></div>
+                                      <div>
+                                        <div className="font-medium text-orange-700 mb-1">Escalated to Admin</div>
+                                        {complaint.escalation_reason && (
+                                          <div className="text-gray-700 bg-orange-50 p-2 rounded border border-orange-200 mt-1">
+                                            <strong>Reason:</strong> {complaint.escalation_reason}
                                           </div>
                                         )}
                                       </div>

@@ -216,6 +216,8 @@ CREATE TABLE complaints (
   issue_type VARCHAR(50) NOT NULL,
   description TEXT NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'rejected')),
+  is_escalated BOOLEAN DEFAULT FALSE,
+  escalation_reason TEXT,
   resolution_notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

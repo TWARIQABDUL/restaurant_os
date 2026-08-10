@@ -1,0 +1,2 @@
+ALTER TABLE complaints ADD COLUMN IF NOT EXISTS is_escalated BOOLEAN DEFAULT FALSE;
+ALTER TABLE complaints ADD COLUMN IF NOT EXISTS escalation_reason TEXT;

@@ -15,6 +15,8 @@ router.get('/', authenticate, authorize('admin', 'manager'), async (req, res) =>
         issue_type, 
         description, 
         status, 
+        is_escalated,
+        escalation_reason,
         resolution_notes, 
         created_at,
         orders ( 
@@ -151,6 +153,50 @@ router.patch(
       res.json({ complaint });
     } catch (err) {
       console.error('Resolve complaint error:', err.message);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// PATCH /api/complaints/:id/escalate — Manager escalates a complaint
+router.patch(
+  '/:id/escalate',
+  authenticate,
+  authorize('manager'),
+  [
+    body('escalation_reason').notEmpty().withMessage('Reason is required to escalate'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { id } = req.params;
+      const { escalation_reason } = req.body;
+      const tenantId = req.tenant.id;
+
+      const { data: complaint, error } = await supabase
+        .from('complaints')
+        .update({
+          is_escalated: true,
+          escalation_reason: escalation_reason,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Escalate complaint error:', error);
+        return res.status(500).json({ error: 'Failed to escalate complaint' });
+      }
+
+      res.json({ complaint });
+    } catch (err) {
+      console.error('Escalate complaint error:', err.message);
       res.status(500).json({ error: 'Internal server error' });
     }
   }
