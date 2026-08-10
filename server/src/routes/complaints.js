@@ -27,6 +27,9 @@ router.get('/', authenticate, authorize('admin', 'manager'), async (req, res) =>
           guest_name,
           guest_phone,
           customer:users!orders_customer_id_fkey ( phone ),
+          delivery_type,
+          external_rider_info,
+          delivery_person:users!orders_delivery_person_id_fkey ( name, phone ),
           created_at,
           order_items (
             quantity,

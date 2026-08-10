@@ -171,6 +171,47 @@ export default function ComplaintsManagement() {
                                   </div>
                                 </div>
 
+                                {(complaint.orders?.status === 'assigned' || complaint.orders?.status === 'delivered') && (() => {
+                                  let externalRider = complaint.orders?.external_rider_info;
+                                  if (typeof externalRider === 'string') {
+                                    try { externalRider = JSON.parse(externalRider); } catch(e) {}
+                                  }
+                                  
+                                  return (
+                                    <>
+                                      <h5 className="mb-2 mt-4 text-secondary">Delivery Information</h5>
+                                      <div className="bg-white p-4 rounded border text-sm">
+                                        <div className="flex justify-between mb-2">
+                                          <span className="text-secondary">Type:</span>
+                                          <span style={{ textTransform: 'capitalize' }}>{complaint.orders?.delivery_type || 'Internal'}</span>
+                                        </div>
+                                        <div className="flex justify-between mb-2">
+                                          <span className="text-secondary">Driver Name:</span>
+                                          <span>
+                                            {complaint.orders?.delivery_type === 'external' 
+                                              ? externalRider?.name || 'N/A'
+                                              : complaint.orders?.delivery_person?.name || 'N/A'}
+                                          </span>
+                                        </div>
+                                        <div className="flex justify-between mb-2">
+                                          <span className="text-secondary">Driver Phone:</span>
+                                          <span>
+                                            {complaint.orders?.delivery_type === 'external' 
+                                              ? externalRider?.phone || 'N/A'
+                                              : complaint.orders?.delivery_person?.phone || 'N/A'}
+                                          </span>
+                                        </div>
+                                        {complaint.orders?.delivery_type === 'external' && externalRider?.plateNumber && (
+                                          <div className="flex justify-between mb-2">
+                                            <span className="text-secondary">Plate Number:</span>
+                                            <span>{externalRider.plateNumber}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </>
+                                  );
+                                })()}
+
                                 <h5 className="mb-2 mt-4 text-secondary">Payment Information</h5>
                                 <div className="bg-white p-4 rounded border text-sm">
                                   <div className="flex justify-between mb-2">
