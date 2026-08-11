@@ -63,6 +63,7 @@ router.get('/', authenticate, authorize('admin', 'manager'), async (req, res) =>
 // POST /api/complaints — Customer submits a complaint via tracking code
 router.post(
   '/',
+  authenticate,
   [
     body('tracking_code').notEmpty().withMessage('Tracking code is required'),
     body('issue_type').notEmpty().withMessage('Issue type is required'),
@@ -77,17 +78,22 @@ router.post(
 
       const { tracking_code, issue_type, description } = req.body;
       const tenantId = req.tenant.id;
+      const userId = req.user.id;
 
-      // Verify the order exists and belongs to this tenant
+      // Verify the order exists, belongs to this tenant, and belongs to this user
       const { data: order } = await supabase
         .from('orders')
-        .select('id, status')
+        .select('id, status, customer_id')
         .eq('tracking_code', tracking_code)
         .eq('tenant_id', tenantId)
         .single();
 
       if (!order) {
         return res.status(404).json({ error: 'Order not found' });
+      }
+      
+      if (order.customer_id !== userId) {
+        return res.status(403).json({ error: 'You are not authorized to report an issue for this order' });
       }
 
       // Check if order is eligible for complaints (delivered, ready, assigned)

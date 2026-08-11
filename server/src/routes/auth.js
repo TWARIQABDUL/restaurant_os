@@ -58,6 +58,16 @@ router.post(
         return res.status(500).json({ error: 'Registration failed' });
       }
 
+      // Link any previous guest orders placed with this phone number to the new account
+      if (phone) {
+        await supabase
+          .from('orders')
+          .update({ customer_id: user.id })
+          .eq('tenant_id', tenantId)
+          .eq('guest_phone', phone)
+          .is('customer_id', null);
+      }
+
       const token = jwt.sign(
         { userId: user.id, tenantId, role: user.role },
         process.env.JWT_SECRET,

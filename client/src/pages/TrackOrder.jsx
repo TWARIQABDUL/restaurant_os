@@ -1,17 +1,22 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { getSocket } from '../services/socket';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 export default function TrackOrder() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialCode = searchParams.get('code') || '';
   
   const [trackingCode, setTrackingCode] = useState(initialCode);
+  const [phone, setPhone] = useState('');
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [requireLogin, setRequireLogin] = useState(false);
   
   // Complaint State
   const [showComplaintForm, setShowComplaintForm] = useState(false);
@@ -23,8 +28,11 @@ export default function TrackOrder() {
     if (!code) return;
     setLoading(true);
     setError(null);
+    setRequireLogin(false);
     try {
-      const { data } = await api.get(`/orders/track/${code}`);
+      const { data } = await api.get(`/orders/track/${code}`, {
+        params: { phone }
+      });
       setOrder(data.order);
       
       // Join tracking room via socket
@@ -33,7 +41,12 @@ export default function TrackOrder() {
         socket.emit('trackOrder', code);
       }
     } catch (err) {
-      setError('Order not found. Please check your tracking code.');
+      if (err.response?.data?.requireLogin) {
+        setRequireLogin(true);
+        setError(err.response.data.error);
+      } else {
+        setError(err.response?.data?.error || 'Order not found. Please check your tracking code.');
+      }
       setOrder(null);
     } finally {
       setLoading(false);
@@ -134,21 +147,49 @@ export default function TrackOrder() {
     <div className="page" style={{ maxWidth: '600px', margin: '0 auto' }}>
       <h1 className="text-center mb-6">Track Your Order</h1>
 
-      <form onSubmit={handleSubmit} className="flex gap-2 mb-8">
-        <input 
-          type="text" 
-          className="form-input flex-1" 
-          placeholder="Enter Tracking Code (e.g. ORD-12345)" 
-          value={trackingCode}
-          onChange={(e) => setTrackingCode(e.target.value)}
-          required
-        />
-        <button type="submit" className="btn btn-primary" disabled={loading}>
-          {loading ? 'Searching...' : 'Track'}
-        </button>
+      <form onSubmit={handleSubmit} className="mb-8 p-6 bg-white border rounded-lg shadow-sm">
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="form-label">Tracking Code</label>
+            <input 
+              type="text" 
+              className="form-input w-full" 
+              placeholder="e.g. ORD-12345" 
+              value={trackingCode}
+              onChange={(e) => setTrackingCode(e.target.value)}
+              required
+            />
+          </div>
+          
+          {!user && (
+            <div>
+              <label className="form-label">Phone Number <span className="text-muted text-xs font-normal">(Used for verification)</span></label>
+              <input 
+                type="tel" 
+                className="form-input w-full" 
+                placeholder="e.g. 078XXXXXXX" 
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+          )}
+
+          <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+            {loading ? 'Searching...' : 'Track Order'}
+          </button>
+        </div>
       </form>
 
-      {error && <div className="form-error text-center p-4 bg-red-50 text-red-700 rounded mb-6">{error}</div>}
+      {error && (
+        <div className="form-error text-center p-4 bg-red-50 text-red-700 rounded mb-6 flex flex-col items-center gap-3">
+          <p>{error}</p>
+          {requireLogin && (
+            <Link to={`/login?redirect=/track?code=${trackingCode}`} className="btn btn-primary">
+              Log In to Track Order
+            </Link>
+          )}
+        </div>
+      )}
 
       {order && (
         <div className="card">
@@ -218,7 +259,17 @@ export default function TrackOrder() {
 
           {canComplain && (
             <div className="pt-4 border-t">
-              {!showComplaintForm ? (
+              {!user ? (
+                <div className="p-4 bg-orange-50 rounded-lg border border-orange-100 text-center">
+                  <p className="text-orange-800 mb-3 text-sm">You must be a registered user to report an issue with this order.</p>
+                  <Link 
+                    to={`/register?phone=${order.guest_phone || ''}`} 
+                    className="btn btn-primary"
+                  >
+                    Register to Report an Issue
+                  </Link>
+                </div>
+              ) : !showComplaintForm ? (
                 <button 
                   className="btn btn-secondary w-full"
                   onClick={() => setShowComplaintForm(true)}

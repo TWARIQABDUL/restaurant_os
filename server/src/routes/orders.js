@@ -271,16 +271,17 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/orders/track/:code — Track order by code (public)
-router.get('/track/:code', async (req, res) => {
+// GET /api/orders/track/:code — Track order by code (public but secured)
+router.get('/track/:code', optionalAuth, async (req, res) => {
   try {
     const { code } = req.params;
+    const { phone } = req.query;
     const tenantId = req.tenant.id;
 
     const { data: order, error } = await supabase
       .from('orders')
       .select(`
-        id, tracking_code, status, total_amount, payment_method, payment_status,
+        id, tracking_code, status, total_amount, payment_method, payment_status, customer_id, guest_phone,
         guest_name, created_at, updated_at, delivery_type, external_rider_info,
         order_items (
           *,
@@ -299,6 +300,27 @@ router.get('/track/:code', async (req, res) => {
 
     if (error || !order) {
       return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Security Verification
+    const isStaff = req.user && ['admin', 'manager', 'kitchen', 'delivery'].includes(req.user.role);
+    
+    if (!isStaff) {
+      if (order.customer_id) {
+        if (!req.user || req.user.id !== order.customer_id) {
+          return res.status(401).json({ 
+            error: 'This order belongs to a registered account. Please log in to track it.',
+            requireLogin: true 
+          });
+        }
+      } else {
+        if (!phone || phone !== order.guest_phone) {
+          return res.status(403).json({ 
+            error: 'Please provide the correct phone number used for this guest order.',
+            requirePhone: true 
+          });
+        }
+      }
     }
 
     res.json({ order });

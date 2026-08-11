@@ -1,16 +1,17 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    phone: ''
+    phone: searchParams.get('phone') || ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
