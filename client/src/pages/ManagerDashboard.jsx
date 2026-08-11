@@ -321,10 +321,32 @@ export default function ManagerDashboard() {
 
   return (
     <div className="page">
-      <div className="flex justify-between items-center mb-8" style={{ flexWrap: 'wrap', gap: 'var(--space-4)' }}>
+      <div className="flex justify-between items-start mb-8" style={{ flexWrap: 'wrap', gap: 'var(--space-4)' }}>
         <div>
           <h1>Manager Dashboard</h1>
-          <p className="text-secondary">Welcome, {user.name}</p>
+          <p className="text-secondary mb-3">Welcome, {user.name}</p>
+          
+          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm">
+            <span className="font-medium">Storefront Link:</span>
+            <a 
+              href={`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`} 
+              target="_blank" 
+              rel="noreferrer"
+              className="text-blue-600 hover:underline hover:text-blue-800"
+            >
+              {`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`}
+            </a>
+            <button 
+              className="ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors"
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`);
+                toast.success('Storefront link copied!');
+              }}
+              title="Copy Link"
+            >
+              📋
+            </button>
+          </div>
         </div>
         <div className="flex gap-2">
           <button
