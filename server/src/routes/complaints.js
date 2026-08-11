@@ -17,6 +17,7 @@ router.get('/', authenticate, authorize('admin', 'manager'), async (req, res) =>
         status, 
         is_escalated,
         escalation_reason,
+        refunded_amount,
         resolution_notes, 
         created_at,
         orders ( 
@@ -197,6 +198,174 @@ router.patch(
       res.json({ complaint });
     } catch (err) {
       console.error('Escalate complaint error:', err.message);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// PATCH /api/complaints/:id/approve-refund — Admin approves refund for an escalated complaint
+router.patch(
+  '/:id/approve-refund',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('amount').optional().isFloat({ min: 0 }),
+    body('resolution_notes').optional().isString()
+  ],
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { amount, resolution_notes } = req.body;
+      const tenantId = req.tenant.id;
+
+      // 1. Fetch complaint and verify it is escalated and open
+      const { data: complaint, error: fetchErr } = await supabase
+        .from('complaints')
+        .select('*, order:orders(id, total_amount)')
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (fetchErr || !complaint) return res.status(404).json({ error: 'Complaint not found' });
+      if (!complaint.is_escalated || complaint.status !== 'open') {
+        return res.status(400).json({ error: 'Complaint is not open and escalated' });
+      }
+
+      const refundAmount = amount !== undefined ? amount : complaint.order.total_amount;
+      const finalNotes = resolution_notes || `Refund of ${refundAmount} approved by Admin.`;
+
+      // 2. Create Refund Request
+      const { data: refundRequest, error: reqErr } = await supabase
+        .from('refund_requests')
+        .insert({
+          order_id: complaint.order.id,
+          requested_by: req.user.id,
+          reason: `Escalated complaint ${id}: ${finalNotes}`,
+          amount: refundAmount
+        })
+        .select('*')
+        .single();
+
+      if (reqErr) {
+        console.error('Failed to create refund request:', reqErr);
+        return res.status(500).json({ error: 'Failed to create refund request' });
+      }
+
+      // 3. Trigger wallet deduction and MoMo payout
+      const walletService = require('../services/walletService');
+      try {
+        await walletService.approveRefund({ 
+          refundRequestId: refundRequest.id, 
+          reviewerUserId: req.user.id 
+        });
+      } catch (refundErr) {
+        console.error('Wallet deduction/payout failed:', refundErr.message);
+        return res.status(400).json({ error: refundErr.message });
+      }
+
+      // 4. Mark complaint as resolved
+      const { data: updatedComplaint, error: updateErr } = await supabase
+        .from('complaints')
+        .update({
+          status: 'resolved',
+          refunded_amount: refundAmount,
+          resolution_notes: finalNotes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateErr) return res.status(500).json({ error: 'Failed to update complaint status' });
+
+      res.json({ complaint: updatedComplaint });
+    } catch (err) {
+      console.error('Approve refund error:', err.message);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// PATCH /api/complaints/:id/reject-escalation — Admin rejects an escalated complaint
+router.patch(
+  '/:id/reject-escalation',
+  authenticate,
+  authorize('admin', 'super_admin'),
+  [
+    body('resolution_notes').notEmpty().withMessage('Reason is required to reject')
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+      const { id } = req.params;
+      const { resolution_notes } = req.body;
+      const tenantId = req.tenant.id;
+
+      const { data: complaint, error } = await supabase
+        .from('complaints')
+        .update({
+          status: 'rejected',
+          resolution_notes: resolution_notes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .eq('is_escalated', true)
+        .select()
+        .single();
+
+      if (error) return res.status(500).json({ error: 'Failed to reject complaint' });
+
+      res.json({ complaint });
+    } catch (err) {
+      console.error('Reject escalation error:', err.message);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// PATCH /api/complaints/:id/reopen — Customer reopens a rejected complaint
+router.patch(
+  '/:id/reopen',
+  authenticate,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const tenantId = req.tenant.id;
+
+      const { data: complaint, error: fetchErr } = await supabase
+        .from('complaints')
+        .select('*')
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .single();
+
+      if (fetchErr || !complaint) return res.status(404).json({ error: 'Complaint not found' });
+      
+      // Can't reopen if it was refunded
+      if (complaint.refunded_amount > 0) {
+        return res.status(400).json({ error: 'Cannot reopen a complaint that was resolved with a refund' });
+      }
+
+      const { data: updatedComplaint, error } = await supabase
+        .from('complaints')
+        .update({
+          status: 'open',
+          is_escalated: false, // reset escalation so manager can review again
+          resolution_notes: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) return res.status(500).json({ error: 'Failed to reopen complaint' });
+
+      res.json({ complaint: updatedComplaint });
+    } catch (err) {
+      console.error('Reopen complaint error:', err.message);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

@@ -290,7 +290,8 @@ router.get('/track/:code', async (req, res) => {
             add_on:add_ons ( id, name )
           )
         ),
-        delivery_person:users!orders_delivery_person_id_fkey ( name, phone, plate_number )
+        delivery_person:users!orders_delivery_person_id_fkey ( name, phone, plate_number ),
+        complaints ( * )
       `)
       .eq('tracking_code', code.toUpperCase())
       .eq('tenant_id', tenantId)

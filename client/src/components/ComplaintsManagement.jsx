@@ -15,6 +15,11 @@ export default function ComplaintsManagement() {
   const [escalatingId, setEscalatingId] = useState(null);
   const [escalationReason, setEscalationReason] = useState('');
   
+  const [adminActionId, setAdminActionId] = useState(null);
+  const [adminActionType, setAdminActionType] = useState(null); // 'approve' or 'reject'
+  const [adminAmount, setAdminAmount] = useState('');
+  const [adminNotes, setAdminNotes] = useState('');
+  
   const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
@@ -59,6 +64,29 @@ export default function ComplaintsManagement() {
       fetchComplaints();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to escalate complaint');
+    }
+  };
+
+  const handleAdminAction = async (id) => {
+    try {
+      if (adminActionType === 'approve') {
+        await api.patch(`/complaints/${id}/approve-refund`, {
+          amount: adminAmount ? parseFloat(adminAmount) : undefined,
+          resolution_notes: adminNotes
+        });
+        toast.success('Refund approved and initiated successfully!');
+      } else {
+        await api.patch(`/complaints/${id}/reject-escalation`, {
+          resolution_notes: adminNotes
+        });
+        toast.success('Escalation rejected successfully!');
+      }
+      setAdminActionId(null);
+      setAdminNotes('');
+      setAdminAmount('');
+      fetchComplaints();
+    } catch (err) {
+      toast.error(err.response?.data?.error || `Failed to ${adminActionType} escalation`);
     }
   };
 
@@ -160,6 +188,32 @@ export default function ComplaintsManagement() {
                           </div>
                         )}
                         
+                        {complaint.is_escalated && complaint.status === 'open' && adminActionId !== complaint.id && (user?.role === 'admin' || user?.role === 'super_admin') && (
+                          <div className="flex gap-2">
+                            <button 
+                              className="btn btn-primary btn-sm bg-green-600 hover:bg-green-700 border-green-600"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setAdminActionId(complaint.id);
+                                setAdminActionType('approve');
+                                setAdminAmount(complaint.order?.total_amount || '');
+                              }}
+                            >
+                              Approve Refund
+                            </button>
+                            <button 
+                              className="btn btn-secondary btn-sm border-red-500 text-red-500 hover:bg-red-50"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setAdminActionId(complaint.id);
+                                setAdminActionType('reject');
+                              }}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                        
                         {resolvingId === complaint.id && (
                           <div className="flex flex-col gap-2 mt-2" style={{ minWidth: '200px' }}>
                             <textarea
@@ -217,6 +271,50 @@ export default function ComplaintsManagement() {
                                 onClick={(e) => { e.stopPropagation(); handleEscalate(complaint.id); }}
                               >
                                 Submit
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {adminActionId === complaint.id && (
+                          <div className="flex flex-col gap-2 mt-2" style={{ minWidth: '220px' }}>
+                            {adminActionType === 'approve' && (
+                              <div className="mb-1">
+                                <label className="text-xs text-secondary mb-1 block">Refund Amount</label>
+                                <input
+                                  type="number"
+                                  className="form-input form-input-sm"
+                                  placeholder={`Max: ${complaint.order?.total_amount}`}
+                                  value={adminAmount}
+                                  onChange={(e) => setAdminAmount(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                            )}
+                            <textarea
+                              className="form-input form-input-sm"
+                              rows="2"
+                              placeholder={adminActionType === 'approve' ? "Optional approval notes..." : "Reason for rejection..."}
+                              value={adminNotes}
+                              onChange={(e) => setAdminNotes(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                            ></textarea>
+                            <div className="flex gap-2">
+                              <button 
+                                className="btn btn-secondary btn-sm flex-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setAdminActionId(null);
+                                  setAdminNotes('');
+                                }}
+                              >
+                                Cancel
+                              </button>
+                              <button 
+                                className={`btn btn-primary btn-sm flex-1 ${adminActionType === 'reject' ? 'bg-red-600 hover:bg-red-700 border-red-600' : 'bg-green-600 hover:bg-green-700 border-green-600'}`}
+                                onClick={(e) => { e.stopPropagation(); handleAdminAction(complaint.id); }}
+                              >
+                                Confirm
                               </button>
                             </div>
                           </div>
@@ -349,7 +447,13 @@ export default function ComplaintsManagement() {
                                       <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></div>
                                       <div>
                                         <div className="text-secondary text-xs mb-1">{new Date(complaint.updated_at).toLocaleString()}</div>
-                                        <div className="font-medium text-green-700 mb-1">Resolved</div>
+                                        {complaint.status === 'resolved' ? (
+                                          <div className="font-medium text-green-700 mb-1">
+                                            {complaint.refunded_amount > 0 ? `Resolved (Refunded: $${complaint.refunded_amount})` : 'Resolved'}
+                                          </div>
+                                        ) : (
+                                          <div className="font-medium text-red-700 mb-1">Rejected</div>
+                                        )}
                                         {complaint.resolution_notes && (
                                           <div className="text-gray-700 bg-gray-50 p-2 rounded border mt-1">
                                             {complaint.resolution_notes}

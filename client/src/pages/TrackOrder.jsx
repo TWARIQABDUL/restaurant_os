@@ -110,10 +110,21 @@ export default function TrackOrder() {
       toast.success('Your issue has been reported. We will contact you soon.');
       setShowComplaintForm(false);
       setComplaintDesc('');
+      fetchOrder(trackingCode);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to submit complaint');
     } finally {
       setSubmittingComplaint(false);
+    }
+  };
+
+  const handleReopen = async (complaintId) => {
+    try {
+      await api.patch(`/complaints/${complaintId}/reopen`);
+      toast.success('Complaint reopened successfully.');
+      fetchOrder(trackingCode);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to reopen complaint');
     }
   };
 
@@ -263,6 +274,46 @@ export default function TrackOrder() {
                   </div>
                 </form>
               )}
+            </div>
+          )}
+          
+          {/* List existing complaints */}
+          {order.complaints && order.complaints.length > 0 && (
+            <div className="mt-6 pt-6 border-t">
+              <h4 className="mb-4">Your Reported Issues</h4>
+              <div className="flex flex-col gap-3">
+                {order.complaints.map(complaint => (
+                  <div key={complaint.id} className="p-4 bg-gray-50 rounded-lg border">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="font-medium text-sm capitalize">{complaint.issue_type.replace('_', ' ')}</span>
+                      <span className={`badge ${complaint.status === 'resolved' ? 'badge-delivered' : (complaint.status === 'rejected' ? 'badge-rejected' : 'badge-pending')}`}>
+                        {complaint.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-secondary mb-3">{complaint.description}</p>
+                    
+                    {complaint.status === 'rejected' && complaint.refunded_amount === 0 && (
+                      <div className="bg-red-50 p-3 rounded mt-2 border border-red-100">
+                        <p className="text-xs text-red-800 mb-2"><strong>Decision:</strong> {complaint.resolution_notes || 'Rejected by management.'}</p>
+                        <button 
+                          onClick={() => handleReopen(complaint.id)}
+                          className="btn btn-sm btn-primary bg-red-600 hover:bg-red-700 border-red-600"
+                        >
+                          I disagree, Reopen Complaint
+                        </button>
+                      </div>
+                    )}
+                    
+                    {complaint.status === 'resolved' && (
+                      <div className="bg-green-50 p-3 rounded mt-2 border border-green-100">
+                        <p className="text-xs text-green-800">
+                          <strong>Resolved:</strong> {complaint.resolution_notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
