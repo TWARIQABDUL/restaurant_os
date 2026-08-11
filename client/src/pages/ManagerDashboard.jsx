@@ -6,7 +6,7 @@ import { getSocket } from '../services/socket';
 import MenuManagement from '../components/MenuManagement';
 import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
-import { Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { Clock, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 
 const COLUMNS = [
   { key: 'pending', label: 'Pending', statuses: ['pending'] },
@@ -344,7 +344,7 @@ export default function ManagerDashboard() {
               }}
               title="Copy Link"
             >
-              📋
+              <Copy size={16} />
             </button>
           </div>
         </div>

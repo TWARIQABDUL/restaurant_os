@@ -10,6 +10,7 @@ import MenuManagement from '../components/MenuManagement';
 import StaffManagement from '../components/StaffManagement';
 import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
+import { Copy } from 'lucide-react';
 
 const COLORS = ['#e8890c', '#2563eb', '#2d8a4e', '#c53030', '#8b5cf6'];
 
@@ -200,7 +201,7 @@ export default function AdminDashboard() {
               }}
               title="Copy Link"
             >
-              📋
+              <Copy size={16} />
             </button>
           </div>
         </div>
