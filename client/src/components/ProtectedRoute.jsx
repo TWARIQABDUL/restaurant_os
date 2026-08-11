@@ -18,7 +18,8 @@ export default function ProtectedRoute({ children, roles }) {
   }
 
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+    const slug = localStorage.getItem('tenantSlug');
+    return <Navigate to={slug ? `/${slug}` : "/"} replace />;
   }
 
   return children;
