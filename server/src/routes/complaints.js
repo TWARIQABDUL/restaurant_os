@@ -221,7 +221,7 @@ router.patch(
       // 1. Fetch complaint and verify it is escalated and open
       const { data: complaint, error: fetchErr } = await supabase
         .from('complaints')
-        .select('*, order:orders(id, total_amount)')
+        .select('*, order:orders(id, total_amount, payment_status)')
         .eq('id', id)
         .eq('tenant_id', tenantId)
         .single();
@@ -229,6 +229,9 @@ router.patch(
       if (fetchErr || !complaint) return res.status(404).json({ error: 'Complaint not found' });
       if (!complaint.is_escalated || complaint.status !== 'open') {
         return res.status(400).json({ error: 'Complaint is not open and escalated' });
+      }
+      if (complaint.order.payment_status !== 'paid') {
+        return res.status(400).json({ error: 'Cannot refund an order that has not been paid' });
       }
 
       const refundAmount = amount !== undefined ? amount : complaint.order.total_amount;
