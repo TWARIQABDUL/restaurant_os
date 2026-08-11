@@ -1,9 +1,22 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 
 const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
-  const getCartKey = () => `restaurant_os_cart_${localStorage.getItem('tenantSlug') || 'default'}`;
+  const location = useLocation();
+  
+  const getTenantSlug = () => {
+    const pathParts = location.pathname.split('/').filter(Boolean);
+    const globalRoutes = ['login', 'register', 'manager', 'admin', 'delivery', 'super-admin'];
+    
+    if (pathParts.length > 0 && !globalRoutes.includes(pathParts[0]) && !pathParts[0].includes('.')) {
+      return pathParts[0];
+    }
+    return localStorage.getItem('tenantSlug') || 'default';
+  };
+
+  const getCartKey = () => `restaurant_os_cart_${getTenantSlug()}`;
 
   const [items, setItems] = useState(() => {
     try {
@@ -14,6 +27,17 @@ export function CartProvider({ children }) {
     }
   });
 
+  // Track route changes to detect if the user switched to a different restaurant
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(getCartKey());
+      setItems(saved ? JSON.parse(saved) : []);
+    } catch (e) {
+      setItems([]);
+    }
+  }, [location.pathname]);
+
+  // Save to localStorage whenever items change
   useEffect(() => {
     localStorage.setItem(getCartKey(), JSON.stringify(items));
   }, [items]);
