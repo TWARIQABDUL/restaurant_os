@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { getSocket } from '../services/socket';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
 export default function TrackOrder() {
+  const { tenantSlug } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -184,7 +185,7 @@ export default function TrackOrder() {
         <div className="form-error text-center p-4 bg-red-50 text-red-700 rounded mb-6 flex flex-col items-center gap-3">
           <p>{error}</p>
           {requireLogin && (
-            <Link to={`/login?redirect=/track?code=${trackingCode}`} className="btn btn-primary">
+            <Link to={`/login?redirect=/${tenantSlug}/track?code=${trackingCode}`} className="btn btn-primary">
               Log In to Track Order
             </Link>
           )}

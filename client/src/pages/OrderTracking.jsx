@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { getSocket } from '../services/socket';
 import toast from 'react-hot-toast';
 
 export default function OrderTracking() {
+  const { tenantSlug } = useParams();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -97,7 +98,7 @@ export default function OrderTracking() {
               </div>
               <div className="flex flex-col items-end gap-2">
                 <span className={getStatusBadge(order.status)}>{order.status}</span>
-                <Link to={`/track?code=${order.tracking_code}`} className="text-xs text-accent underline">
+                <Link to={`/${tenantSlug}/track?code=${order.tracking_code}`} className="text-xs text-accent underline">
                   Live Track
                 </Link>
               </div>
