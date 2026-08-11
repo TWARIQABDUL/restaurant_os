@@ -194,7 +194,7 @@ export default function AdminDashboard() {
               {`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`}
             </a>
             <button 
-              className="ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors"
+              className="icon-btn ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors"
               onClick={() => {
                 navigator.clipboard.writeText(`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`);
                 toast.success('Storefront link copied!');

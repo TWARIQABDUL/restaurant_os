@@ -249,6 +249,21 @@ h4 { font-size: var(--font-size-lg); font-weight: 600; }
   border-color: var(--color-text-muted);
 }
 
+.icon-btn {
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: inherit;
+}
+.icon-btn:focus {
+  outline: none;
+}
+
 .btn-danger {
   background: var(--color-error);
   color: var(--color-text-inverse);
