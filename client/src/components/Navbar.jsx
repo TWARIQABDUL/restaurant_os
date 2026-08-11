@@ -113,11 +113,25 @@ export default function Navbar() {
   const getPath = (path) => currentSlug ? `/${currentSlug}${path}` : path;
   const basePath = currentSlug ? `/${currentSlug}` : '/';
 
+  // Helper to format slug into a readable brand name
+  const formatBrandName = (slug) => {
+    // If they are visiting a specific storefront, format its slug
+    if (slug) {
+      return slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    }
+    // If they are on a global route (like /admin or /manager) but belong to a restaurant, format their tenant slug
+    if (user && user.tenants && user.tenants.slug) {
+      return user.tenants.slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    }
+    // Otherwise fallback to the SaaS brand
+    return <><span style={{ color: 'var(--color-text)' }}>Restaurant</span><span style={{ color: 'var(--color-accent)' }}>OS</span></>;
+  };
+
   return (
     <nav className="navbar">
       <div className="navbar-inner">
-        <Link to={basePath} className="navbar-brand">
-          Restaurant<span>OS</span>
+        <Link to={basePath} className="navbar-brand" style={{ color: 'var(--color-accent)' }}>
+          {formatBrandName(currentSlug)}
         </Link>
 
         <button

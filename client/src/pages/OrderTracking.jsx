@@ -79,7 +79,7 @@ export default function OrderTracking() {
         <div style={{ fontSize: '48px', marginBottom: '16px' }}>📦</div>
         <h3>No Orders Yet</h3>
         <p className="mb-6">You haven't placed any orders with us yet.</p>
-        <Link to="/" className="btn btn-primary">Start Ordering</Link>
+        <Link to={`/${tenantSlug}`} className="btn btn-primary">Start Ordering</Link>
       </div>
     );
   }

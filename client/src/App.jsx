@@ -41,7 +41,7 @@ function App() {
           <Route 
             path="/:tenantSlug/orders" 
             element={
-              <ProtectedRoute roles={['customer']}>
+              <ProtectedRoute>
                 <OrderTracking />
               </ProtectedRoute>
             } 

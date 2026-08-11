@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect');
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,8 +19,10 @@ export default function Login() {
     setError(null);
     try {
       const user = await login(email, password);
-      // Redirect based on role
-      if (user.role === 'admin') navigate('/admin');
+      // Redirect based on role or URL param
+      if (redirect) {
+        navigate(redirect);
+      } else if (user.role === 'admin') navigate('/admin');
       else if (user.role === 'manager') navigate('/manager');
       else if (user.role === 'delivery') navigate('/delivery');
       else if (user.role === 'super_admin') navigate('/super-admin');
@@ -72,7 +76,7 @@ export default function Login() {
         </form>
 
         <p className="text-center text-sm text-secondary">
-          Don't have an account? <Link to="/register" style={{ fontWeight: 500 }}>Sign up</Link>
+          Don't have an account? <Link to={redirect ? `/register?redirect=${encodeURIComponent(redirect)}` : '/register'} style={{ fontWeight: 500 }}>Sign up</Link>
         </p>
       </div>
     </div>

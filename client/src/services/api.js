@@ -42,7 +42,8 @@ api.interceptors.response.use(
       localStorage.removeItem('user');
       // Don't redirect if already on login/register page
       if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
-        window.location.href = '/login';
+        const currentPath = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/login?redirect=${currentPath}`;
       }
     }
     return Promise.reject(error);

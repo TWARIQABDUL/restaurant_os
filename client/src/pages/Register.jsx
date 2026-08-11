@@ -6,6 +6,7 @@ export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect');
   
   const [formData, setFormData] = useState({
     name: '',
@@ -26,8 +27,12 @@ export default function Register() {
     setError(null);
     try {
       await register(formData.name, formData.email, formData.password, formData.phone);
-      const slug = localStorage.getItem('tenantSlug');
-      navigate(slug ? `/${slug}` : '/');
+      if (redirect) {
+        navigate(redirect);
+      } else {
+        const slug = localStorage.getItem('tenantSlug');
+        navigate(slug ? `/${slug}` : '/');
+      }
     } catch (err) {
       setError(err.response?.data?.errors?.[0]?.msg || err.response?.data?.error || 'Registration failed.');
     } finally {
@@ -99,7 +104,7 @@ export default function Register() {
         </form>
 
         <p className="text-center text-sm text-secondary">
-          Already have an account? <Link to="/login" style={{ fontWeight: 500 }}>Log in</Link>
+          Already have an account? <Link to={redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'} style={{ fontWeight: 500 }}>Log in</Link>
         </p>
       </div>
     </div>
