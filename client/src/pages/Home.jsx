@@ -58,6 +58,45 @@ export default function Home() {
             document.head.appendChild(newMetaKeywords);
           }
         }
+
+        // Favicon
+        if (seo.faviconUrl) {
+          let linkIcon = document.querySelector('link[rel="icon"]');
+          if (linkIcon) {
+            linkIcon.setAttribute('href', seo.faviconUrl);
+          } else {
+            linkIcon = document.createElement('link');
+            linkIcon.rel = 'icon';
+            linkIcon.href = seo.faviconUrl;
+            document.head.appendChild(linkIcon);
+          }
+        }
+
+        // Theme Color
+        if (seo.themeColor) {
+          let metaTheme = document.querySelector('meta[name="theme-color"]');
+          if (metaTheme) {
+            metaTheme.setAttribute('content', seo.themeColor);
+          } else {
+            metaTheme = document.createElement('meta');
+            metaTheme.name = 'theme-color';
+            metaTheme.content = seo.themeColor;
+            document.head.appendChild(metaTheme);
+          }
+        }
+
+        // Author
+        if (seo.author) {
+          let metaAuthor = document.querySelector('meta[name="author"]');
+          if (metaAuthor) {
+            metaAuthor.setAttribute('content', seo.author);
+          } else {
+            metaAuthor = document.createElement('meta');
+            metaAuthor.name = 'author';
+            metaAuthor.content = seo.author;
+            document.head.appendChild(metaAuthor);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load menu', err);

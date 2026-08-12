@@ -11,6 +11,7 @@ import StaffManagement from '../components/StaffManagement';
 import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
 import { Copy } from 'lucide-react';
+import { uploadImage } from '../services/supabase';
 
 const COLORS = ['#e8890c', '#2563eb', '#2d8a4e', '#c53030', '#8b5cf6'];
 
@@ -40,7 +41,11 @@ export default function AdminDashboard() {
   const [savingSettings, setSavingSettings] = useState(false);
 
   // SEO State
-  const [seoSettings, setSeoSettings] = useState({ seoTitle: '', seoDescription: '', seoKeywords: '' });
+  const [seoSettings, setSeoSettings] = useState({ 
+    seoTitle: '', seoDescription: '', seoKeywords: '',
+    faviconUrl: '', themeColor: '#ffffff', twitterHandle: '', ogLocale: 'en_US', author: ''
+  });
+  const [faviconFile, setFaviconFile] = useState(null);
   const [savingSeo, setSavingSeo] = useState(false);
 
   useEffect(() => {
@@ -171,7 +176,12 @@ export default function AdminDashboard() {
       setSeoSettings({
         seoTitle: data.seo_settings?.seoTitle || '',
         seoDescription: data.seo_settings?.seoDescription || '',
-        seoKeywords: data.seo_settings?.seoKeywords || ''
+        seoKeywords: data.seo_settings?.seoKeywords || '',
+        faviconUrl: data.seo_settings?.faviconUrl || '',
+        themeColor: data.seo_settings?.themeColor || '#ffffff',
+        twitterHandle: data.seo_settings?.twitterHandle || '',
+        ogLocale: data.seo_settings?.ogLocale || 'en_US',
+        author: data.seo_settings?.author || ''
       });
     } catch (err) {
       console.error('Failed to load SEO settings', err);
@@ -184,7 +194,14 @@ export default function AdminDashboard() {
     e.preventDefault();
     setSavingSeo(true);
     try {
-      await api.patch('/tenants/me/seo-settings', seoSettings);
+      let finalFaviconUrl = seoSettings.faviconUrl;
+      
+      if (faviconFile) {
+        finalFaviconUrl = await uploadImage(faviconFile, 'blog-images', 'favicons');
+      }
+
+      await api.patch('/tenants/me/seo-settings', { ...seoSettings, faviconUrl: finalFaviconUrl });
+      setFaviconFile(null);
       toast.success('SEO settings saved!');
     } catch (err) {
       toast.error('Failed to save SEO settings');
@@ -661,7 +678,7 @@ export default function AdminDashboard() {
               <p className="text-xs text-secondary mt-1">Leave empty to use a default description.</p>
             </div>
 
-            <div className="form-group mb-6">
+            <div className="form-group mb-4">
               <label className="form-label">Meta Keywords</label>
               <input 
                 type="text" 
@@ -673,8 +690,74 @@ export default function AdminDashboard() {
               <p className="text-xs text-secondary mt-1">Comma-separated list of keywords.</p>
             </div>
 
+            <div className="grid grid-2 gap-4 mb-4">
+              <div className="form-group mb-0">
+                <label className="form-label">Favicon Upload</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  className="form-input" 
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) {
+                      setFaviconFile(e.target.files[0]);
+                    }
+                  }} 
+                  style={{ padding: '6px' }}
+                />
+                {(seoSettings.faviconUrl || faviconFile) && (
+                  <p className="text-xs text-secondary mt-1">
+                    {faviconFile ? `Selected: ${faviconFile.name}` : 'Current favicon active'}
+                  </p>
+                )}
+              </div>
+              <div className="form-group mb-0">
+                <label className="form-label">Theme Color</label>
+                <input 
+                  type="color" 
+                  className="form-input" 
+                  style={{ height: '42px', padding: '4px' }}
+                  value={seoSettings.themeColor}
+                  onChange={(e) => setSeoSettings({ ...seoSettings, themeColor: e.target.value })}
+                />
+                <p className="text-xs text-secondary mt-1">Mobile browser header color.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-2 gap-4 mb-6">
+              <div className="form-group mb-0">
+                <label className="form-label">Twitter Handle</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  value={seoSettings.twitterHandle}
+                  onChange={(e) => setSeoSettings({ ...seoSettings, twitterHandle: e.target.value })}
+                  placeholder="@yourrestaurant"
+                />
+              </div>
+              <div className="form-group mb-0">
+                <label className="form-label">Author / Locale</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    className="form-input flex-1" 
+                    value={seoSettings.author}
+                    onChange={(e) => setSeoSettings({ ...seoSettings, author: e.target.value })}
+                    placeholder="Author Name"
+                  />
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    style={{ width: '80px' }}
+                    value={seoSettings.ogLocale}
+                    onChange={(e) => setSeoSettings({ ...seoSettings, ogLocale: e.target.value })}
+                    placeholder="en_US"
+                  />
+                </div>
+              </div>
+            </div>
+
             <button type="submit" className="btn btn-primary" disabled={savingSeo}>
-              {savingSeo ? 'Saving...' : 'Save SEO Settings'}
+              {savingSeo ? 'Saving...' : 'Save Advanced SEO Settings'}
             </button>
           </form>
         </div>

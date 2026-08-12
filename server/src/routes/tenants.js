@@ -255,7 +255,10 @@ router.get('/me/seo-settings', authenticate, authorize('admin'), async (req, res
 // PATCH /api/tenants/me/seo-settings — tenant admin configures their OWN SEO settings
 router.patch('/me/seo-settings', authenticate, authorize('admin'), async (req, res) => {
   try {
-    const { seoTitle, seoDescription, seoKeywords } = req.body;
+    const { 
+      seoTitle, seoDescription, seoKeywords, 
+      faviconUrl, themeColor, twitterHandle, ogLocale, author 
+    } = req.body;
 
     const { data: current, error: fetchErr } = await supabase
       .from('tenants')
@@ -274,6 +277,11 @@ router.patch('/me/seo-settings', authenticate, authorize('admin'), async (req, r
         ...(seoTitle !== undefined ? { seoTitle } : {}),
         ...(seoDescription !== undefined ? { seoDescription } : {}),
         ...(seoKeywords !== undefined ? { seoKeywords } : {}),
+        ...(faviconUrl !== undefined ? { faviconUrl } : {}),
+        ...(themeColor !== undefined ? { themeColor } : {}),
+        ...(twitterHandle !== undefined ? { twitterHandle } : {}),
+        ...(ogLocale !== undefined ? { ogLocale } : {}),
+        ...(author !== undefined ? { author } : {}),
       },
     };
 

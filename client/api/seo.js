@@ -26,6 +26,11 @@ export default async function handler(req, res) {
     const title = seo.seoTitle || tenant.name || 'Restaurant OS';
     const description = seo.seoDescription || `Order online from ${tenant.name}`;
     const keywords = seo.seoKeywords || '';
+    const faviconUrl = seo.faviconUrl || '';
+    const themeColor = seo.themeColor || '#ffffff';
+    const twitterHandle = seo.twitterHandle || '';
+    const ogLocale = seo.ogLocale || 'en_US';
+    const author = seo.author || '';
 
     // Generate a lightweight HTML page for crawlers
     const html = `<!doctype html>
@@ -34,20 +39,25 @@ export default async function handler(req, res) {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${title}</title>
+    ${faviconUrl ? `<link rel="icon" href="${faviconUrl}" />` : ''}
+    <meta name="theme-color" content="${themeColor}" />
     <meta name="description" content="${description}" />
     ${keywords ? `<meta name="keywords" content="${keywords}" />` : ''}
+    ${author ? `<meta name="author" content="${author}" />` : ''}
     
     <!-- Open Graph tags for social sharing -->
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
     ${tenant.logo_url ? `<meta property="og:image" content="${tenant.logo_url}" />` : ''}
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content="${ogLocale}" />
     
     <!-- Twitter Card tags -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${title}" />
     <meta name="twitter:description" content="${description}" />
     ${tenant.logo_url ? `<meta name="twitter:image" content="${tenant.logo_url}" />` : ''}
+    ${twitterHandle ? `<meta name="twitter:site" content="${twitterHandle}" />` : ''}
   </head>
   <body>
     <!-- This page is only served to web crawlers. Normal users get the React SPA. -->

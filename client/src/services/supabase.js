@@ -13,14 +13,15 @@ export const supabase = createClient(supabaseUrl || 'https://placeholder.supabas
  * Uploads an image to the Supabase Storage bucket and returns the public URL.
  * @param {File} file - The file object from an input field
  * @param {string} bucketName - The name of the storage bucket
+ * @param {string} folderPath - The folder to place the file into
  * @returns {Promise<string>} The public URL of the uploaded image
  */
-export async function uploadImage(file, bucketName = 'blog-images') {
+export async function uploadImage(file, bucketName = 'blog-images', folderPath = 'menu-items') {
   if (!file) return null;
 
   const fileExt = file.name.split('.').pop();
   const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-  const filePath = `menu-items/${fileName}`;
+  const filePath = `${folderPath}/${fileName}`;
 
   const { error } = await supabase.storage
     .from(bucketName)
