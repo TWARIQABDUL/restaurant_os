@@ -39,6 +39,10 @@ export default function AdminDashboard() {
   const [withdrawing, setWithdrawing] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // SEO State
+  const [seoSettings, setSeoSettings] = useState({ seoTitle: '', seoDescription: '', seoKeywords: '' });
+  const [savingSeo, setSavingSeo] = useState(false);
+
   useEffect(() => {
     if (activeTab === 'analytics') {
       fetchAnalytics();
@@ -46,6 +50,8 @@ export default function AdminDashboard() {
       fetchDeliveryData();
     } else if (activeTab === 'wallet') {
       fetchWallet();
+    } else if (activeTab === 'seo') {
+      fetchSeoSettings();
     }
   }, [activeTab]);
 
@@ -145,15 +151,45 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSaveSettings = async () => {
+  const savePaymentSettings = async (e) => {
+    e.preventDefault();
     setSavingSettings(true);
     try {
       await api.patch('/tenants/me/payment-settings', paymentSettings);
-      toast.success('Payment settings saved');
+      toast.success('Payment settings saved!');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save settings');
+      toast.error('Failed to save settings');
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  const fetchSeoSettings = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/tenants/me/seo-settings');
+      setSeoSettings({
+        seoTitle: data.seo_settings?.seoTitle || '',
+        seoDescription: data.seo_settings?.seoDescription || '',
+        seoKeywords: data.seo_settings?.seoKeywords || ''
+      });
+    } catch (err) {
+      console.error('Failed to load SEO settings', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveSeoSettings = async (e) => {
+    e.preventDefault();
+    setSavingSeo(true);
+    try {
+      await api.patch('/tenants/me/seo-settings', seoSettings);
+      toast.success('SEO settings saved!');
+    } catch (err) {
+      toast.error('Failed to save SEO settings');
+    } finally {
+      setSavingSeo(false);
     }
   };
 
@@ -241,6 +277,12 @@ export default function AdminDashboard() {
             onClick={() => setActiveTab('complaints')}
           >
             Complaints
+          </button>
+          <button 
+            className={`btn ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('seo')}
+          >
+            SEO
           </button>
         </div>
       </div>
@@ -498,7 +540,7 @@ export default function AdminDashboard() {
                     onChange={e => setPaymentSettings(prev => ({ ...prev, payoutPhone: e.target.value }))}
                   />
                 </div>
-                <button className="btn btn-secondary" disabled={savingSettings} onClick={handleSaveSettings}>
+                <button className="btn btn-secondary" disabled={savingSettings} onClick={savePaymentSettings}>
                   {savingSettings ? 'Saving…' : 'Save Settings'}
                 </button>
                 {paymentSettings.settlementMode === 'auto' && !paymentSettings.payoutPhone && (
@@ -588,6 +630,54 @@ export default function AdminDashboard() {
 
       {!loading && activeTab === 'complaints' && (
         <ComplaintsManagement />
+      )}
+
+      {!loading && activeTab === 'seo' && (
+        <div className="card max-w-2xl mx-auto">
+          <h2 className="mb-4">SEO Settings</h2>
+          <p className="text-secondary mb-6">Optimize your restaurant's storefront for search engines.</p>
+          <form onSubmit={saveSeoSettings}>
+            <div className="form-group">
+              <label className="form-label">SEO Page Title</label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={seoSettings.seoTitle}
+                onChange={(e) => setSeoSettings({ ...seoSettings, seoTitle: e.target.value })}
+                placeholder="e.g. Burger Bros - The Best Burgers in Town"
+              />
+              <p className="text-xs text-secondary mt-1">Leave empty to use your restaurant name.</p>
+            </div>
+            
+            <div className="form-group">
+              <label className="form-label">Meta Description</label>
+              <textarea 
+                className="form-input" 
+                rows="3"
+                value={seoSettings.seoDescription}
+                onChange={(e) => setSeoSettings({ ...seoSettings, seoDescription: e.target.value })}
+                placeholder="Brief description of your restaurant that appears in search results."
+              />
+              <p className="text-xs text-secondary mt-1">Leave empty to use a default description.</p>
+            </div>
+
+            <div className="form-group mb-6">
+              <label className="form-label">Meta Keywords</label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={seoSettings.seoKeywords}
+                onChange={(e) => setSeoSettings({ ...seoSettings, seoKeywords: e.target.value })}
+                placeholder="burgers, fast food, delivery, local"
+              />
+              <p className="text-xs text-secondary mt-1">Comma-separated list of keywords.</p>
+            </div>
+
+            <button type="submit" className="btn btn-primary" disabled={savingSeo}>
+              {savingSeo ? 'Saving...' : 'Save SEO Settings'}
+            </button>
+          </form>
+        </div>
       )}
     </div>
   );

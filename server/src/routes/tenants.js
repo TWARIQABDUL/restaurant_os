@@ -203,4 +203,95 @@ router.patch('/:id/toggle', authenticate, superAdminOnly, async (req, res) => {
   }
 });
 
+// GET /api/tenants/public/:slug — Fetch public tenant info (Public)
+router.get('/public/:slug', async (req, res) => {
+  try {
+    const { data: tenant, error } = await supabase
+      .from('tenants')
+      .select('id, name, slug, logo_url, settings')
+      .eq('slug', req.params.slug)
+      .eq('active', true)
+      .single();
+
+    if (error || !tenant) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+
+    res.json({
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        logo_url: tenant.logo_url,
+        seo: tenant.settings?.seo || {}
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/tenants/me/seo-settings — read back current seo settings
+router.get('/me/seo-settings', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { data: tenant, error } = await supabase
+      .from('tenants')
+      .select('id, name, settings')
+      .eq('id', req.user.tenant_id)
+      .single();
+
+    if (error || !tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    res.json({
+      seo_settings: tenant.settings?.seo || {},
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/tenants/me/seo-settings — tenant admin configures their OWN SEO settings
+router.patch('/me/seo-settings', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const { seoTitle, seoDescription, seoKeywords } = req.body;
+
+    const { data: current, error: fetchErr } = await supabase
+      .from('tenants')
+      .select('settings')
+      .eq('id', req.user.tenant_id)
+      .single();
+
+    if (fetchErr || !current) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    const nextSettings = {
+      ...current.settings,
+      seo: {
+        ...(current.settings?.seo || {}),
+        ...(seoTitle !== undefined ? { seoTitle } : {}),
+        ...(seoDescription !== undefined ? { seoDescription } : {}),
+        ...(seoKeywords !== undefined ? { seoKeywords } : {}),
+      },
+    };
+
+    const { data: tenant, error } = await supabase
+      .from('tenants')
+      .update({ settings: nextSettings })
+      .eq('id', req.user.tenant_id)
+      .select('id, name, settings')
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to update SEO settings' });
+    }
+
+    res.json({ seo_settings: tenant.settings?.seo || {} });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

@@ -21,12 +21,44 @@ export default function Home() {
   async function fetchData() {
     try {
       setLoading(true);
-      const [catRes, itemsRes] = await Promise.all([
+      const [catRes, itemsRes, tenantRes] = await Promise.all([
         api.get('/menu/categories'),
         api.get('/menu', { params: { category: selectedCategory, search: searchQuery } }),
+        api.get(`/tenants/public/${tenantSlug}`).catch(() => null)
       ]);
+      
       setCategories(catRes.data.categories);
       setItems(itemsRes.data.items);
+
+      if (tenantRes?.data?.tenant) {
+        const tenant = tenantRes.data.tenant;
+        const seo = tenant.seo || {};
+        
+        // Inject SEO tags
+        document.title = seo.seoTitle || tenant.name || 'Restaurant OS';
+        
+        const metaDesc = document.querySelector('meta[name="description"]');
+        if (metaDesc) {
+          metaDesc.setAttribute('content', seo.seoDescription || `Order online from ${tenant.name}`);
+        } else {
+          const newMetaDesc = document.createElement('meta');
+          newMetaDesc.name = "description";
+          newMetaDesc.content = seo.seoDescription || `Order online from ${tenant.name}`;
+          document.head.appendChild(newMetaDesc);
+        }
+
+        const metaKeywords = document.querySelector('meta[name="keywords"]');
+        if (seo.seoKeywords) {
+          if (metaKeywords) {
+            metaKeywords.setAttribute('content', seo.seoKeywords);
+          } else {
+            const newMetaKeywords = document.createElement('meta');
+            newMetaKeywords.name = "keywords";
+            newMetaKeywords.content = seo.seoKeywords;
+            document.head.appendChild(newMetaKeywords);
+          }
+        }
+      }
     } catch (err) {
       console.error('Failed to load menu', err);
       if (err.response?.status === 404) {
