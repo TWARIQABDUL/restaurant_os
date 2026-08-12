@@ -32,6 +32,9 @@ export default async function handler(req, res) {
     const ogLocale = seo.ogLocale || 'en_US';
     const author = seo.author || '';
 
+    const imageUrl = tenant.logo_url || faviconUrl || '';
+    const currentUrl = `https://${req.headers.host || 'restaurant-os-liart-rho.vercel.app'}/${slug}`;
+
     // Generate a lightweight HTML page for crawlers
     const html = `<!doctype html>
 <html lang="en">
@@ -48,7 +51,8 @@ export default async function handler(req, res) {
     <!-- Open Graph tags for social sharing -->
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
-    ${tenant.logo_url ? `<meta property="og:image" content="${tenant.logo_url}" />` : ''}
+    ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ''}
+    <meta property="og:url" content="${currentUrl}" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="${ogLocale}" />
     
@@ -56,7 +60,7 @@ export default async function handler(req, res) {
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${title}" />
     <meta name="twitter:description" content="${description}" />
-    ${tenant.logo_url ? `<meta name="twitter:image" content="${tenant.logo_url}" />` : ''}
+    ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ''}
     ${twitterHandle ? `<meta name="twitter:site" content="${twitterHandle}" />` : ''}
   </head>
   <body>
