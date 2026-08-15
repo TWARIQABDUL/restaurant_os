@@ -231,23 +231,23 @@ export default function AdminDashboard() {
 
   return (
     <div className="page">
-      <div className="flex justify-between items-start mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-8">
         <div>
           <h1>Admin Dashboard</h1>
           <p className="text-secondary mb-3">Overview & Analytics</p>
           
-          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm">
-            <span className="font-medium">Storefront Link:</span>
+          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm max-w-full overflow-hidden">
+            <span className="font-medium whitespace-nowrap">Storefront:</span>
             <a 
               href={`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`} 
               target="_blank" 
               rel="noreferrer"
-              className="text-blue-600 hover:underline hover:text-blue-800"
+              className="text-blue-600 hover:underline hover:text-blue-800 truncate"
             >
               {`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`}
             </a>
             <button 
-              className="icon-btn ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors"
+              className="icon-btn ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors flex-shrink-0"
               onClick={() => {
                 navigator.clipboard.writeText(`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`);
                 toast.success('Storefront link copied!');
@@ -258,7 +258,7 @@ export default function AdminDashboard() {
             </button>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
           <button 
             className={`btn ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('analytics')}
