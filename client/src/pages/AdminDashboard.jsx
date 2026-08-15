@@ -258,49 +258,51 @@ export default function AdminDashboard() {
             </button>
           </div>
         </div>
-        <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 max-w-full" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-          <button 
-            className={`btn flex-shrink-0 ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('analytics')}
-          >
-            Analytics
-          </button>
-          <button 
-            className={`btn flex-shrink-0 ${activeTab === 'delivery' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('delivery')}
-          >
-            Dispatch & Delivery
-          </button>
-          <button 
-            className={`btn flex-shrink-0 ${activeTab === 'wallet' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('wallet')}
-          >
-            Wallet
-          </button>
-          <button 
-            className={`btn flex-shrink-0 ${activeTab === 'menu' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('menu')}
-          >
-            Menu Management
-          </button>
-          <button 
-            className={`btn flex-shrink-0 ${activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('staff')}
-          >
-            Staff
-          </button>
-          <button 
-            className={`btn flex-shrink-0 ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('complaints')}
-          >
-            Complaints
-          </button>
-          <button 
-            className={`btn flex-shrink-0 ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('seo')}
-          >
-            SEO
-          </button>
+        <div className="w-full min-w-0 mt-4 md:mt-0">
+          <div className="flex gap-2 overflow-x-auto pb-2 w-full" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+            <button 
+              className={`btn flex-shrink-0 ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('analytics')}
+            >
+              Analytics
+            </button>
+            <button 
+              className={`btn flex-shrink-0 ${activeTab === 'delivery' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('delivery')}
+            >
+              Dispatch & Delivery
+            </button>
+            <button 
+              className={`btn flex-shrink-0 ${activeTab === 'wallet' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('wallet')}
+            >
+              Wallet
+            </button>
+            <button 
+              className={`btn flex-shrink-0 ${activeTab === 'menu' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('menu')}
+            >
+              Menu Management
+            </button>
+            <button 
+              className={`btn flex-shrink-0 ${activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('staff')}
+            >
+              Staff
+            </button>
+            <button 
+              className={`btn flex-shrink-0 ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('complaints')}
+            >
+              Complaints
+            </button>
+            <button 
+              className={`btn flex-shrink-0 ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('seo')}
+            >
+              SEO
+            </button>
+          </div>
         </div>
       </div>
 
