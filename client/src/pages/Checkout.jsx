@@ -212,12 +212,36 @@ export default function Checkout() {
                 : 'Your payment will be verified manually by our staff.'}
             </p>
 
-            <div className="form-group">
-              <select name="payment_method" className="form-select" value={formData.payment_method} onChange={handleChange}>
-                <option value="cash_on_delivery">Cash on Delivery</option>
-                <option value="mobile_money">Mobile Money</option>
-                <option value="bank_transfer">Bank Transfer</option>
-              </select>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
+              {[
+                { value: 'cash_on_delivery', label: 'Cash on Delivery', icon: '💵' },
+                { value: 'mobile_money', label: 'Mobile Money', icon: '📱' },
+                { value: 'bank_transfer', label: 'Bank Transfer', icon: '🏦' },
+              ].map(method => (
+                <button
+                  type="button"
+                  key={method.value}
+                  onClick={() => setFormData(prev => ({ ...prev, payment_method: method.value }))}
+                  style={{
+                    flex: '1 1 120px',
+                    padding: 'var(--space-4)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: formData.payment_method === method.value
+                      ? '2px solid var(--color-accent)'
+                      : '1px solid var(--color-border)',
+                    background: formData.payment_method === method.value
+                      ? 'var(--color-accent-light)'
+                      : 'var(--color-surface)',
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    transition: 'all var(--transition-base)',
+                    fontFamily: 'var(--font-family)'
+                  }}
+                >
+                  <div style={{ fontSize: '24px', marginBottom: 'var(--space-2)' }}>{method.icon}</div>
+                  <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' }}>{method.label}</div>
+                </button>
+              ))}
             </div>
 
             {formData.payment_method === 'mobile_money' && (
@@ -236,8 +260,8 @@ export default function Checkout() {
             )}
           </div>
 
-          <button type="submit" className="btn btn-primary btn-lg btn-full" disabled={loading}>
-            {loading ? 'Processing...' : 'Place Order'}
+          <button type="submit" className="btn btn-primary btn-lg btn-full btn-pill" disabled={loading}>
+            {loading ? 'Processing...' : '🛒 Place Order'}
           </button>
         </form>
       </div>

@@ -119,28 +119,51 @@ export default function MenuDetail() {
 
   return (
     <div className="page" style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <button className="btn btn-secondary mb-6" onClick={() => navigate(-1)}>
-        ← Back to Menu
-      </button>
-
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {item.image_url ? (
-          <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '300px', objectFit: 'cover' }} />
-        ) : (
-          <div style={{ width: '100%', height: '200px', background: 'var(--color-bg-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="text-muted">No Image</span>
-          </div>
-        )}
+        {/* Hero Image with overlay */}
+        <div style={{ position: 'relative' }}>
+          {item.image_url ? (
+            <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '320px', objectFit: 'cover', display: 'block' }} />
+          ) : (
+            <div style={{ width: '100%', height: '220px', background: 'var(--gradient-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: '3rem', opacity: 0.3 }}>🍴</span>
+            </div>
+          )}
+          {/* Gradient overlay */}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '120px',
+            background: 'linear-gradient(transparent, rgba(0,0,0,0.5))',
+            pointerEvents: 'none'
+          }} />
+          {/* Back button */}
+          <button
+            className="btn btn-pill"
+            onClick={() => navigate(-1)}
+            style={{
+              position: 'absolute', top: 'var(--space-4)', left: 'var(--space-4)',
+              background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)',
+              border: 'none', fontWeight: 600, fontSize: 'var(--font-size-sm)',
+              boxShadow: 'var(--shadow-md)'
+            }}
+          >
+            ← Back
+          </button>
+          {/* Price badge */}
+          <span style={{
+            position: 'absolute', bottom: 'var(--space-4)', right: 'var(--space-4)',
+            background: 'var(--gradient-accent)', color: 'white',
+            fontWeight: 800, fontSize: 'var(--font-size-xl)',
+            padding: '6px 16px', borderRadius: '999px',
+            boxShadow: 'var(--shadow-accent)'
+          }}>
+            ${parseFloat(item.price).toFixed(2)}
+          </span>
+        </div>
 
         <div className="p-6">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h1 className="mb-2">{item.name}</h1>
-              <p className="text-secondary">{item.description}</p>
-            </div>
-            <span style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--color-accent)' }}>
-              ${parseFloat(item.price).toFixed(2)}
-            </span>
+          <div className="mb-4">
+            <h1 className="mb-2">{item.name}</h1>
+            <p className="text-secondary">{item.description}</p>
           </div>
 
           <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '24px 0' }} />

@@ -108,6 +108,29 @@ export default function Home() {
     }
   }
 
+  // Extract restaurant info for hero
+  const [tenantInfo, setTenantInfo] = useState(null);
+
+  // Store tenant info when fetched
+  useEffect(() => {
+    if (items.length > 0 || categories.length > 0) return; // already fetched
+  }, []);
+
+  // We capture tenant info from the fetchData response
+  const storeTenantInfo = (tenant) => {
+    if (tenant && !tenantInfo) setTenantInfo(tenant);
+  };
+
+  // Patch: store tenant info inside fetchData
+  useEffect(() => {
+    // This runs once to capture the tenant data for the hero
+    if (!tenantInfo && !loading) {
+      api.get(`/tenants/public/${tenantSlug}`).then(res => {
+        if (res.data?.tenant) setTenantInfo(res.data.tenant);
+      }).catch(() => {});
+    }
+  }, [loading, tenantSlug, tenantInfo]);
+
   if (isStaticAssetPath) {
     return null;
   }
@@ -123,17 +146,58 @@ export default function Home() {
     );
   }
 
+  const restaurantName = tenantInfo?.name || tenantSlug?.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Restaurant';
+
   return (
     <div className="page">
-      <div className="flex flex-col items-center mb-8 text-center">
-        <h1>Our Menu</h1>
-        <p className="text-secondary mt-2">Discover our delicious offerings.</p>
+      {/* ── Restaurant Hero Banner ── */}
+      <div style={{
+        background: 'var(--gradient-dark)',
+        borderRadius: 'var(--radius-xl)',
+        padding: 'var(--space-10) var(--space-8)',
+        marginBottom: 'var(--space-8)',
+        position: 'relative',
+        overflow: 'hidden',
+        textAlign: 'center',
+        color: 'var(--color-text-inverse)'
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'radial-gradient(circle at 30% 50%, rgba(232, 137, 12, 0.15) 0%, transparent 60%)',
+          pointerEvents: 'none'
+        }} />
+        {tenantInfo?.logo_url && (
+          <img
+            src={tenantInfo.logo_url}
+            alt={restaurantName}
+            style={{
+              width: '72px', height: '72px', borderRadius: '50%',
+              objectFit: 'cover', margin: '0 auto var(--space-4)',
+              border: '3px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+            }}
+          />
+        )}
+        <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-2)', position: 'relative' }}>
+          {restaurantName}
+        </h1>
+        <p style={{ opacity: 0.7, fontSize: 'var(--font-size-sm)', position: 'relative' }}>
+          {tenantInfo?.seo?.seoDescription || 'Explore our menu and order your favorites.'}
+        </p>
       </div>
 
-      <div className="flex flex-col gap-6 md:flex-row justify-between mb-8">
-        <div className="flex gap-2" style={{ overflowX: 'auto', paddingBottom: '4px' }}>
+      {/* ── Category Pills + Search ── */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-4)',
+        marginBottom: 'var(--space-8)'
+      }}>
+        <div style={{
+          display: 'flex', gap: 'var(--space-2)',
+          overflowX: 'auto', paddingBottom: '4px',
+          scrollbarWidth: 'none'
+        }}>
           <button
-            className={`btn ${selectedCategory === '' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn btn-pill ${selectedCategory === '' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setSelectedCategory('')}
           >
             All
@@ -141,7 +205,7 @@ export default function Home() {
           {categories.map((cat) => (
             <button
               key={cat}
-              className={`btn ${selectedCategory === cat ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn btn-pill ${selectedCategory === cat ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setSelectedCategory(cat)}
             >
               {cat}
@@ -149,44 +213,93 @@ export default function Home() {
           ))}
         </div>
 
-        <div style={{ minWidth: '250px' }}>
+        <div style={{ position: 'relative', maxWidth: '360px' }}>
+          <span style={{
+            position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
+            color: 'var(--color-text-muted)', fontSize: '16px', pointerEvents: 'none'
+          }}>🔍</span>
           <input
             type="text"
             className="form-input"
             placeholder="Search menu..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ paddingLeft: '36px' }}
           />
         </div>
       </div>
 
+      {/* ── Menu Grid ── */}
       {loading ? (
         <div className="loading-page">
           <div className="spinner" />
         </div>
       ) : items.length === 0 ? (
         <div className="empty-state">
+          <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>🍽️</div>
           <h3>No items found</h3>
           <p>Try adjusting your search or category filter.</p>
         </div>
       ) : (
         <div className="grid grid-3">
           {items.map((item) => (
-            <Link to={`/${tenantSlug}/menu/${item.id}`} key={item.id} className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-              {item.image_url ? (
-                <img src={item.image_url} alt={item.name} className="card-image" />
-              ) : (
-                <div className="card-image flex items-center" style={{ justifyContent: 'center' }}>
-                  <span className="text-muted">No Image</span>
-                </div>
-              )}
-              <h3 className="mb-2">{item.name}</h3>
-              <p className="text-secondary text-sm mb-4" style={{ flexGrow: 1 }}>{item.description}</p>
-              <div className="flex items-center justify-between mt-auto">
-                <span style={{ fontWeight: 600, color: 'var(--color-accent)', fontSize: 'var(--font-size-lg)' }}>
+            <Link
+              to={`/${tenantSlug}/menu/${item.id}`}
+              key={item.id}
+              className="card"
+              style={{
+                display: 'flex', flexDirection: 'column',
+                padding: 0, overflow: 'hidden',
+                textDecoration: 'none', color: 'inherit'
+              }}
+            >
+              <div style={{ position: 'relative', overflow: 'hidden' }}>
+                {item.image_url ? (
+                  <img
+                    src={item.image_url}
+                    alt={item.name}
+                    style={{
+                      width: '100%', height: '200px', objectFit: 'cover',
+                      transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%', height: '200px',
+                    background: 'var(--color-bg-alt)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <span style={{ color: 'var(--color-text-muted)', fontSize: '2rem' }}>🍴</span>
+                  </div>
+                )}
+                {/* Gradient overlay */}
+                <div style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0,
+                  height: '60px',
+                  background: 'linear-gradient(transparent, rgba(0,0,0,0.04))',
+                  pointerEvents: 'none'
+                }} />
+                {/* Price badge */}
+                <span style={{
+                  position: 'absolute', top: 'var(--space-3)', right: 'var(--space-3)',
+                  background: 'var(--gradient-accent)',
+                  color: 'white', fontWeight: 700,
+                  fontSize: 'var(--font-size-sm)',
+                  padding: '4px 10px', borderRadius: '999px',
+                  boxShadow: 'var(--shadow-md)'
+                }}>
                   ${parseFloat(item.price).toFixed(2)}
                 </span>
-                <span className="btn btn-secondary btn-sm">View</span>
+              </div>
+
+              <div style={{ padding: 'var(--space-4) var(--space-5) var(--space-5)', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ fontSize: 'var(--font-size-base)', marginBottom: 'var(--space-1)' }}>{item.name}</h3>
+                <p className="text-secondary text-sm" style={{ flexGrow: 1, marginBottom: 'var(--space-3)', lineHeight: 1.5 }}>
+                  {item.description?.length > 80 ? item.description.slice(0, 80) + '…' : item.description}
+                </p>
+                <span className="btn btn-secondary btn-sm btn-pill" style={{ alignSelf: 'flex-start' }}>
+                  View Details →
+                </span>
               </div>
             </Link>
           ))}

@@ -9,10 +9,15 @@ export default function Cart() {
   if (items.length === 0) {
     return (
       <div className="page empty-state">
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🛒</div>
+        <div style={{
+          width: '80px', height: '80px', borderRadius: '50%',
+          background: 'var(--color-accent-light)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto var(--space-4)', fontSize: '32px'
+        }}>🛒</div>
         <h3>Your cart is empty</h3>
         <p className="mb-6">Looks like you haven't added anything to your cart yet.</p>
-        <Link to={`/${tenantSlug}`} className="btn btn-primary">Browse Menu</Link>
+        <Link to={`/${tenantSlug}`} className="btn btn-primary btn-lg btn-pill">Browse Menu</Link>
       </div>
     );
   }
@@ -101,21 +106,37 @@ export default function Cart() {
         })}
       </div>
 
-      <div className="card" style={{ background: 'var(--color-surface-hover)' }}>
+      <div className="card" style={{
+        background: 'var(--gradient-dark)',
+        color: 'var(--color-text-inverse)',
+        border: 'none'
+      }}>
         <div className="flex justify-between items-center mb-6">
-          <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 500 }}>Total</span>
-          <span style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--color-accent)' }}>
+          <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 500, opacity: 0.8 }}>Total</span>
+          <span style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 800 }}>
             ${getTotal().toFixed(2)}
           </span>
         </div>
 
-        <button 
-          className="btn btn-primary btn-lg btn-full"
+        <button
+          className="btn btn-lg btn-full btn-pill"
           onClick={() => navigate(`/${tenantSlug}/checkout`)}
+          style={{
+            background: 'var(--gradient-accent)', color: 'white',
+            border: 'none', fontWeight: 700, marginBottom: 'var(--space-3)'
+          }}
         >
           Proceed to Checkout
         </button>
-        <Link to={`/${tenantSlug}`} className="btn btn-secondary btn-full mt-4" style={{ display: 'block', textAlign: 'center' }}>
+        <Link
+          to={`/${tenantSlug}`}
+          className="btn btn-full btn-pill"
+          style={{
+            display: 'block', textAlign: 'center',
+            background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.8)',
+            border: '1px solid rgba(255,255,255,0.15)'
+          }}
+        >
           Continue Shopping
         </Link>
       </div>
