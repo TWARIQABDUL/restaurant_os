@@ -230,19 +230,19 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="page">
-      <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-8">
-        <div>
+    <div className="page" style={{ maxWidth: '100vw', overflowX: 'hidden' }}>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 w-full max-w-full">
+        <div className="w-full md:w-auto min-w-0">
           <h1>Admin Dashboard</h1>
           <p className="text-secondary mb-3">Overview & Analytics</p>
           
-          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm max-w-full overflow-hidden">
+          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm w-full md:w-auto overflow-hidden">
             <span className="font-medium whitespace-nowrap">Storefront:</span>
             <a 
               href={`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`} 
               target="_blank" 
               rel="noreferrer"
-              className="text-blue-600 hover:underline hover:text-blue-800 truncate"
+              className="text-blue-600 hover:underline hover:text-blue-800 truncate block"
             >
               {`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`}
             </a>
@@ -258,45 +258,45 @@ export default function AdminDashboard() {
             </button>
           </div>
         </div>
-        <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 max-w-full" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
           <button 
-            className={`btn ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn flex-shrink-0 ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('analytics')}
           >
             Analytics
           </button>
           <button 
-            className={`btn ${activeTab === 'delivery' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn flex-shrink-0 ${activeTab === 'delivery' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('delivery')}
           >
             Dispatch & Delivery
           </button>
           <button 
-            className={`btn ${activeTab === 'wallet' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn flex-shrink-0 ${activeTab === 'wallet' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('wallet')}
           >
             Wallet
           </button>
           <button 
-            className={`btn ${activeTab === 'menu' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn flex-shrink-0 ${activeTab === 'menu' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('menu')}
           >
             Menu Management
           </button>
           <button 
-            className={`btn ${activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn flex-shrink-0 ${activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('staff')}
           >
             Staff
           </button>
           <button 
-            className={`btn ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn flex-shrink-0 ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('complaints')}
           >
             Complaints
           </button>
           <button 
-            className={`btn ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn flex-shrink-0 ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('seo')}
           >
             SEO
