@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { getSocket } from '../services/socket';
 import api from '../services/api';
-import { Bell, ShoppingBag, UtensilsCrossed, CheckCircle, XCircle, Bike, PartyPopper } from 'lucide-react';
+import { Bell, ShoppingBag, ShoppingCart, UtensilsCrossed, CheckCircle, XCircle, Bike, PartyPopper, Menu, X } from 'lucide-react';
 
 const getIcon = (iconName) => {
   switch (iconName) {
@@ -128,6 +128,7 @@ export default function Navbar() {
   };
 
   return (
+    <>
     <nav className="navbar">
       <div className="navbar-inner">
         <Link to={basePath} className="navbar-brand" style={{ color: 'var(--color-accent)' }}>
@@ -138,8 +139,9 @@ export default function Navbar() {
           className="navbar-toggle"
           onClick={() => setMenuOpen(!menuOpen)}
           aria-label="Toggle menu"
+          style={{ color: 'var(--color-text)' }}
         >
-          {menuOpen ? '✕' : '☰'}
+          {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
 
         <ul className={`navbar-links ${menuOpen ? 'open' : ''}`}>
@@ -148,8 +150,19 @@ export default function Navbar() {
               <li><Link to={basePath} className={isActive(basePath)} onClick={() => setMenuOpen(false)}>Menu</Link></li>
 
               <li>
-                <Link to={getPath('/cart')} className={isActive(getPath('/cart'))} onClick={() => setMenuOpen(false)}>
-                  Cart{itemCount > 0 && ` (${itemCount})`}
+                <Link to={getPath('/cart')} className={isActive(getPath('/cart'))} onClick={() => setMenuOpen(false)} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <ShoppingCart size={16} />
+                  Cart
+                  {itemCount > 0 && (
+                    <span style={{
+                      background: 'var(--gradient-accent)', color: 'white',
+                      fontSize: '10px', fontWeight: 700,
+                      minWidth: '18px', height: '18px',
+                      borderRadius: '999px', display: 'inline-flex',
+                      alignItems: 'center', justifyContent: 'center',
+                      marginLeft: '2px'
+                    }}>{itemCount}</span>
+                  )}
                 </Link>
               </li>
 
@@ -251,5 +264,21 @@ export default function Navbar() {
         </ul>
       </div>
     </nav>
+
+    {/* Mobile backdrop overlay */}
+    {menuOpen && (
+      <div
+        onClick={() => setMenuOpen(false)}
+        style={{
+          position: 'fixed', inset: 0, top: '60px',
+          background: 'rgba(0,0,0,0.3)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 99,
+          animation: 'fadeIn 0.2s ease'
+        }}
+        className="navbar-backdrop"
+      />
+    )}
+    </>
   );
 }
