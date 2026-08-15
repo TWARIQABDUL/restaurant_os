@@ -906,17 +906,9 @@ tr:nth-child(even) {
 }
 
 .hero-visual {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
-  padding: var(--space-6);
-}
-
-.hero-visual svg {
-  width: 100%;
-  height: auto;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .section-header {
@@ -945,10 +937,12 @@ tr:nth-child(even) {
   justify-content: center;
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--color-accent-light);
   color: var(--color-accent);
   margin-bottom: var(--space-4);
+  transition: transform var(--transition-spring), box-shadow var(--transition-base);
+  cursor: default;
 }
 
 .role-card {
