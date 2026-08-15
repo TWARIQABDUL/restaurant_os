@@ -3,6 +3,8 @@ import { useNavigate, Link, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import api from '../services/api';
+import { Banknote, Smartphone, Landmark, ShoppingCart } from 'lucide-react';
+
 
 export default function Checkout() {
   const { user } = useAuth();
@@ -214,11 +216,13 @@ export default function Checkout() {
 
             <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
               {[
-                { value: 'cash_on_delivery', label: 'Cash on Delivery', icon: '💵' },
-                { value: 'mobile_money', label: 'Mobile Money', icon: '📱' },
-                { value: 'bank_transfer', label: 'Bank Transfer', icon: '🏦' },
-              ].map(method => (
-                <button
+                { value: 'cash_on_delivery', label: 'Cash on Delivery', icon: Banknote },
+                { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone },
+                { value: 'bank_transfer', label: 'Bank Transfer', icon: Landmark },
+              ].map(method => {
+                const Icon = method.icon;
+                return (
+                  <button
                   type="button"
                   key={method.value}
                   onClick={() => setFormData(prev => ({ ...prev, payment_method: method.value }))}
@@ -238,10 +242,13 @@ export default function Checkout() {
                     fontFamily: 'var(--font-family)'
                   }}
                 >
-                  <div style={{ fontSize: '24px', marginBottom: 'var(--space-2)' }}>{method.icon}</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
+                    <Icon size={24} />
+                  </div>
                   <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' }}>{method.label}</div>
                 </button>
-              ))}
+                );
+              })}
             </div>
 
             {formData.payment_method === 'mobile_money' && (
@@ -260,8 +267,8 @@ export default function Checkout() {
             )}
           </div>
 
-          <button type="submit" className="btn btn-primary btn-lg btn-full btn-pill" disabled={loading}>
-            {loading ? 'Processing...' : '🛒 Place Order'}
+          <button type="submit" className="btn btn-primary btn-lg btn-full btn-pill" disabled={loading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            {loading ? 'Processing...' : <><ShoppingCart size={18} /> Place Order</>}
           </button>
         </form>
       </div>

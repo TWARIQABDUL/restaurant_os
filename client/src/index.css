@@ -1,45 +1,49 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Karla:wght@300;400;500;600;700&family=Playfair+Display+SC:wght@400;700&display=swap');
 
 /* ================================================
    DESIGN SYSTEM — Restaurant OS
-   Premium, dynamic, refined.
+   Vibrant, energetic, block-based.
    ================================================ */
 
 :root {
   /* Color palette */
-  --color-bg: #f7f7f3;
-  --color-bg-alt: #eeeee8;
-  --color-surface: #ffffff;
-  --color-surface-hover: #fafaf7;
-  --color-border: #e2e2dd;
-  --color-border-subtle: #ededea;
+  --color-bg: #FEF2F2;
+  --color-bg-alt: #F0EDF1;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #FEF2F2;
+  --color-border: #FECACA;
+  --color-border-subtle: #FEE2E2;
 
-  --color-text: #1a1a2e;
-  --color-text-secondary: #5a5a6e;
-  --color-text-muted: #8a8a9a;
-  --color-text-inverse: #ffffff;
+  --color-text: #450A0A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+  --color-text-inverse: #FFFFFF;
 
-  --color-accent: #e8890c;
-  --color-accent-hover: #d47a08;
-  --color-accent-light: #fef3e2;
-  --color-accent-dark: #b86d08;
+  --color-primary: #DC2626;
+  --color-secondary: #F87171;
+
+  --color-accent: #A16207;
+  --color-accent-hover: #854D0E;
+  --color-accent-light: #FEF3C7;
+  --color-accent-dark: #713F12;
 
   --color-success: #2d8a4e;
   --color-success-light: #e8f5ee;
   --color-warning: #c8850a;
   --color-warning-light: #fef6e6;
-  --color-error: #c53030;
-  --color-error-light: #fee2e2;
+  --color-error: #DC2626;
+  --color-error-light: #FEE2E2;
   --color-info: #2563eb;
   --color-info-light: #eff6ff;
 
   /* Gradients */
-  --gradient-accent: linear-gradient(135deg, #e8890c 0%, #f5a623 100%);
-  --gradient-dark: linear-gradient(135deg, #1a1a2e 0%, #2d2d44 100%);
-  --gradient-surface: linear-gradient(180deg, #ffffff 0%, #fafaf7 100%);
+  --gradient-accent: linear-gradient(135deg, #DC2626 0%, #A16207 100%);
+  --gradient-dark: linear-gradient(135deg, #450A0A 0%, #7F1D1D 100%);
+  --gradient-surface: linear-gradient(180deg, #FFFFFF 0%, #FEF2F2 100%);
 
   /* Typography */
-  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-family: 'Karla', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Playfair Display SC', serif;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.8125rem;
   --font-size-base: 0.9375rem;
@@ -116,6 +120,13 @@ a:hover {
   color: var(--color-accent-hover);
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 img {
   max-width: 100%;
   display: block;
@@ -126,8 +137,8 @@ img {
    ================================================ */
 
 h1, h2, h3, h4 {
-  line-height: 1.3;
-  letter-spacing: -0.01em;
+  font-family: var(--font-heading);
+  line-height: 1.2;
   color: var(--color-text);
 }
 

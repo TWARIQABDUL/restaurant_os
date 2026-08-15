@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Rocket } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function Register() {
@@ -53,11 +54,11 @@ export default function Register() {
       }} className="auth-panel-left">
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'radial-gradient(circle at 80% 20%, rgba(232,137,12,0.2) 0%, transparent 50%)',
+          background: 'radial-gradient(circle at 80% 20%, rgba(220, 38, 38, 0.2) 0%, transparent 50%)',
           pointerEvents: 'none'
         }} />
         <div style={{ position: 'relative', textAlign: 'center', color: 'var(--color-text-inverse)' }}>
-          <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>🚀</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}><Rocket size={48} color="var(--color-accent)" /></div>
           <h2 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-3)' }}>Get started</h2>
           <p style={{ opacity: 0.6, maxWidth: '280px', lineHeight: 1.6, fontSize: 'var(--font-size-sm)' }}>
             Create an account to order food, track deliveries, and enjoy a seamless experience.

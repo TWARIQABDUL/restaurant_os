@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { ShoppingCart } from 'lucide-react';
 
 export default function Cart() {
   const { items, removeItem, updateQuantity, getTotal, clearCart } = useCart();
@@ -12,9 +13,10 @@ export default function Cart() {
         <div style={{
           width: '80px', height: '80px', borderRadius: '50%',
           background: 'var(--color-accent-light)',
+          color: 'var(--color-accent)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto var(--space-4)', fontSize: '32px'
-        }}>🛒</div>
+          margin: '0 auto var(--space-4)'
+        }}><ShoppingCart size={32} /></div>
         <h3>Your cart is empty</h3>
         <p className="mb-6">Looks like you haven't added anything to your cart yet.</p>
         <Link to={`/${tenantSlug}`} className="btn btn-primary btn-lg btn-pill">Browse Menu</Link>

@@ -1,22 +1,22 @@
 import { Link } from 'react-router-dom';
-import { UtensilsCrossed, ClipboardList, Bike, MapPin, Users, BarChart3, ArrowRight, Sparkles, Zap, Shield } from 'lucide-react';
+import { UtensilsCrossed, ClipboardList, Bike, MapPin, Users, BarChart3, ArrowRight, Sparkles, Zap, Shield, Smartphone, Rocket, Crown, Target } from 'lucide-react';
 
 const steps = [
   {
     number: 1,
-    emoji: '📋',
+    icon: ClipboardList,
     title: 'Set up your menu',
     description: 'Add your dishes, categories, prices, and add-ons. Takes minutes, not days.',
   },
   {
     number: 2,
-    emoji: '📱',
+    icon: Smartphone,
     title: 'Customers order online',
     description: "Each restaurant gets its own ordering page — no app download, no marketplace cut.",
   },
   {
     number: 3,
-    emoji: '🚀',
+    icon: Rocket,
     title: 'Track it to the door',
     description: 'Your kitchen approves and preps, a driver gets dispatched, and the customer watches it happen live.',
   },
@@ -57,17 +57,17 @@ const features = [
 
 const roles = [
   {
-    emoji: '👑',
+    icon: Crown,
     title: 'Owners & Admins',
     description: 'Full control over menus, pricing, staff, and performance for your restaurant.',
   },
   {
-    emoji: '🎯',
+    icon: Target,
     title: 'Managers',
     description: 'Approve orders, run the kitchen queue, and dispatch drivers in real time.',
   },
   {
-    emoji: '🛵',
+    icon: Bike,
     title: 'Delivery Drivers',
     description: 'See assigned orders and delivery details on a screen built for the road.',
   },
@@ -207,9 +207,10 @@ function LandingPage() {
               <div style={{
                 width: '56px', height: '56px', borderRadius: '50%',
                 background: 'var(--color-accent-light)',
+                color: 'var(--color-accent)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto var(--space-4)', fontSize: '24px'
-              }}>{step.emoji}</div>
+                margin: '0 auto var(--space-4)'
+              }}><step.icon size={24} /></div>
               <div style={{
                 fontSize: 'var(--font-size-xs)', fontWeight: 700,
                 color: 'var(--color-accent)', textTransform: 'uppercase',
@@ -258,7 +259,7 @@ function LandingPage() {
               borderLeft: '3px solid var(--color-accent)',
               display: 'flex', flexDirection: 'column', gap: 'var(--space-2)'
             }}>
-              <span style={{ fontSize: '28px' }}>{role.emoji}</span>
+              <span style={{ color: 'var(--color-accent)' }}><role.icon size={28} /></span>
               <h3 style={{ fontSize: 'var(--font-size-lg)' }}>{role.title}</h3>
               <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{role.description}</p>
             </div>
@@ -277,7 +278,7 @@ function LandingPage() {
       }}>
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'radial-gradient(circle at 50% 120%, rgba(232,137,12,0.2) 0%, transparent 60%)',
+          background: 'radial-gradient(circle at 50% 120%, rgba(220, 38, 38, 0.2) 0%, transparent 60%)',
           pointerEvents: 'none'
         }} />
         <div style={{ position: 'relative' }}>
