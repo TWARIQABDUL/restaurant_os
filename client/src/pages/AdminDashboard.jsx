@@ -258,8 +258,8 @@ export default function AdminDashboard() {
             </button>
           </div>
         </div>
-        <div className="w-full min-w-0 mt-4 md:mt-0">
-          <div className="flex gap-2 overflow-x-auto pb-2 w-full" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ width: '100%', minWidth: 0, marginTop: 'var(--space-4)' }}>
+          <div className="scrollable-tabs">
             <button 
               className={`btn flex-shrink-0 ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('analytics')}
