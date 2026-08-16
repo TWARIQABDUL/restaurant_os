@@ -21,7 +21,7 @@ function setupSocketHandlers(io) {
   });
 
   io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id}`);
+    // console.log(`Socket connected: ${socket.id}`);
 
     // Authenticated users join their personal room
     if (socket.userId) {
@@ -46,7 +46,7 @@ function setupSocketHandlers(io) {
     });
 
     socket.on('disconnect', () => {
-      console.log(`Socket disconnected: ${socket.id}`);
+      // console.log(`Socket disconnected: ${socket.id}`);
     });
   });
 }
