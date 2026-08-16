@@ -35,6 +35,27 @@ export default async function handler(req, res) {
     const imageUrl = tenant.logo_url || faviconUrl || '';
     const currentUrl = `https://${req.headers.host || 'restaurant-os-liart-rho.vercel.app'}/${slug}`;
 
+    // JSON-LD structured data for Google Rich Results
+    const jsonLd = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Restaurant",
+      "name": tenant.name,
+      "description": description,
+      "url": currentUrl,
+      ...(imageUrl && { "image": imageUrl }),
+      ...(author && { "author": { "@type": "Organization", "name": author } }),
+      "servesCuisine": keywords || "Food",
+      "hasMenu": `${currentUrl}#menu`,
+      "potentialAction": {
+        "@type": "OrderAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": currentUrl
+        },
+        "deliveryMethod": "http://purl.org/goodrelations/v1#DeliveryModeDirectDownload"
+      }
+    });
+
     // Generate a lightweight HTML page for crawlers
     const html = `<!doctype html>
 <html lang="en">
@@ -53,7 +74,7 @@ export default async function handler(req, res) {
     <meta property="og:description" content="${description}" />
     ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ''}
     <meta property="og:url" content="${currentUrl}" />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content="restaurant" />
     <meta property="og:locale" content="${ogLocale}" />
     
     <!-- Twitter Card tags -->
@@ -62,9 +83,13 @@ export default async function handler(req, res) {
     <meta name="twitter:description" content="${description}" />
     ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ''}
     ${twitterHandle ? `<meta name="twitter:site" content="${twitterHandle}" />` : ''}
+
+    <!-- JSON-LD Structured Data for Google Rich Results -->
+    <script type="application/ld+json">${jsonLd}</script>
   </head>
   <body>
     <!-- This page is only served to web crawlers. Normal users get the React SPA. -->
+    <h1>${title}</h1>
     <p>${description}</p>
   </body>
 </html>`;

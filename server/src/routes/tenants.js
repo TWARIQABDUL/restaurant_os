@@ -203,6 +203,23 @@ router.patch('/:id/toggle', authenticate, superAdminOnly, async (req, res) => {
   }
 });
 
+// GET /api/tenants/public — List all active tenants (for sitemap)
+router.get('/public', async (req, res) => {
+  try {
+    const { data: tenants, error } = await supabase
+      .from('tenants')
+      .select('slug, name, updated_at')
+      .eq('active', true)
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+
+    res.json({ tenants: tenants || [] });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/tenants/public/:slug — Fetch public tenant info (Public)
 router.get('/public/:slug', async (req, res) => {
   try {

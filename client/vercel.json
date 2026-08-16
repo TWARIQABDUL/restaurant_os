@@ -1,12 +1,20 @@
 {
   "rewrites": [
     {
-      "source": "/:slug(.*)",
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/api/robots"
+    },
+    {
+      "source": "/:slug((?!api|_next|static|favicon\\.ico).*)",
       "has": [
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(?i).*(whatsapp|twitterbot|facebookexternalhit|slackbot|linkedinbot|pinterest|skypeuripreview|discordbot|telegrambot|vkshare|discord|applebot).*"
+          "value": "(?i).*(googlebot|bingbot|duckduckbot|baiduspider|yandexbot|ahrefsbot|semrushbot|whatsapp|twitterbot|facebookexternalhit|slackbot|linkedinbot|pinterest|skypeuripreview|discordbot|telegrambot|vkshare|discord|applebot).*"
         }
       ],
       "destination": "/api/seo"
