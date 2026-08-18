@@ -10,7 +10,7 @@ import MenuManagement from '../components/MenuManagement';
 import StaffManagement from '../components/StaffManagement';
 import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
-import { Copy, QrCode, X, Download } from 'lucide-react';
+import { Copy, QrCode, X, Download, MapPin, StickyNote, Phone } from 'lucide-react';
 import { uploadImage } from '../services/supabase';
 import { QRCodeCanvas } from 'qrcode.react';
 
@@ -416,15 +416,17 @@ export default function AdminDashboard() {
                         #{order.tracking_code}
                         <span className="text-sm font-normal text-accent ml-2">${parseFloat(order.total_amount).toFixed(2)}</span>
                       </div>
-                      <div className="text-sm text-secondary mb-1">
+                      <div className="text-sm text-secondary mb-1 flex items-center gap-1">
                         {order.guest_name || order.customer?.name} 
                         {' • '} 
-                        <a href={`tel:${order.guest_phone || order.customer?.phone}`} className="text-blue-600 hover:underline">
+                        <a href={`tel:${order.guest_phone || order.customer?.phone}`} className="text-blue-600 hover:underline flex items-center gap-1">
+                          <Phone size={12} />
                           {order.guest_phone || order.customer?.phone || 'No phone'}
                         </a>
                       </div>
-                      <div className="text-sm text-secondary mb-2">
-                        📍 {order.guest_address || 'Customer Address'}
+                      <div className="text-sm text-secondary mb-2 flex items-start gap-1">
+                        <MapPin size={14} className="mt-0.5 text-secondary flex-shrink-0" /> 
+                        <span>{order.guest_address || 'Customer Address'}</span>
                       </div>
                       
                       {/* Order items summary */}
@@ -437,8 +439,9 @@ export default function AdminDashboard() {
                       </div>
 
                       {order.delivery_notes && (
-                        <div className="text-xs text-warning mb-2 bg-warning-light p-2 rounded">
-                          📝 {order.delivery_notes}
+                        <div className="text-xs text-warning mb-2 bg-warning-light p-2 rounded flex items-start gap-1">
+                          <StickyNote size={14} className="mt-0.5 flex-shrink-0" />
+                          <span>{order.delivery_notes}</span>
                         </div>
                       )}
                       
