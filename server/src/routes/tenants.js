@@ -114,6 +114,7 @@ router.get('/me/payment-settings', authenticate, authorize('admin'), async (req,
       payment_settings: {
         settlementMode: tenant.settings?.payments?.settlementMode || 'manual',
         payoutPhone: tenant.settings?.payments?.payoutPhone || '',
+        acceptedPaymentMethods: tenant.settings?.payments?.acceptedPaymentMethods || ['cash_on_delivery', 'mobile_money', 'bank_transfer'],
       },
     });
   } catch (err) {
@@ -130,10 +131,21 @@ router.patch(
   authorize('admin'),
   async (req, res) => {
     try {
-      const { settlementMode, payoutPhone } = req.body;
+      const { settlementMode, payoutPhone, acceptedPaymentMethods } = req.body;
 
       if (settlementMode !== undefined && !['manual', 'auto'].includes(settlementMode)) {
         return res.status(400).json({ error: 'settlementMode must be "manual" or "auto"' });
+      }
+
+      const validMethods = ['cash_on_delivery', 'mobile_money', 'bank_transfer'];
+      if (acceptedPaymentMethods !== undefined) {
+        if (!Array.isArray(acceptedPaymentMethods) || acceptedPaymentMethods.length === 0) {
+          return res.status(400).json({ error: 'At least one payment method must be enabled' });
+        }
+        const invalid = acceptedPaymentMethods.filter(m => !validMethods.includes(m));
+        if (invalid.length > 0) {
+          return res.status(400).json({ error: `Invalid payment methods: ${invalid.join(', ')}` });
+        }
       }
 
       const { data: current, error: fetchErr } = await supabase
@@ -152,6 +164,7 @@ router.patch(
           ...(current.settings?.payments || {}),
           ...(settlementMode !== undefined ? { settlementMode } : {}),
           ...(payoutPhone !== undefined ? { payoutPhone } : {}),
+          ...(acceptedPaymentMethods !== undefined ? { acceptedPaymentMethods } : {}),
         },
       };
 
@@ -240,7 +253,8 @@ router.get('/public/:slug', async (req, res) => {
         name: tenant.name,
         slug: tenant.slug,
         logo_url: tenant.logo_url,
-        seo: tenant.settings?.seo || {}
+        seo: tenant.settings?.seo || {},
+        acceptedPaymentMethods: tenant.settings?.payments?.acceptedPaymentMethods || ['cash_on_delivery', 'mobile_money', 'bank_transfer']
       }
     });
   } catch (err) {

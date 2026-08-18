@@ -16,6 +16,7 @@ export default function Checkout() {
   const [error, setError] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState(null); // null | 'waiting' | 'paid' | 'timeout'
   const [trackingCode, setTrackingCode] = useState(null);
+  const [acceptedMethods, setAcceptedMethods] = useState(['cash_on_delivery', 'mobile_money', 'bank_transfer']);
 
   const [formData, setFormData] = useState({
     guest_name: '',
@@ -26,6 +27,24 @@ export default function Checkout() {
     payment_phone: '',
     delivery_notes: ''
   });
+
+  // Fetch tenant's accepted payment methods
+  useEffect(() => {
+    async function loadTenantPaymentMethods() {
+      try {
+        const res = await api.get(`/tenants/public/${tenantSlug}`);
+        const methods = res.data.tenant?.acceptedPaymentMethods || ['cash_on_delivery', 'mobile_money', 'bank_transfer'];
+        setAcceptedMethods(methods);
+        // Set default to the first accepted method
+        if (!methods.includes(formData.payment_method)) {
+          setFormData(prev => ({ ...prev, payment_method: methods[0] }));
+        }
+      } catch (err) {
+        console.error('Failed to load tenant payment methods');
+      }
+    }
+    loadTenantPaymentMethods();
+  }, [tenantSlug]);
 
   useEffect(() => {
     if (user && user.phone && !formData.payment_phone) {
@@ -219,7 +238,7 @@ export default function Checkout() {
                 { value: 'cash_on_delivery', label: 'Cash on Delivery', icon: Banknote },
                 { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone },
                 { value: 'bank_transfer', label: 'Bank Transfer', icon: Landmark },
-              ].map(method => {
+              ].filter(method => acceptedMethods.includes(method.value)).map(method => {
                 const Icon = method.icon;
                 return (
                   <button

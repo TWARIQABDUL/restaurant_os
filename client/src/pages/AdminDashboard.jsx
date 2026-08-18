@@ -34,7 +34,7 @@ export default function AdminDashboard() {
   const [wallet, setWallet] = useState(null);
   const [ledger, setLedger] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
-  const [paymentSettings, setPaymentSettings] = useState({ settlementMode: 'manual', payoutPhone: '' });
+  const [paymentSettings, setPaymentSettings] = useState({ settlementMode: 'manual', payoutPhone: '', acceptedPaymentMethods: ['cash_on_delivery', 'mobile_money', 'bank_transfer'] });
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawPhone, setWithdrawPhone] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -538,7 +538,55 @@ export default function AdminDashboard() {
             <div className="card">
               <h3 className="mb-4">Payment settings</h3>
               <div className="flex flex-col gap-3">
+
+                {/* Accepted payment methods */}
                 <div>
+                  <label className="form-label" style={{ marginBottom: 'var(--space-3)' }}>Accepted payment methods</label>
+                  <p className="text-xs text-muted" style={{ marginBottom: 'var(--space-3)' }}>
+                    Choose which payment methods your customers can use at checkout.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {[
+                      { value: 'cash_on_delivery', label: 'Cash on Delivery' },
+                      { value: 'mobile_money', label: 'Mobile Money (MoMo)' },
+                      { value: 'bank_transfer', label: 'Bank Transfer' },
+                    ].map(method => {
+                      const isChecked = (paymentSettings.acceptedPaymentMethods || []).includes(method.value);
+                      const isOnly = isChecked && (paymentSettings.acceptedPaymentMethods || []).length === 1;
+                      return (
+                        <label key={method.value} style={{
+                          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+                          padding: 'var(--space-3) var(--space-4)',
+                          borderRadius: 'var(--radius-md)',
+                          border: `1px solid ${isChecked ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                          background: isChecked ? 'var(--color-accent-light)' : 'var(--color-surface)',
+                          cursor: isOnly ? 'not-allowed' : 'pointer',
+                          transition: 'all var(--transition-base)',
+                          opacity: isOnly ? 0.7 : 1
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={isOnly}
+                            onChange={() => {
+                              setPaymentSettings(prev => {
+                                const current = prev.acceptedPaymentMethods || [];
+                                const next = isChecked
+                                  ? current.filter(m => m !== method.value)
+                                  : [...current, method.value];
+                                return { ...prev, acceptedPaymentMethods: next };
+                              });
+                            }}
+                            style={{ width: '18px', height: '18px', accentColor: 'var(--color-accent)', cursor: 'inherit' }}
+                          />
+                          <span style={{ fontWeight: 500, fontSize: 'var(--font-size-sm)' }}>{method.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-3)', marginTop: 'var(--space-1)' }}>
                   <label className="form-label">Settlement mode</label>
                   <select
                     className="form-select"
