@@ -10,8 +10,9 @@ import MenuManagement from '../components/MenuManagement';
 import StaffManagement from '../components/StaffManagement';
 import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
-import { Copy } from 'lucide-react';
+import { Copy, QrCode, X, Download } from 'lucide-react';
 import { uploadImage } from '../services/supabase';
+import { QRCodeCanvas } from 'qrcode.react';
 
 const COLORS = ['#e8890c', '#2563eb', '#2d8a4e', '#c53030', '#8b5cf6'];
 
@@ -47,6 +48,9 @@ export default function AdminDashboard() {
   });
   const [faviconFile, setFaviconFile] = useState(null);
   const [savingSeo, setSavingSeo] = useState(false);
+
+  // QR Code State
+  const [showQrModal, setShowQrModal] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'analytics') {
@@ -229,8 +233,21 @@ export default function AdminDashboard() {
     }));
   };
 
+  const downloadQRCode = () => {
+    const canvas = document.getElementById('tenant-qr-code');
+    if (canvas) {
+      const pngUrl = canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream');
+      const downloadLink = document.createElement('a');
+      downloadLink.href = pngUrl;
+      downloadLink.download = `${user?.tenants?.slug || 'restaurant'}-qr-code.png`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    }
+  };
+
   return (
-    <div className="page" style={{ maxWidth: '100vw', overflowX: 'hidden' }}>
+    <div className="page" style={{ maxWidth: '100vw', overflowX: 'hidden', position: 'relative' }}>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 w-full max-w-full">
         <div className="w-full md:w-auto min-w-0">
           <h1>Admin Dashboard</h1>
@@ -255,6 +272,13 @@ export default function AdminDashboard() {
               title="Copy Link"
             >
               <Copy size={16} />
+            </button>
+            <button 
+              className="icon-btn ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors flex-shrink-0"
+              onClick={() => setShowQrModal(true)}
+              title="Generate QR Code"
+            >
+              <QrCode size={16} />
             </button>
           </div>
         </div>
@@ -812,6 +836,42 @@ export default function AdminDashboard() {
           </form>
         </div>
       )}
+
+      {/* QR Code Modal */}
+      {showQrModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div className="card" style={{ background: 'var(--color-surface)', width: '100%', maxWidth: '400px', padding: 'var(--space-6)', position: 'relative' }}>
+            <button 
+              onClick={() => setShowQrModal(false)}
+              style={{ position: 'absolute', top: 'var(--space-4)', right: 'var(--space-4)', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              <X size={20} className="text-muted" />
+            </button>
+            <h3 className="mb-2 text-center">Storefront QR Code</h3>
+            <p className="text-sm text-secondary text-center mb-6">Scan to visit the restaurant page</p>
+            
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-6)', background: 'white', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)' }}>
+              <QRCodeCanvas 
+                id="tenant-qr-code"
+                value={`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`}
+                size={256}
+                level={"H"}
+                includeMargin={true}
+              />
+            </div>
+            
+            <button className="btn btn-primary w-full" onClick={downloadQRCode} style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: 'var(--space-2)' }}>
+              <Download size={18} />
+              Download QR Code
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
