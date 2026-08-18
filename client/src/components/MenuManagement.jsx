@@ -13,16 +13,10 @@ export default function MenuManagement() {
   
   // Addons state
   const [allAddOns, setAllAddOns] = useState([]);
-  const [selectedAddOnIds, setSelectedAddOnIds] = useState([]);
-
   const fetchMenuAndAddons = async () => {
     try {
-      const [{ data: menuData }, { data: addonsData }] = await Promise.all([
-        api.get('/menu'),
-        api.get('/addons')
-      ]);
+      const { data: menuData } = await api.get('/menu');
       setMenuItems(menuData.items || []);
-      setAllAddOns(addonsData.addOns || []);
     } catch (err) {
       console.error('Failed to fetch data', err);
     }
@@ -45,25 +39,16 @@ export default function MenuManagement() {
 
       const payload = { ...newMenu, image_url: finalImageUrl };
 
-      let savedMenuItemId = editingItemId;
-
       if (editingItemId) {
         await api.put(`/menu/${editingItemId}`, payload);
       } else {
-        const { data } = await api.post('/menu', payload);
-        savedMenuItemId = data.item.id;
-      }
-
-      // Save add-ons links if any
-      if (selectedAddOnIds.length > 0) {
-        await api.post(`/addons/menu/${savedMenuItemId}/link`, { add_on_ids: selectedAddOnIds });
+        await api.post('/menu', payload);
       }
 
       setNewMenu({ name: '', description: '', price: '', category: '', image_url: '' });
       setImageFile(null);
       setIsAddingMenu(false);
       setEditingItemId(null);
-      setSelectedAddOnIds([]);
       fetchMenuAndAddons();
     } catch (err) {
       alert(err.message || err.response?.data?.error || 'Failed to save menu item');
@@ -82,7 +67,6 @@ export default function MenuManagement() {
       image_url: item.image_url || '' 
     });
     setImageFile(null);
-    setSelectedAddOnIds(item.add_ons?.map(a => a.add_on_id) || []);
     setIsAddingMenu(true);
   };
 
@@ -110,7 +94,6 @@ export default function MenuManagement() {
               setNewMenu({ name: '', description: '', price: '', category: '', image_url: '' });
               setImageFile(null);
               setEditingItemId(null);
-              setSelectedAddOnIds([]);
               setIsAddingMenu(true);
             }
           }}
@@ -159,40 +142,6 @@ export default function MenuManagement() {
             <div className="form-group mb-4">
               <label className="form-label">Description (Optional)</label>
               <textarea className="form-textarea" rows="2" value={newMenu.description} onChange={e => setNewMenu({...newMenu, description: e.target.value})}></textarea>
-            </div>
-            
-            <div className="form-group mb-6">
-              <label className="form-label">Linked Add-ons (Optional)</label>
-              <div className="flex flex-wrap gap-2">
-                {allAddOns.map(addon => {
-                  const isSelected = selectedAddOnIds.includes(addon.id);
-                  return (
-                    <div 
-                      key={addon.id}
-                      onClick={() => {
-                        if (isSelected) {
-                          setSelectedAddOnIds(selectedAddOnIds.filter(id => id !== addon.id));
-                        } else {
-                          setSelectedAddOnIds([...selectedAddOnIds, addon.id]);
-                        }
-                      }}
-                      style={{
-                        padding: '4px 12px',
-                        border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        borderRadius: '999px',
-                        cursor: 'pointer',
-                        fontSize: '13px',
-                        backgroundColor: isSelected ? 'var(--color-primary)' : 'white',
-                        color: isSelected ? 'white' : 'var(--color-text)',
-                        fontWeight: isSelected ? 600 : 400
-                      }}
-                    >
-                      {addon.name} (+${addon.price})
-                    </div>
-                  );
-                })}
-                {allAddOns.length === 0 && <span className="text-sm text-secondary">No add-ons created yet.</span>}
-              </div>
             </div>
 
             <button type="submit" className="btn btn-primary" disabled={isSaving}>

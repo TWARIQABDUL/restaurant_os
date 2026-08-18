@@ -80,23 +80,16 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Menu item not found' });
     }
 
-    // Fetch available add-ons for this item
-    const { data: addOnLinks } = await supabase
-      .from('menu_item_addons')
-      .select('add_on_id')
-      .eq('menu_item_id', id);
+    // Fetch all available add-ons for the tenant (globally available for every item)
+    const { data: addOnData } = await supabase
+      .from('add_ons')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .eq('available', true)
+      .order('category')
+      .order('name');
 
-    let addOns = [];
-    if (addOnLinks && addOnLinks.length > 0) {
-      const addOnIds = addOnLinks.map(link => link.add_on_id);
-      const { data: addOnData } = await supabase
-        .from('add_ons')
-        .select('*')
-        .in('id', addOnIds)
-        .eq('available', true);
-
-      addOns = addOnData || [];
-    }
+    const addOns = addOnData || [];
 
     res.json({ item, addOns });
   } catch (err) {
