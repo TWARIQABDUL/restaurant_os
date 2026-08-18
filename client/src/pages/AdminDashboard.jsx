@@ -400,8 +400,8 @@ export default function AdminDashboard() {
       )}
 
       {!loading && activeTab === 'delivery' && (
-        <div className="grid grid-2" style={{ gridTemplateColumns: '2fr 1fr' }}>
-          <div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-6)' }}>
+          <div style={{ flex: '2 1 400px', minWidth: 0 }}>
             <h3 className="mb-4">Orders Ready for Dispatch</h3>
             {readyOrders.length === 0 ? (
               <div className="card text-center p-8 text-secondary">
@@ -410,8 +410,8 @@ export default function AdminDashboard() {
             ) : (
               <div className="flex flex-col gap-4">
                 {readyOrders.map(order => (
-                  <div key={order.id} className="card flex justify-between items-center">
-                    <div>
+                  <div key={order.id} className="card" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: '1 1 200px', minWidth: 0 }}>
                       <div className="font-bold mb-1">#{order.tracking_code}</div>
                       <div className="text-sm text-secondary mb-1">
                         {order.guest_name || order.customer?.name} • {order.guest_address || 'Customer Address'}
@@ -420,12 +420,12 @@ export default function AdminDashboard() {
                         Ready since: {new Date(order.updated_at).toLocaleTimeString()}
                       </div>
                     </div>
-                    <div className="w-full mt-2">
+                    <div style={{ flex: '2 1 300px', minWidth: 0 }}>
                       {(() => {
                         const state = dispatchState[order.id] || { type: 'internal', name: '', phone: '', plate: '' };
                         return (
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2 w-full">
+                          <div className="flex flex-col gap-2 w-full">
+                            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-2)', width: '100%' }}>
                               <select 
                                 className="form-select form-select-sm"
                                 value={state.type}
@@ -438,9 +438,10 @@ export default function AdminDashboard() {
                               
                               {state.type === 'internal' ? (
                                 <select 
-                                  className="form-select form-select-sm flex-1" 
+                                  className="form-select form-select-sm" 
                                   id={`driver-select-${order.id}`}
                                   defaultValue=""
+                                  style={{ flex: '1 1 150px', minWidth: 0 }}
                                 >
                                   <option value="" disabled>Select Driver...</option>
                                   {drivers.map(driver => (
@@ -450,10 +451,10 @@ export default function AdminDashboard() {
                                   ))}
                                 </select>
                               ) : (
-                                <div className="flex gap-1 flex-1">
-                                  <input type="text" className="form-input form-input-sm" style={{ padding: '4px 8px' }} placeholder="Name (e.g. Uber)" value={state.name} onChange={e => handleDispatchState(order.id, 'name', e.target.value)} />
-                                  <input type="text" className="form-input form-input-sm" style={{ padding: '4px 8px' }} placeholder="Phone" value={state.phone} onChange={e => handleDispatchState(order.id, 'phone', e.target.value)} />
-                                  <input type="text" className="form-input form-input-sm" style={{ padding: '4px 8px' }} placeholder="Plate (Optional)" value={state.plate} onChange={e => handleDispatchState(order.id, 'plate', e.target.value)} />
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)', flex: '1 1 200px', minWidth: 0 }}>
+                                  <input type="text" className="form-input form-input-sm" style={{ padding: '4px 8px', flex: '1 1 80px', minWidth: 0 }} placeholder="Name" value={state.name} onChange={e => handleDispatchState(order.id, 'name', e.target.value)} />
+                                  <input type="text" className="form-input form-input-sm" style={{ padding: '4px 8px', flex: '1 1 80px', minWidth: 0 }} placeholder="Phone" value={state.phone} onChange={e => handleDispatchState(order.id, 'phone', e.target.value)} />
+                                  <input type="text" className="form-input form-input-sm" style={{ padding: '4px 8px', flex: '1 1 80px', minWidth: 0 }} placeholder="Plate" value={state.plate} onChange={e => handleDispatchState(order.id, 'plate', e.target.value)} />
                                 </div>
                               )}
                               
@@ -489,7 +490,8 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          <div>
+          {/* Active Deliveries */}
+          <div style={{ flex: '1 1 300px', minWidth: 0 }}>
             <h3 className="mb-4">Available Drivers</h3>
             <div className="card">
               {drivers.map((driver, idx) => (
