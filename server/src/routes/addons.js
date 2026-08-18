@@ -132,13 +132,13 @@ router.delete(
   }
 );
 
-// POST /api/menu/:menuItemId/addons — Link add-ons to a menu item (Admin/Manager)
+// POST /api/addons/menu/:menuItemId/link — Link add-ons to a menu item (Admin/Manager)
 router.post(
   '/menu/:menuItemId/link',
   authenticate,
   authorize('admin', 'manager'),
   [
-    body('add_on_ids').isArray({ min: 1 }).withMessage('add_on_ids must be a non-empty array'),
+    body('add_on_ids').isArray().withMessage('add_on_ids must be an array'),
   ],
   async (req, res) => {
     try {
@@ -150,18 +150,27 @@ router.post(
       const { menuItemId } = req.params;
       const { add_on_ids } = req.body;
 
-      const links = add_on_ids.map(addOnId => ({
-        menu_item_id: menuItemId,
-        add_on_id: addOnId,
-      }));
-
-      const { error } = await supabase
+      // 1. Delete all existing links for this item to start fresh
+      await supabase
         .from('menu_item_addons')
-        .upsert(links, { onConflict: 'menu_item_id,add_on_id' });
+        .delete()
+        .eq('menu_item_id', menuItemId);
 
-      if (error) {
-        console.error('Link add-ons error:', error);
-        return res.status(500).json({ error: 'Failed to link add-ons' });
+      // 2. Insert new links if any
+      if (add_on_ids.length > 0) {
+        const links = add_on_ids.map(addOnId => ({
+          menu_item_id: menuItemId,
+          add_on_id: addOnId,
+        }));
+
+        const { error } = await supabase
+          .from('menu_item_addons')
+          .insert(links);
+
+        if (error) {
+          console.error('Link add-ons error:', error);
+          return res.status(500).json({ error: 'Failed to link add-ons' });
+        }
       }
 
       res.json({ message: 'Add-ons linked successfully' });
