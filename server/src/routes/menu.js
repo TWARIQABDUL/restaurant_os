@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
 
     let query = supabase
       .from('menu_items')
-      .select('*')
+      .select('*, add_ons:menu_item_addons ( add_on_id )')
       .eq('tenant_id', tenantId)
       .eq('available', true)
       .order('category')

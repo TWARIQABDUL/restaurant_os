@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { uploadImage } from '../services/supabase';
+import AddonsManagement from './AddonsManagement';
 
 export default function MenuManagement() {
   const [menuItems, setMenuItems] = useState([]);
@@ -9,18 +10,26 @@ export default function MenuManagement() {
   const [newMenu, setNewMenu] = useState({ name: '', description: '', price: '', category: '', image_url: '' });
   const [imageFile, setImageFile] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Addons state
+  const [allAddOns, setAllAddOns] = useState([]);
+  const [selectedAddOnIds, setSelectedAddOnIds] = useState([]);
 
-  const fetchMenu = async () => {
+  const fetchMenuAndAddons = async () => {
     try {
-      const { data } = await api.get('/menu');
-      setMenuItems(data.items || []);
+      const [{ data: menuData }, { data: addonsData }] = await Promise.all([
+        api.get('/menu'),
+        api.get('/addons')
+      ]);
+      setMenuItems(menuData.items || []);
+      setAllAddOns(addonsData.addOns || []);
     } catch (err) {
-      console.error('Failed to fetch menu items', err);
+      console.error('Failed to fetch data', err);
     }
   };
 
   useEffect(() => {
-    fetchMenu();
+    fetchMenuAndAddons();
   }, []);
 
   const handleSaveMenu = async (e) => {
@@ -36,17 +45,26 @@ export default function MenuManagement() {
 
       const payload = { ...newMenu, image_url: finalImageUrl };
 
+      let savedMenuItemId = editingItemId;
+
       if (editingItemId) {
         await api.put(`/menu/${editingItemId}`, payload);
       } else {
-        await api.post('/menu', payload);
+        const { data } = await api.post('/menu', payload);
+        savedMenuItemId = data.item.id;
+      }
+
+      // Save add-ons links if any
+      if (selectedAddOnIds.length > 0) {
+        await api.post(`/addons/menu/${savedMenuItemId}/link`, { add_on_ids: selectedAddOnIds });
       }
 
       setNewMenu({ name: '', description: '', price: '', category: '', image_url: '' });
       setImageFile(null);
       setIsAddingMenu(false);
       setEditingItemId(null);
-      fetchMenu();
+      setSelectedAddOnIds([]);
+      fetchMenuAndAddons();
     } catch (err) {
       alert(err.message || err.response?.data?.error || 'Failed to save menu item');
     } finally {
@@ -64,6 +82,7 @@ export default function MenuManagement() {
       image_url: item.image_url || '' 
     });
     setImageFile(null);
+    setSelectedAddOnIds(item.add_ons?.map(a => a.add_on_id) || []);
     setIsAddingMenu(true);
   };
 
@@ -71,7 +90,7 @@ export default function MenuManagement() {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     try {
       await api.delete(`/menu/${id}`);
-      fetchMenu();
+      fetchMenuAndAddons();
     } catch (err) {
       alert('Failed to delete menu item');
     }
@@ -91,6 +110,7 @@ export default function MenuManagement() {
               setNewMenu({ name: '', description: '', price: '', category: '', image_url: '' });
               setImageFile(null);
               setEditingItemId(null);
+              setSelectedAddOnIds([]);
               setIsAddingMenu(true);
             }
           }}
@@ -140,6 +160,41 @@ export default function MenuManagement() {
               <label className="form-label">Description (Optional)</label>
               <textarea className="form-textarea" rows="2" value={newMenu.description} onChange={e => setNewMenu({...newMenu, description: e.target.value})}></textarea>
             </div>
+            
+            <div className="form-group mb-6">
+              <label className="form-label">Linked Add-ons (Optional)</label>
+              <div className="flex flex-wrap gap-2">
+                {allAddOns.map(addon => {
+                  const isSelected = selectedAddOnIds.includes(addon.id);
+                  return (
+                    <div 
+                      key={addon.id}
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedAddOnIds(selectedAddOnIds.filter(id => id !== addon.id));
+                        } else {
+                          setSelectedAddOnIds([...selectedAddOnIds, addon.id]);
+                        }
+                      }}
+                      style={{
+                        padding: '4px 12px',
+                        border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        borderRadius: '999px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        backgroundColor: isSelected ? 'var(--color-primary)' : 'white',
+                        color: isSelected ? 'white' : 'var(--color-text)',
+                        fontWeight: isSelected ? 600 : 400
+                      }}
+                    >
+                      {addon.name} (+${addon.price})
+                    </div>
+                  );
+                })}
+                {allAddOns.length === 0 && <span className="text-sm text-secondary">No add-ons created yet.</span>}
+              </div>
+            </div>
+
             <button type="submit" className="btn btn-primary" disabled={isSaving}>
               {isSaving ? 'Saving...' : 'Save Item'}
             </button>
@@ -187,6 +242,10 @@ export default function MenuManagement() {
           </tbody>
         </table>
       </div>
+
+      <hr style={{ margin: 'var(--space-8) 0', border: 'none', borderTop: '1px solid var(--color-border)' }} />
+      
+      <AddonsManagement />
     </div>
   );
 }
