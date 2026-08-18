@@ -412,10 +412,36 @@ export default function AdminDashboard() {
                 {readyOrders.map(order => (
                   <div key={order.id} className="card" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                      <div className="font-bold mb-1">#{order.tracking_code}</div>
-                      <div className="text-sm text-secondary mb-1">
-                        {order.guest_name || order.customer?.name} • {order.guest_address || 'Customer Address'}
+                      <div className="font-bold mb-1">
+                        #{order.tracking_code}
+                        <span className="text-sm font-normal text-accent ml-2">${parseFloat(order.total_amount).toFixed(2)}</span>
                       </div>
+                      <div className="text-sm text-secondary mb-1">
+                        {order.guest_name || order.customer?.name} 
+                        {' • '} 
+                        <a href={`tel:${order.guest_phone || order.customer?.phone}`} className="text-blue-600 hover:underline">
+                          {order.guest_phone || order.customer?.phone || 'No phone'}
+                        </a>
+                      </div>
+                      <div className="text-sm text-secondary mb-2">
+                        📍 {order.guest_address || 'Customer Address'}
+                      </div>
+                      
+                      {/* Order items summary */}
+                      <div className="text-xs text-secondary mb-2 bg-gray-50 p-2 rounded border border-gray-100">
+                        {order.order_items?.map((item, i) => (
+                          <div key={i} className="truncate">
+                            {item.quantity}x {item.menu_item?.name || 'Unknown item'}
+                          </div>
+                        ))}
+                      </div>
+
+                      {order.delivery_notes && (
+                        <div className="text-xs text-warning mb-2 bg-warning-light p-2 rounded">
+                          📝 {order.delivery_notes}
+                        </div>
+                      )}
+                      
                       <div className="text-xs text-muted">
                         Ready since: {new Date(order.updated_at).toLocaleTimeString()}
                       </div>
