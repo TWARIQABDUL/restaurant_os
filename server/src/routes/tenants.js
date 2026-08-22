@@ -358,7 +358,7 @@ router.get('/me/theme', authenticate, authorize('admin', 'manager'), async (req,
 // PATCH /api/tenants/me/theme — update current theme settings
 router.patch('/me/theme', authenticate, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { primaryColor, accentColor } = req.body;
+    const { primaryColor, accentColor, secondaryColor, backgroundColor, textColor } = req.body;
 
     const { data: current, error: fetchErr } = await supabase
       .from('tenants')
@@ -376,6 +376,9 @@ router.patch('/me/theme', authenticate, authorize('admin', 'manager'), async (re
         ...(current.settings?.theme || {}),
         ...(primaryColor !== undefined ? { primaryColor } : {}),
         ...(accentColor !== undefined ? { accentColor } : {}),
+        ...(secondaryColor !== undefined ? { secondaryColor } : {}),
+        ...(backgroundColor !== undefined ? { backgroundColor } : {}),
+        ...(textColor !== undefined ? { textColor } : {}),
       },
     };
 

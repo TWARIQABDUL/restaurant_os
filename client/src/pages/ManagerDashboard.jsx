@@ -41,7 +41,13 @@ export default function ManagerDashboard() {
   const [activeTab, setActiveTab] = useState('orders');
 
   // Theme State
-  const [themeSettings, setThemeSettings] = useState({ primaryColor: '#DC2626', accentColor: '#A16207' });
+  const [themeSettings, setThemeSettings] = useState({ 
+    primaryColor: '#DC2626', 
+    accentColor: '#A16207',
+    secondaryColor: '#F87171',
+    backgroundColor: '#FEF2F2',
+    textColor: '#450A0A'
+  });
   const [savingTheme, setSavingTheme] = useState(false);
 
   const fetchOrders = async () => {
@@ -119,7 +125,10 @@ export default function ManagerDashboard() {
       const { data } = await api.get('/tenants/me/theme');
       setThemeSettings({
         primaryColor: data.theme?.primaryColor || '#DC2626',
-        accentColor: data.theme?.accentColor || '#A16207'
+        accentColor: data.theme?.accentColor || '#A16207',
+        secondaryColor: data.theme?.secondaryColor || '#F87171',
+        backgroundColor: data.theme?.backgroundColor || '#FEF2F2',
+        textColor: data.theme?.textColor || '#450A0A',
       });
     } catch (err) {
       console.error('Failed to load theme settings', err);
@@ -529,6 +538,66 @@ export default function ManagerDashboard() {
                 />
               </div>
               <p className="text-xs text-secondary mt-1">Used for gradients, links, and secondary highlights.</p>
+            </div>
+
+            <div className="form-group mb-6">
+              <label className="form-label">Secondary Color</label>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="color" 
+                  value={themeSettings.secondaryColor}
+                  onChange={(e) => setThemeSettings({ ...themeSettings, secondaryColor: e.target.value })}
+                  style={{ width: '50px', height: '50px', padding: '0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+                />
+                <input
+                  type="text"
+                  className="form-input"
+                  value={themeSettings.secondaryColor}
+                  onChange={(e) => setThemeSettings({ ...themeSettings, secondaryColor: e.target.value })}
+                  style={{ width: '120px' }}
+                />
+              </div>
+              <p className="text-xs text-secondary mt-1">Used for alternative buttons and badges.</p>
+            </div>
+
+            <div className="form-group mb-6">
+              <label className="form-label">Background Color</label>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="color" 
+                  value={themeSettings.backgroundColor}
+                  onChange={(e) => setThemeSettings({ ...themeSettings, backgroundColor: e.target.value })}
+                  style={{ width: '50px', height: '50px', padding: '0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+                />
+                <input
+                  type="text"
+                  className="form-input"
+                  value={themeSettings.backgroundColor}
+                  onChange={(e) => setThemeSettings({ ...themeSettings, backgroundColor: e.target.value })}
+                  style={{ width: '120px' }}
+                />
+              </div>
+              <p className="text-xs text-secondary mt-1">The main background color of the storefront.</p>
+            </div>
+
+            <div className="form-group mb-6">
+              <label className="form-label">Text Color</label>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="color" 
+                  value={themeSettings.textColor}
+                  onChange={(e) => setThemeSettings({ ...themeSettings, textColor: e.target.value })}
+                  style={{ width: '50px', height: '50px', padding: '0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+                />
+                <input
+                  type="text"
+                  className="form-input"
+                  value={themeSettings.textColor}
+                  onChange={(e) => setThemeSettings({ ...themeSettings, textColor: e.target.value })}
+                  style={{ width: '120px' }}
+                />
+              </div>
+              <p className="text-xs text-secondary mt-1">The primary text color (ensure it contrasts well with the background).</p>
             </div>
 
             <button type="submit" className="btn btn-primary" disabled={savingTheme}>

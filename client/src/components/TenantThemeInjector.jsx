@@ -17,6 +17,9 @@ export default function TenantThemeInjector() {
       // Reset theme or skip
       document.documentElement.style.removeProperty('--color-primary');
       document.documentElement.style.removeProperty('--color-accent');
+      document.documentElement.style.removeProperty('--color-secondary');
+      document.documentElement.style.removeProperty('--color-bg');
+      document.documentElement.style.removeProperty('--color-text');
       document.documentElement.style.removeProperty('--gradient-dark');
       document.documentElement.style.removeProperty('--gradient-accent');
       return;
@@ -28,7 +31,7 @@ export default function TenantThemeInjector() {
         const root = document.documentElement;
         
         if (tenant?.theme) {
-          const { primaryColor, accentColor } = tenant.theme;
+          const { primaryColor, accentColor, secondaryColor, backgroundColor, textColor } = tenant.theme;
           
           if (primaryColor) {
             root.style.setProperty('--color-primary', primaryColor);
@@ -44,6 +47,26 @@ export default function TenantThemeInjector() {
           } else {
             root.style.removeProperty('--color-accent');
             root.style.removeProperty('--gradient-accent');
+          }
+
+          if (secondaryColor) {
+            root.style.setProperty('--color-secondary', secondaryColor);
+          } else {
+            root.style.removeProperty('--color-secondary');
+          }
+
+          if (backgroundColor) {
+            root.style.setProperty('--color-bg', backgroundColor);
+            root.style.setProperty('--color-surface-hover', backgroundColor); // ensure hover states adapt to the custom bg
+          } else {
+            root.style.removeProperty('--color-bg');
+            root.style.removeProperty('--color-surface-hover');
+          }
+
+          if (textColor) {
+            root.style.setProperty('--color-text', textColor);
+          } else {
+            root.style.removeProperty('--color-text');
           }
         }
       })
