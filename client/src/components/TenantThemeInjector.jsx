@@ -1,19 +1,33 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function TenantThemeInjector() {
   const location = useLocation();
+  const { user } = useAuth();
 
   useEffect(() => {
     // Attempt to extract tenantSlug from the URL path.
     // Assuming format is /:tenantSlug/... where tenantSlug is not a static asset or reserved word.
     const pathParts = location.pathname.split('/').filter(Boolean);
-    const tenantSlug = pathParts[0];
+    let tenantSlug = pathParts[0];
 
     // Reserved paths that are not tenant slugs
     const reserved = ['admin', 'manager', 'delivery', 'super-admin', 'login', 'register', 'api'];
-    if (!tenantSlug || reserved.includes(tenantSlug) || tenantSlug.includes('.')) {
+    
+    // If we are on a reserved route (like /admin), try to use the authenticated user's tenant
+    if (!tenantSlug || reserved.includes(tenantSlug)) {
+      if (user && user.tenants?.slug) {
+        tenantSlug = user.tenants.slug;
+      } else if (localStorage.getItem('tenantSlug')) {
+        tenantSlug = localStorage.getItem('tenantSlug');
+      } else {
+        tenantSlug = null;
+      }
+    }
+
+    if (!tenantSlug || tenantSlug.includes('.')) {
       // Reset theme or skip
       document.documentElement.style.removeProperty('--color-primary');
       document.documentElement.style.removeProperty('--color-accent');
@@ -74,7 +88,7 @@ export default function TenantThemeInjector() {
         // If tenant is not found or error, don't break the app but log
         console.error('Failed to load theme for tenant', err);
       });
-  }, [location.pathname]);
+  }, [location.pathname, user?.tenants?.slug]);
 
   return null;
 }
