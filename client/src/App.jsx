@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
+import TenantThemeInjector from './components/TenantThemeInjector';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -22,6 +23,7 @@ import SuperAdminDashboard from './pages/SuperAdminDashboard';
 function App() {
   return (
     <>
+      <TenantThemeInjector />
       <Navbar />
       <div className="container">
         <Routes>

@@ -49,6 +49,10 @@ export default function AdminDashboard() {
   const [faviconFile, setFaviconFile] = useState(null);
   const [savingSeo, setSavingSeo] = useState(false);
 
+  // Theme State
+  const [themeSettings, setThemeSettings] = useState({ primaryColor: '#DC2626', accentColor: '#A16207' });
+  const [savingTheme, setSavingTheme] = useState(false);
+
   // QR Code State
   const [showQrModal, setShowQrModal] = useState(false);
 
@@ -61,6 +65,8 @@ export default function AdminDashboard() {
       fetchWallet();
     } else if (activeTab === 'seo') {
       fetchSeoSettings();
+    } else if (activeTab === 'theme') {
+      fetchThemeSettings();
     }
   }, [activeTab]);
 
@@ -214,6 +220,34 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchThemeSettings = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/tenants/me/theme');
+      setThemeSettings({
+        primaryColor: data.theme?.primaryColor || '#DC2626',
+        accentColor: data.theme?.accentColor || '#A16207'
+      });
+    } catch (err) {
+      console.error('Failed to load theme settings', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveThemeSettings = async (e) => {
+    e.preventDefault();
+    setSavingTheme(true);
+    try {
+      await api.patch('/tenants/me/theme', themeSettings);
+      toast.success('Theme settings saved!');
+    } catch (err) {
+      toast.error('Failed to save theme settings');
+    } finally {
+      setSavingTheme(false);
+    }
+  };
+
   const assignDriver = async (orderId, payload) => {
     try {
       await api.patch(`/orders/${orderId}/assign`, payload);
@@ -325,6 +359,12 @@ export default function AdminDashboard() {
               onClick={() => setActiveTab('seo')}
             >
               SEO
+            </button>
+            <button 
+              className={`btn flex-shrink-0 ${activeTab === 'theme' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('theme')}
+            >
+              Theme
             </button>
           </div>
         </div>
@@ -863,6 +903,58 @@ export default function AdminDashboard() {
 
             <button type="submit" className="btn btn-primary" disabled={savingSeo}>
               {savingSeo ? 'Saving...' : 'Save Advanced SEO Settings'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {!loading && activeTab === 'theme' && (
+        <div className="card max-w-2xl mx-auto">
+          <h2 className="mb-4">Storefront Theme</h2>
+          <p className="text-secondary mb-6">Customize the primary and accent colors of your customer-facing storefront.</p>
+          <form onSubmit={saveThemeSettings}>
+            <div className="form-group">
+              <label className="form-label">Primary Color</label>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="color" 
+                  value={themeSettings.primaryColor}
+                  onChange={(e) => setThemeSettings({ ...themeSettings, primaryColor: e.target.value })}
+                  style={{ width: '50px', height: '50px', padding: '0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+                />
+                <input
+                  type="text"
+                  className="form-input"
+                  value={themeSettings.primaryColor}
+                  onChange={(e) => setThemeSettings({ ...themeSettings, primaryColor: e.target.value })}
+                  style={{ width: '120px' }}
+                />
+              </div>
+              <p className="text-xs text-secondary mt-1">Used for primary buttons and main highlights.</p>
+            </div>
+            
+            <div className="form-group mb-6">
+              <label className="form-label">Accent Color</label>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="color" 
+                  value={themeSettings.accentColor}
+                  onChange={(e) => setThemeSettings({ ...themeSettings, accentColor: e.target.value })}
+                  style={{ width: '50px', height: '50px', padding: '0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+                />
+                <input
+                  type="text"
+                  className="form-input"
+                  value={themeSettings.accentColor}
+                  onChange={(e) => setThemeSettings({ ...themeSettings, accentColor: e.target.value })}
+                  style={{ width: '120px' }}
+                />
+              </div>
+              <p className="text-xs text-secondary mt-1">Used for gradients, links, and secondary highlights.</p>
+            </div>
+
+            <button type="submit" className="btn btn-primary" disabled={savingTheme}>
+              {savingTheme ? 'Saving...' : 'Save Theme'}
             </button>
           </form>
         </div>

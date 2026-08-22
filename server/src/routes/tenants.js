@@ -254,6 +254,7 @@ router.get('/public/:slug', async (req, res) => {
         slug: tenant.slug,
         logo_url: tenant.logo_url,
         seo: tenant.settings?.seo || {},
+        theme: tenant.settings?.theme || {},
         acceptedPaymentMethods: tenant.settings?.payments?.acceptedPaymentMethods || ['cash_on_delivery', 'mobile_money', 'bank_transfer']
       }
     });
@@ -328,6 +329,68 @@ router.patch('/me/seo-settings', authenticate, authorize('admin'), async (req, r
     }
 
     res.json({ seo_settings: tenant.settings?.seo || {} });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/tenants/me/theme — read back current theme settings
+router.get('/me/theme', authenticate, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const { data: tenant, error } = await supabase
+      .from('tenants')
+      .select('id, name, settings')
+      .eq('id', req.user.tenant_id)
+      .single();
+
+    if (error || !tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    res.json({
+      theme: tenant.settings?.theme || {},
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/tenants/me/theme — update current theme settings
+router.patch('/me/theme', authenticate, authorize('admin', 'manager'), async (req, res) => {
+  try {
+    const { primaryColor, accentColor } = req.body;
+
+    const { data: current, error: fetchErr } = await supabase
+      .from('tenants')
+      .select('settings')
+      .eq('id', req.user.tenant_id)
+      .single();
+
+    if (fetchErr || !current) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    const nextSettings = {
+      ...current.settings,
+      theme: {
+        ...(current.settings?.theme || {}),
+        ...(primaryColor !== undefined ? { primaryColor } : {}),
+        ...(accentColor !== undefined ? { accentColor } : {}),
+      },
+    };
+
+    const { data: tenant, error } = await supabase
+      .from('tenants')
+      .update({ settings: nextSettings })
+      .eq('id', req.user.tenant_id)
+      .select('id, name, settings')
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to update theme settings' });
+    }
+
+    res.json({ theme: tenant.settings?.theme || {} });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
