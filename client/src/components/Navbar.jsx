@@ -258,7 +258,6 @@ export default function Navbar() {
           ) : (
             <>
               <li><Link to="/login" className={isActive('/login')} onClick={() => setMenuOpen(false)}>Log in</Link></li>
-              <li><Link to="/register" className={`btn btn-primary btn-sm`} onClick={() => setMenuOpen(false)}>Sign up</Link></li>
             </>
           )}
         </ul>

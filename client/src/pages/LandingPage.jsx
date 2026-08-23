@@ -163,8 +163,8 @@ function LandingPage() {
             Restaurant OS gives every restaurant a digital menu, a live order board for the kitchen, and delivery dispatch — without stitching together five different tools.
           </p>
           <div className="flex gap-4" style={{ flexWrap: 'wrap' }}>
-            <Link to="/register" className="btn btn-primary btn-lg btn-pill">
-              Get Started Free <ArrowRight size={18} />
+            <Link to="/login" className="btn btn-primary btn-lg btn-pill">
+              Log In to Dashboard <ArrowRight size={18} />
             </Link>
             <a href="#how-it-works" className="btn btn-secondary btn-lg btn-pill">
               See How It Works
@@ -286,10 +286,10 @@ function LandingPage() {
           <p style={{ marginBottom: 'var(--space-6)', color: 'rgba(255,255,255,0.6)', maxWidth: '480px', margin: '0 auto var(--space-6)' }}>
             Set up your menu and give your kitchen one screen to run the whole shift.
           </p>
-          <Link to="/register" className="btn btn-lg btn-pill" style={{
+          <Link to="/login" className="btn btn-lg btn-pill" style={{
             background: 'var(--gradient-accent)', color: 'white', border: 'none'
           }}>
-            Get Started Free <ArrowRight size={18} />
+            Log In to Dashboard <ArrowRight size={18} />
           </Link>
         </div>
       </section>

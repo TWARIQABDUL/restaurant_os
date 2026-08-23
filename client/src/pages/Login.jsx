@@ -108,9 +108,6 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-secondary">
-            Don't have an account? <Link to={redirect ? `/register?redirect=${encodeURIComponent(redirect)}` : '/register'} style={{ fontWeight: 600, color: 'var(--color-accent)' }}>Sign up</Link>
-          </p>
         </div>
       </div>
 
