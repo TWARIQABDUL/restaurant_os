@@ -50,6 +50,58 @@ router.post(
   }
 );
 
+// GET /api/tenants/analytics — Platform-wide analytics (Super Admin)
+router.get('/analytics', authenticate, superAdminOnly, async (req, res) => {
+  try {
+    const { count: totalTenants } = await supabase.from('tenants').select('*', { count: 'exact', head: true });
+    const { count: activeTenants } = await supabase.from('tenants').select('*', { count: 'exact', head: true }).eq('active', true);
+
+    const { data: wallets } = await supabase.from('wallets').select('available_balance, pending_balance');
+    let heldBalances = 0;
+    let clearedBalances = 0;
+    for (const w of (wallets || [])) {
+      heldBalances += parseFloat(w.pending_balance || 0);
+      clearedBalances += parseFloat(w.available_balance || 0);
+    }
+
+    const { data: orders } = await supabase.from('orders')
+      .select('total_amount, created_at')
+      .eq('payment_status', 'paid')
+      .not('status', 'eq', 'rejected');
+
+    let totalRevenue = 0;
+    const dailyRevenue = {};
+    for (const o of (orders || [])) {
+      const amt = parseFloat(o.total_amount || 0);
+      totalRevenue += amt;
+      const date = o.created_at.split('T')[0];
+      dailyRevenue[date] = (dailyRevenue[date] || 0) + amt;
+    }
+    
+    // Convert dailyRevenue to array for chart, sorted by date
+    const revenueHistory = Object.entries(dailyRevenue)
+      .map(([date, amount]) => ({ date, amount }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const { count: totalOrders } = await supabase.from('orders').select('*', { count: 'exact', head: true });
+
+    res.json({
+      analytics: {
+        totalTenants: totalTenants || 0,
+        activeTenants: activeTenants || 0,
+        heldBalances,
+        clearedBalances,
+        totalRevenue,
+        totalOrders: totalOrders || 0,
+        revenueHistory
+      }
+    });
+  } catch (err) {
+    console.error('Super admin analytics error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/tenants — List all tenants (Super Admin)
 router.get('/', authenticate, superAdminOnly, async (req, res) => {
   try {

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function SuperAdminDashboard() {
   const [tenants, setTenants] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Form state for new tenant
@@ -15,19 +17,23 @@ export default function SuperAdminDashboard() {
     adminPassword: '' 
   });
 
-  const fetchTenants = async () => {
+  const fetchData = async () => {
     try {
-      const { data } = await api.get('/tenants');
-      setTenants(data.tenants || []);
+      const [tenantsRes, analyticsRes] = await Promise.all([
+        api.get('/tenants'),
+        api.get('/tenants/analytics')
+      ]);
+      setTenants(tenantsRes.data.tenants || []);
+      setAnalytics(analyticsRes.data.analytics);
     } catch (err) {
-      console.error('Failed to fetch tenants', err);
+      console.error('Failed to fetch data', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTenants();
+    fetchData();
   }, []);
 
   const handleCreate = async (e) => {
@@ -36,7 +42,7 @@ export default function SuperAdminDashboard() {
       await api.post('/auth/register-tenant', formData);
       setFormData({ restaurantName: '', slug: '', adminName: '', adminEmail: '', adminPassword: '' });
       setShowForm(false);
-      fetchTenants();
+      fetchData();
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to create tenant and admin');
     }
@@ -45,7 +51,7 @@ export default function SuperAdminDashboard() {
   const toggleStatus = async (id) => {
     try {
       await api.patch(`/tenants/${id}/toggle`);
-      fetchTenants();
+      fetchData();
     } catch (err) {
       alert('Failed to toggle status');
     }
@@ -137,6 +143,48 @@ export default function SuperAdminDashboard() {
             </div>
           </form>
         </div>
+      )}
+
+      {analytics && !loading && (
+        <>
+          <div className="stats-grid mb-8">
+            <div className="stat-card">
+              <div className="stat-card-label">Platform Revenue</div>
+              <div className="stat-card-value text-accent">${(analytics.totalRevenue || 0).toFixed(2)}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-label">Total Orders</div>
+              <div className="stat-card-value">{analytics.totalOrders || 0}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-label">Held Balances</div>
+              <div className="stat-card-value">${(analytics.heldBalances || 0).toFixed(2)}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-card-label">Cleared Balances</div>
+              <div className="stat-card-value">${(analytics.clearedBalances || 0).toFixed(2)}</div>
+            </div>
+          </div>
+
+          <div className="card mb-8">
+            <h3 className="mb-6">Platform Revenue Over Time</h3>
+            <div style={{ height: 300 }}>
+              {analytics.revenueHistory && analytics.revenueHistory.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={analytics.revenueHistory}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
+                    <XAxis dataKey="date" tick={{fontSize: 12}} tickLine={false} axisLine={false} />
+                    <YAxis tick={{fontSize: 12}} tickLine={false} axisLine={false} tickFormatter={val => `$${val}`} />
+                    <Tooltip formatter={(value) => [`$${parseFloat(value).toFixed(2)}`, 'Revenue']} />
+                    <Line type="monotone" dataKey="amount" stroke="var(--color-accent)" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted">No revenue data available</div>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {loading ? (
