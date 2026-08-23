@@ -52,12 +52,17 @@ export default function Register() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         padding: 'var(--space-10)', position: 'relative', overflow: 'hidden'
       }} className="auth-panel-left">
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'radial-gradient(circle at 80% 20%, rgba(220, 38, 38, 0.2) 0%, transparent 50%)',
-          pointerEvents: 'none'
+        <div className="animated-orb" style={{
+          position: 'absolute', top: '-10%', right: '-10%', width: '60%', height: '60%',
+          background: 'radial-gradient(circle, rgba(225, 29, 72, 0.3) 0%, transparent 70%)',
+          pointerEvents: 'none', borderRadius: '50%'
         }} />
-        <div style={{ position: 'relative', textAlign: 'center', color: 'var(--color-text-inverse)' }}>
+        <div className="animated-orb-2" style={{
+          position: 'absolute', bottom: '-10%', left: '-10%', width: '50%', height: '50%',
+          background: 'radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%)',
+          pointerEvents: 'none', borderRadius: '50%'
+        }} />
+        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', color: 'var(--color-text-inverse)' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}><Rocket size={48} color="var(--color-accent)" /></div>
           <h2 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-3)' }}>Get started</h2>
           <p style={{ opacity: 0.6, maxWidth: '280px', lineHeight: 1.6, fontSize: 'var(--font-size-sm)' }}>
@@ -125,6 +130,13 @@ export default function Register() {
         @media (max-width: 768px) {
           .auth-panel-left { display: none !important; }
         }
+        @keyframes floatOrb {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-30px, 30px) scale(1.1); }
+          66% { transform: translate(20px, -20px) scale(0.9); }
+        }
+        .animated-orb { animation: floatOrb 12s ease-in-out infinite; }
+        .animated-orb-2 { animation: floatOrb 15s ease-in-out infinite reverse; }
       `}</style>
     </div>
   );

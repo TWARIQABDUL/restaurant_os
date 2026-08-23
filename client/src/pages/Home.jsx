@@ -258,16 +258,18 @@ export default function Home() {
                   <img
                     src={item.image_url}
                     alt={item.name}
+                    className="card-image"
                     style={{
                       width: '100%', height: '200px', objectFit: 'cover',
-                      transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                      margin: 0, borderRadius: '0'
                     }}
                   />
                 ) : (
-                  <div style={{
+                  <div className="card-image" style={{
                     width: '100%', height: '200px',
                     background: 'var(--color-bg-alt)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: 0, borderRadius: '0'
                   }}>
                     <span style={{ color: 'var(--color-text-muted)', fontSize: '2rem' }}>🍴</span>
                   </div>

@@ -1,20 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Karla:wght@300;400;500;600;700&family=Playfair+Display+SC:wght@400;700&display=swap');
-
 /* ================================================
    DESIGN SYSTEM — Restaurant OS
-   Vibrant, energetic, block-based.
+   Premium, Glassmorphic, Modern.
    ================================================ */
 
 :root {
   /* Color palette */
-  --color-bg: #FEF2F2;
-  --color-bg-alt: #F0EDF1;
+  --color-bg: #F8FAFC;
+  --color-bg-alt: #F1F5F9;
   --color-surface: #FFFFFF;
-  --color-surface-hover: #FEF2F2;
-  --color-border: #FECACA;
-  --color-border-subtle: #FEE2E2;
+  --color-surface-hover: #F8FAFC;
+  --color-border: #E2E8F0;
+  --color-border-subtle: #F1F5F9;
 
-  --color-text: #450A0A;
+  --color-text: #0F172A;
   --color-text-secondary: #475569;
   --color-text-muted: #94A3B8;
   --color-text-inverse: #FFFFFF;
@@ -22,35 +20,35 @@
   --color-primary: #DC2626;
   --color-secondary: #F87171;
 
-  --color-accent: #A16207;
-  --color-accent-hover: #854D0E;
-  --color-accent-light: #FEF3C7;
-  --color-accent-dark: #713F12;
+  --color-accent: #E11D48;
+  --color-accent-hover: #BE123C;
+  --color-accent-light: #FFE4E6;
+  --color-accent-dark: #881337;
 
-  --color-success: #2d8a4e;
-  --color-success-light: #e8f5ee;
-  --color-warning: #c8850a;
-  --color-warning-light: #fef6e6;
-  --color-error: #DC2626;
+  --color-success: #10B981;
+  --color-success-light: #D1FAE5;
+  --color-warning: #F59E0B;
+  --color-warning-light: #FEF3C7;
+  --color-error: #EF4444;
   --color-error-light: #FEE2E2;
-  --color-info: #2563eb;
-  --color-info-light: #eff6ff;
+  --color-info: #3B82F6;
+  --color-info-light: #DBEAFE;
 
   /* Gradients */
-  --gradient-accent: linear-gradient(135deg, #DC2626 0%, #A16207 100%);
-  --gradient-dark: linear-gradient(135deg, #450A0A 0%, #7F1D1D 100%);
-  --gradient-surface: linear-gradient(180deg, #FFFFFF 0%, #FEF2F2 100%);
+  --gradient-accent: linear-gradient(135deg, #E11D48 0%, #BE123C 100%);
+  --gradient-dark: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  --gradient-surface: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
 
   /* Typography */
-  --font-family: 'Karla', system-ui, -apple-system, sans-serif;
-  --font-heading: 'Playfair Display SC', serif;
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Outfit', sans-serif;
   --font-size-xs: 0.75rem;
-  --font-size-sm: 0.8125rem;
-  --font-size-base: 0.9375rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
   --font-size-lg: 1.125rem;
-  --font-size-xl: 1.375rem;
-  --font-size-2xl: 1.75rem;
-  --font-size-3xl: 2.25rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 2rem;
 
   /* Spacing (4px grid) */
   --space-1: 4px;
@@ -199,10 +197,13 @@ h4 { font-size: var(--font-size-lg); font-weight: 600; }
    ================================================ */
 
 .card {
-  background: var(--gradient-surface);
-  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   transition: box-shadow var(--transition-base), transform var(--transition-base), border-color var(--transition-base);
 }
 
@@ -367,18 +368,26 @@ h4 { font-size: var(--font-size-lg); font-weight: 600; }
   font-family: var(--font-family);
   font-size: var(--font-size-base);
   color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  background: var(--color-bg-alt);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: all var(--transition-fast);
   outline: none;
+}
+
+.form-input:hover,
+.form-select:hover,
+.form-textarea:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border);
 }
 
 .form-input:focus,
 .form-select:focus,
 .form-textarea:focus {
+  background: var(--color-surface);
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-light), inset 0 1px 3px rgba(0,0,0,0.04);
+  box-shadow: 0 0 0 4px var(--color-accent-light);
 }
 
 .form-input::placeholder {
@@ -430,6 +439,8 @@ h4 { font-size: var(--font-size-lg); font-weight: 600; }
   overflow-x: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
 }
 
 table {
@@ -439,27 +450,28 @@ table {
 
 th {
   text-align: left;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   font-size: var(--font-size-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-muted);
-  background: var(--color-bg);
+  background: var(--color-bg-alt);
   border-bottom: 1px solid var(--color-border);
 }
 
 td {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   font-size: var(--font-size-sm);
   border-bottom: 1px solid var(--color-border-subtle);
+  transition: background-color var(--transition-fast);
 }
 
 tr:last-child td {
   border-bottom: none;
 }
 
-tr:nth-child(even) {
+tr:hover td {
   background: var(--color-surface-hover);
 }
 
