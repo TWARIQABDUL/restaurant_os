@@ -76,7 +76,7 @@ export default function TrackOrder() {
         fetchOrder(trackingCode);
       },
       orderDelivered: () => {
-        toast.success('Your order has been delivered! Enjoy your meal!');
+        toast.success('Your order has been delivered!');
         fetchOrder(trackingCode);
       },
     };
@@ -285,10 +285,10 @@ export default function TrackOrder() {
                       value={complaintType}
                       onChange={(e) => setComplaintType(e.target.value)}
                     >
-                      <option value="missing_item">Missing Item</option>
-                      <option value="wrong_item">Wrong Item Received</option>
+                      <option value="missing_item">Missing item</option>
+                      <option value="wrong_item">Wrong item received</option>
                       <option value="late_delivery">Delivery is too late</option>
-                      <option value="quality_issue">Food Quality Issue</option>
+                      <option value="quality_issue">Quality issue</option>
                       <option value="other">Other</option>
                     </select>
                   </div>

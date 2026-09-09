@@ -23,18 +23,18 @@ async function resolveTenant(req, res, next) {
     const { data: tenant, error } = await query.single();
 
     if (error || !tenant) {
-      return res.status(404).json({ error: 'Restaurant not found' });
+      return res.status(404).json({ error: 'Store not found' });
     }
 
     if (!tenant.active) {
-      return res.status(403).json({ error: 'This restaurant is currently inactive' });
+      return res.status(403).json({ error: 'This store is currently inactive' });
     }
 
     req.tenant = tenant;
     next();
   } catch (err) {
     console.error('Tenant resolution error:', err.message);
-    return res.status(500).json({ error: 'Failed to resolve restaurant' });
+    return res.status(500).json({ error: 'Failed to resolve store' });
   }
 }
 

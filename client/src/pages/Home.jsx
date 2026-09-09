@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../services/api';
-import { Search, Utensils, Star, Clock, ArrowRight } from 'lucide-react';
+import { Search, Package, Star, Clock, ArrowRight } from 'lucide-react';
+import { BRAND } from '../config/brand';
 
 export default function Home() {
   const [categories, setCategories] = useState([]);
@@ -36,7 +37,7 @@ export default function Home() {
         const seo = tenant.seo || {};
         
         // Inject SEO tags
-        document.title = seo.seoTitle || tenant.name || 'Restaurant OS';
+        document.title = seo.seoTitle || tenant.name || BRAND.name;
         
         const metaDesc = document.querySelector('meta[name="description"]');
         if (metaDesc) {
@@ -100,7 +101,7 @@ export default function Home() {
         }
       }
     } catch (err) {
-      console.error('Failed to load menu', err);
+      console.error('Failed to load products', err);
       if (err.response?.status === 404) {
         setNotFound(true);
       }
@@ -109,7 +110,7 @@ export default function Home() {
     }
   }
 
-  // Extract restaurant info for hero
+  // Extract store info for hero
   const [tenantInfo, setTenantInfo] = useState(null);
 
   // Store tenant info when fetched
@@ -140,34 +141,34 @@ export default function Home() {
     return (
       <div className="page mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
         <h1 className="font-heading text-5xl font-bold text-[#94a3b8]">404</h1>
-        <h2 className="mt-3">Restaurant not found</h2>
-        <p className="mt-2 mb-6 text-[#475569]">We couldn't find a restaurant at this URL.</p>
+        <h2 className="mt-3">Store not found</h2>
+        <p className="mt-2 mb-6 text-[#475569]">We couldn't find a store at this URL.</p>
         <Link to="/" className="btn btn-primary">Return to homepage</Link>
       </div>
     );
   }
 
-  const restaurantName = tenantInfo?.name || tenantSlug?.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Restaurant';
+  const storeName = tenantInfo?.name || tenantSlug?.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Store';
 
   return (
     <div className="page mx-auto max-w-6xl px-4 sm:px-6">
-      {/* ── Restaurant header ── */}
+      {/* ── Store header ── */}
       <section className="flex items-center gap-5 pb-6">
         {tenantInfo?.logo_url ? (
           <img
             src={tenantInfo.logo_url}
-            alt={restaurantName}
+            alt={storeName}
             className="h-[76px] w-[76px] shrink-0 rounded-2xl border border-[#e2e8f0] object-cover"
           />
         ) : (
           <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-2xl border border-[#fecaca] bg-[#fef2f2] text-[#dc2626]">
-            <Utensils size={30} strokeWidth={1.5} />
+            <Package size={30} strokeWidth={1.5} />
           </div>
         )}
         <div className="min-w-0">
-          <h1 className="text-3xl font-bold">{restaurantName}</h1>
+          <h1 className="text-3xl font-bold">{storeName}</h1>
           <p className="mt-1.5 text-[15px] text-[#475569]">
-            {tenantInfo?.seo?.seoDescription || 'Explore our menu and order your favourites.'}
+            {tenantInfo?.seo?.seoDescription || 'Browse the catalogue and order in a couple of taps.'}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-2.5 py-1 text-xs font-semibold text-[#0f172a]">
@@ -205,19 +206,19 @@ export default function Home() {
           <input
             type="text"
             className="form-input pl-9"
-            placeholder="Search the menu"
+            placeholder="Search products"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
 
-      {/* ── Menu grid ── */}
+      {/* ── Product grid ── */}
       {loading ? (
         <div className="loading-page"><div className="spinner" /></div>
       ) : items.length === 0 ? (
         <div className="empty-state">
-          <Utensils size={44} strokeWidth={1.25} className="mx-auto mb-4 text-[#cbd5e1]" />
+          <Package size={44} strokeWidth={1.25} className="mx-auto mb-4 text-[#cbd5e1]" />
           <h3>No items found</h3>
           <p>Try adjusting your search or category filter.</p>
         </div>
@@ -229,26 +230,42 @@ export default function Home() {
               key={item.id}
               className="group flex flex-col overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-[#cbd5e1]"
             >
-              <div className="relative">
+              <div className={`relative ${item.in_stock === false ? 'opacity-55' : ''}`}>
                 {item.image_url ? (
                   <img src={item.image_url} alt={item.name} className="h-44 w-full object-cover" />
                 ) : (
                   <div className="flex h-44 w-full items-center justify-center bg-[#eef2f6] text-[#cbd5e1]">
-                    <Utensils size={40} strokeWidth={1.25} />
+                    <Package size={40} strokeWidth={1.25} />
                   </div>
                 )}
                 <span className="absolute right-3 top-3 rounded-full bg-[#0f172a] px-2.5 py-1 text-xs font-bold text-white">
                   ${parseFloat(item.price).toFixed(2)}
                 </span>
+                {item.in_stock === false && (
+                  <span className="absolute left-3 top-3 rounded-full bg-[#dc2626] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                    Sold out
+                  </span>
+                )}
+                {item.low_stock && item.in_stock !== false && (
+                  <span className="absolute left-3 top-3 rounded-full bg-[#fef3c7] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#92400e]">
+                    Only {item.stock_quantity} left
+                  </span>
+                )}
               </div>
               <div className="flex flex-1 flex-col p-4 pt-3.5">
                 <h3 className="text-[15px] font-semibold">{item.name}</h3>
                 <p className="mt-1 flex-1 text-[13px] leading-snug text-[#475569]">
                   {item.description?.length > 80 ? item.description.slice(0, 80) + '…' : item.description}
                 </p>
-                <span className="mt-3.5 inline-flex items-center gap-1.5 self-start rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-1.5 text-xs font-semibold text-[#dc2626]">
-                  View details <ArrowRight size={13} />
-                </span>
+                {item.in_stock === false ? (
+                  <span className="mt-3.5 inline-flex items-center gap-1.5 self-start rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-1.5 text-xs font-semibold text-[#94a3b8]">
+                    Out of stock
+                  </span>
+                ) : (
+                  <span className="mt-3.5 inline-flex items-center gap-1.5 self-start rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-1.5 text-xs font-semibold text-[#dc2626]">
+                    View details <ArrowRight size={13} />
+                  </span>
+                )}
               </div>
             </Link>
           ))}

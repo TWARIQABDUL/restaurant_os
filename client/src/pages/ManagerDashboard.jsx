@@ -3,14 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { getSocket } from '../services/socket';
-import MenuManagement from '../components/MenuManagement';
+import ProductsManagement from '../components/ProductsManagement';
 import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
 import { Clock, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 
 const COLUMNS = [
   { key: 'pending', label: 'Pending', statuses: ['pending'] },
-  { key: 'kitchen', label: 'In the Kitchen', statuses: ['approved', 'preparing'] },
+  { key: 'packing', label: 'Packing', statuses: ['approved', 'preparing'] },
   { key: 'ready', label: 'Ready', statuses: ['ready'] },
   { key: 'dispatched', label: 'Out for Delivery', statuses: ['assigned'] },
 ];
@@ -264,7 +264,7 @@ export default function ManagerDashboard() {
       <div className="flex flex-col gap-2 pt-3 border-t">
         {order.status === 'pending' && rejectingId !== order.id && (
           <div className="flex gap-2">
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => updateOrderStatus(order.id, 'approve')}>Approve</button>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => updateOrderStatus(order.id, 'approve')}>Accept</button>
             <button className="btn btn-danger" onClick={() => { setRejectingId(order.id); setRejectReason(''); }}>Reject</button>
           </div>
         )}
@@ -289,10 +289,10 @@ export default function ManagerDashboard() {
         )}
 
         {order.status === 'approved' && (
-          <button className="btn btn-primary" onClick={() => updateOrderStatus(order.id, 'preparing')}>Start Preparing</button>
+          <button className="btn btn-primary" onClick={() => updateOrderStatus(order.id, 'preparing')}>Start packing</button>
         )}
         {order.status === 'preparing' && (
-          <button className="btn btn-success" onClick={() => updateOrderStatus(order.id, 'ready')}>Mark Ready</button>
+          <button className="btn btn-success" onClick={() => updateOrderStatus(order.id, 'ready')}>Mark ready</button>
         )}
         {order.status === 'ready' && (() => {
           const state = dispatchState[order.id] || { type: 'internal', name: '', phone: '', plate: '', driverId: '' };
@@ -304,8 +304,8 @@ export default function ManagerDashboard() {
                 value={state.type}
                 onChange={e => handleDispatchState(order.id, 'type', e.target.value)}
               >
-                <option value="internal">Internal Driver</option>
-                <option value="external">External Rider</option>
+                <option value="internal">Internal driver</option>
+                <option value="external">External rider</option>
               </select>
 
               {state.type === 'internal' ? (
@@ -314,7 +314,7 @@ export default function ManagerDashboard() {
                   value={state.driverId}
                   onChange={e => handleDispatchState(order.id, 'driverId', e.target.value)}
                 >
-                  <option value="">Select Driver...</option>
+                  <option value="">Select driver…</option>
                   {drivers.map(driver => (
                     <option key={driver.id} value={driver.id}>
                       {driver.name} ({driver.plate_number || 'No Plate'})
@@ -366,7 +366,7 @@ export default function ManagerDashboard() {
     <div className="page mx-auto max-w-7xl px-4 sm:px-6">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Kitchen board</h1>
+          <h1 className="text-2xl font-bold">Order board</h1>
           <p className="mb-3 text-sm text-[#475569]">Welcome, {user.name}</p>
 
           <div className="inline-flex items-center gap-2 rounded-lg border border-[#dbeaff] bg-[#eff5ff] px-3 py-1.5 text-sm text-[#2563eb]">
@@ -394,7 +394,7 @@ export default function ManagerDashboard() {
         <div className="scrollable-tabs sm:w-auto">
           {[
             ['orders', 'Live orders'],
-            ['menu', 'Menu'],
+            ['menu', 'Products'],
             ['complaints', 'Complaints'],
             ['theme', 'Theme'],
           ].map(([key, label]) => (
@@ -478,7 +478,7 @@ export default function ManagerDashboard() {
       )}
 
       {activeTab === 'menu' && (
-        <MenuManagement />
+        <ProductsManagement />
       )}
 
       {activeTab === 'complaints' && (
@@ -487,8 +487,8 @@ export default function ManagerDashboard() {
 
       {!loading && activeTab === 'theme' && (
         <div className="card max-w-2xl mx-auto">
-          <h2 className="mb-4">Storefront Theme</h2>
-          <p className="text-secondary mb-6">Customize the primary and accent colors of your customer-facing storefront.</p>
+          <h2 className="mb-4">Storefront theme</h2>
+          <p className="text-secondary mb-6">Customise the colours of your customer-facing store page.</p>
           <form onSubmit={saveThemeSettings}>
             <div className="form-group">
               <label className="form-label">Primary Color</label>

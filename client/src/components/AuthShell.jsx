@@ -1,9 +1,11 @@
-import { UtensilsCrossed, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
+import Logo from './Logo';
+import { BRAND } from '../config/brand';
 
 const POINTS = [
-  'Real-time order board',
   'Your own branded ordering page',
-  'No marketplace commission',
+  'Payments and payouts you can rely on',
+  'Stock tracked as orders come in',
 ];
 
 /**
@@ -15,12 +17,7 @@ export default function AuthShell({ heading, subheading, children }) {
     <div className="grid min-h-[calc(100vh-3.75rem)] lg:grid-cols-[minmax(0,520px)_minmax(0,1fr)]">
       <div className="relative hidden flex-col justify-between overflow-hidden bg-[#0f172a] p-11 text-white lg:flex">
         <div className="pointer-events-none absolute -right-32 -top-32 h-[360px] w-[360px] rounded-full bg-[#dc2626] opacity-[0.14]" />
-        <div className="relative flex items-center gap-3">
-          <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] bg-[#dc2626]">
-            <UtensilsCrossed size={19} />
-          </div>
-          <span className="font-heading text-[17px] font-semibold">Restaurant OS</span>
-        </div>
+        <Logo size={34} className="relative" />
 
         <div className="relative">
           <h1 className="font-heading text-[28px] font-bold leading-tight">{heading}</h1>
@@ -37,7 +34,7 @@ export default function AuthShell({ heading, subheading, children }) {
           </div>
         </div>
 
-        <div className="relative text-xs text-[#64748b]">© 2026 Restaurant OS</div>
+        <div className="relative text-xs text-[#64748b]">© {new Date().getFullYear()} {BRAND.name}</div>
       </div>
 
       <div className="flex items-center justify-center p-8">

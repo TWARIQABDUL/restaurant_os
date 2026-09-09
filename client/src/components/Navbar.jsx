@@ -4,12 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { getSocket } from '../services/socket';
 import api from '../services/api';
-import { Bell, ShoppingBag, ShoppingCart, UtensilsCrossed, CheckCircle, XCircle, Bike, PartyPopper, Menu, X } from 'lucide-react';
+import { Bell, ShoppingBag, ShoppingCart, Package, CheckCircle, XCircle, Bike, PartyPopper, Menu, X } from 'lucide-react';
+import { BRAND } from '../config/brand';
 
 const getIcon = (iconName) => {
   switch (iconName) {
     case 'ShoppingBag': return <ShoppingBag size={20} style={{ color: 'var(--color-info)' }} />;
-    case 'UtensilsCrossed': return <UtensilsCrossed size={20} style={{ color: 'var(--color-accent)' }} />;
+    case 'UtensilsCrossed': return <Package size={20} style={{ color: 'var(--color-accent)' }} />;
     case 'CheckCircle': return <CheckCircle size={20} style={{ color: 'var(--color-success)' }} />;
     case 'XCircle': return <XCircle size={20} style={{ color: 'var(--color-error)' }} />;
     case 'Bike': return <Bike size={20} style={{ color: 'var(--color-info)' }} />;
@@ -119,12 +120,12 @@ export default function Navbar() {
     if (slug) {
       return slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
-    // If they are on a global route (like /admin or /manager) but belong to a restaurant, format their tenant slug
+    // If they are on a global route (like /admin or /manager) but belong to a store, format their tenant slug
     if (user && user.tenants && user.tenants.slug) {
       return user.tenants.slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     }
     // Otherwise fallback to the SaaS brand
-    return <><span style={{ color: 'var(--color-text)' }}>Restaurant</span><span style={{ color: 'var(--color-accent)' }}>OS</span></>;
+    return BRAND.name;
   };
 
   return (
@@ -147,7 +148,7 @@ export default function Navbar() {
         <ul className={`navbar-links ${menuOpen ? 'open' : ''}`}>
           {currentSlug && (
             <>
-              <li><Link to={basePath} className={isActive(basePath)} onClick={() => setMenuOpen(false)}>Menu</Link></li>
+              <li><Link to={basePath} className={isActive(basePath)} onClick={() => setMenuOpen(false)}>Shop</Link></li>
 
               <li>
                 <Link to={getPath('/cart')} className={isActive(getPath('/cart'))} onClick={() => setMenuOpen(false)} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>

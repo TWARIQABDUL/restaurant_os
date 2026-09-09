@@ -15,6 +15,7 @@ const refundsRoutes = require('./routes/refunds');
 const momoWebhookRoutes = require('./routes/momoWebhook');
 const reviewsRoutes = require('./routes/reviews');
 const complaintsRoutes = require('./routes/complaints');
+const categoriesRoutes = require('./routes/categories');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/momo', momoWebhookRoutes);
 // All other routes require tenant resolution
 app.use('/api/auth', resolveTenant, authRoutes);
 app.use('/api/menu', resolveTenant, menuRoutes);
+app.use('/api/categories', resolveTenant, categoriesRoutes);
 app.use('/api/addons', resolveTenant, addonsRoutes);
 app.use('/api/orders', resolveTenant, ordersRoutes);
 app.use('/api/delivery', resolveTenant, deliveryRoutes);

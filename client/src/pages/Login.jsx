@@ -39,8 +39,8 @@ export default function Login() {
 
   return (
     <AuthShell
-      heading={<>One screen for your<br />whole service.</>}
-      subheading="Menus, live orders, dispatch and analytics — for owners, managers, kitchen staff and drivers."
+      heading={<>One screen for your<br />whole business.</>}
+      subheading="Products, live orders, stock and payouts — for owners, managers, staff and drivers."
     >
       <h2 className="text-[22px] font-bold">Log in</h2>
       <p className="mt-1.5 mb-6 text-[13.5px] text-[#475569]">Enter your credentials to continue.</p>

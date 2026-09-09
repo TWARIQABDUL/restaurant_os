@@ -6,7 +6,7 @@ import TenantThemeInjector from './components/TenantThemeInjector';
 // Pages
 import LandingPage from './pages/LandingPage';
 import Home from './pages/Home';
-import MenuDetail from './pages/MenuDetail';
+import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import OrderTracking from './pages/OrderTracking';
@@ -34,7 +34,7 @@ function App() {
 
           {/* Tenant Storefront Routes */}
           <Route path="/:tenantSlug" element={<Home />} />
-          <Route path="/:tenantSlug/menu/:id" element={<MenuDetail />} />
+          <Route path="/:tenantSlug/menu/:id" element={<ProductDetail />} />
           <Route path="/:tenantSlug/cart" element={<Cart />} />
           <Route path="/:tenantSlug/checkout" element={<Checkout />} />
           <Route path="/:tenantSlug/track" element={<TrackOrder />} />

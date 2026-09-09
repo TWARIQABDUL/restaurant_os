@@ -27,7 +27,7 @@ export function CartProvider({ children }) {
     }
   });
 
-  // Track route changes to detect if the user switched to a different restaurant
+  // Track route changes to detect if the user switched to a different store
   useEffect(() => {
     try {
       const saved = localStorage.getItem(getCartKey());

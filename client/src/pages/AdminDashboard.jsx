@@ -6,13 +6,13 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Cell, AreaChart, Area,
 } from 'recharts';
-import MenuManagement from '../components/MenuManagement';
+import ProductsManagement from '../components/ProductsManagement';
 import StaffManagement from '../components/StaffManagement';
 import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
 import {
   Copy, QrCode, X, Download, MapPin, StickyNote, Phone,
-  BarChart3, Bike, Wallet, UtensilsCrossed, Users, MessageSquare, Globe, Palette,
+  BarChart3, Bike, Wallet, Users, MessageSquare, Globe, Palette,
   ShoppingBag, Package, CheckCircle2, Clock, ArrowUpRight,
 } from 'lucide-react';
 import { uploadImage } from '../services/supabase';
@@ -27,7 +27,7 @@ const NAV = [
     { key: 'wallet', label: 'Wallet', icon: Wallet },
   ] },
   { group: 'Catalogue', items: [
-    { key: 'menu', label: 'Menu', icon: UtensilsCrossed },
+    { key: 'menu', label: 'Products', icon: Package },
     { key: 'staff', label: 'Staff', icon: Users },
   ] },
   { group: 'Support', items: [
@@ -346,7 +346,7 @@ export default function AdminDashboard() {
       const pngUrl = canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream');
       const link = document.createElement('a');
       link.href = pngUrl;
-      link.download = `${user?.tenants?.slug || 'restaurant'}-qr-code.png`;
+      link.download = `${user?.tenants?.slug || 'store'}-qr-code.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -366,7 +366,7 @@ export default function AdminDashboard() {
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold">Admin</h1>
-          <p className="text-sm text-[#475569]">{user?.tenants?.name || 'Your restaurant'}</p>
+          <p className="text-sm text-[#475569]">{user?.tenants?.name || 'Your store'}</p>
         </div>
         <div className="flex min-w-0 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1.5">
           <a
@@ -520,7 +520,7 @@ export default function AdminDashboard() {
                       <div className="empty-state rounded-xl border border-[#e2e8f0] bg-white">
                         <Bike size={30} strokeWidth={1.25} className="mx-auto mb-3 text-[#cbd5e1]" />
                         <h3>Nothing waiting</h3>
-                        <p>Orders show here the moment the kitchen marks them ready.</p>
+                        <p>Orders show here the moment they're marked ready to ship.</p>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-3">
@@ -807,7 +807,7 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {activeTab === 'menu' && <MenuManagement />}
+              {activeTab === 'menu' && <ProductsManagement />}
               {activeTab === 'staff' && <StaffManagement />}
               {activeTab === 'complaints' && <ComplaintsManagement />}
 
@@ -877,7 +877,7 @@ export default function AdminDashboard() {
                             type="text" className="form-input"
                             value={seoSettings.twitterHandle}
                             onChange={(e) => setSeoSettings({ ...seoSettings, twitterHandle: e.target.value })}
-                            placeholder="@yourrestaurant"
+                            placeholder="@yourstore"
                           />
                         </div>
                         <div>
@@ -928,8 +928,8 @@ export default function AdminDashboard() {
                     >
                       <div className="p-4">
                         <div className="text-[11px] font-semibold uppercase tracking-wide opacity-60">Preview</div>
-                        <div className="mt-2 text-lg font-bold">Today's specials</div>
-                        <div className="mt-1 text-xs opacity-70">Fresh from the kitchen</div>
+                        <div className="mt-2 text-lg font-bold">Featured products</div>
+                        <div className="mt-1 text-xs opacity-70">Handpicked for you</div>
                         <button
                           type="button"
                           className="mt-3 rounded-lg px-3 py-2 text-sm font-semibold"

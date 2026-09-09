@@ -41,7 +41,7 @@ export default function OrderTracking() {
         fetchOrders();
       },
       orderDelivered: () => {
-        toast.success('Your order has been delivered! Enjoy your meal!');
+        toast.success('Your order has been delivered!');
         fetchOrders();
       },
     };

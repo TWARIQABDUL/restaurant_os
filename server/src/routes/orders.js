@@ -4,6 +4,10 @@ const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
 
+const {
+  reserveStock, releaseStock, linesForOrder, addonLinesForOrder, InsufficientStockError,
+} = require('../services/stock');
+
 const router = express.Router();
 
 /** Generate a unique tracking code like ORD-A1B2C3 */
@@ -68,7 +72,7 @@ router.post(
           for (const addOn of item.add_ons) {
             const { data: addOnData } = await supabase
               .from('add_ons')
-              .select('id, price, name')
+              .select('id, price, name, single_choice')
               .eq('id', addOn.add_on_id)
               .eq('tenant_id', tenantId)
               .eq('available', true)
@@ -78,7 +82,9 @@ router.post(
               return res.status(400).json({ error: `Add-on ${addOn.add_on_id} not found or unavailable` });
             }
 
-            const addOnQty = addOn.quantity || 1;
+            // A single-choice option (a size) applies once per unit, so it
+            // scales with the line quantity: 3 shirts in M = 3 mediums.
+            const addOnQty = addOnData.single_choice ? item.quantity : (addOn.quantity || 1);
             itemTotal += addOnData.price * addOnQty;
 
             itemAddOns.push({
@@ -97,6 +103,26 @@ router.post(
           unit_price: menuItem.price,
           addOns: itemAddOns,
         });
+      }
+
+      // Hold stock before the order exists. This is atomic per line, so two
+      // shoppers racing for the last unit can't both get it. Covers both the
+      // product and any single-choice option (a size). Untracked items skipped.
+      const addonStockLines = orderItems.flatMap((oi) =>
+        oi.addOns.map((a) => ({ add_on_id: a.add_on_id, quantity: a.quantity })),
+      );
+      try {
+        await reserveStock(tenantId, orderItems, addonStockLines);
+      } catch (stockErr) {
+        if (stockErr instanceof InsufficientStockError) {
+          return res.status(409).json({
+            error: `${stockErr.productName} is out of stock`,
+            code: 'INSUFFICIENT_STOCK',
+            product: stockErr.productName,
+          });
+        }
+        console.error('Stock reservation error:', stockErr);
+        return res.status(500).json({ error: 'Could not reserve stock' });
       }
 
       // Create the order
@@ -123,6 +149,8 @@ router.post(
 
       if (orderError) {
         console.error('Order creation error:', orderError);
+        // The stock was already held — give it back rather than leaking it.
+        await releaseStock(tenantId, orderItems, addonStockLines);
         return res.status(500).json({ error: 'Failed to create order' });
       }
 
@@ -440,7 +468,14 @@ router.patch(
         return res.status(400).json({ error: 'Order not found or cannot be rejected' });
       }
 
-      // If this was already paid via MoMo, the restaurant declining it
+      // The order never happened, so its stock goes back on the shelf.
+      await releaseStock(
+        req.tenant.id,
+        await linesForOrder(order.id),
+        await addonLinesForOrder(order.id),
+      );
+
+      // If this was already paid via MoMo, the seller declining it
       // means the customer needs their money back — automatically, not
       // via a separate refund request they'd have to know to submit.
       if (order.payment_method === 'mobile_money' && order.payment_status === 'paid' && order.settlement_status === 'pending') {
@@ -449,7 +484,7 @@ router.patch(
           .from('refund_requests')
           .insert({
             order_id: order.id,
-            reason: `Auto-refund: order rejected by restaurant (${reason || 'no reason given'})`,
+            reason: `Auto-refund: order rejected by seller (${reason || 'no reason given'})`,
             status: 'pending',
           })
           .select('id')

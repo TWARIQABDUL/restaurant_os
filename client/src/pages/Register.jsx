@@ -44,7 +44,7 @@ export default function Register() {
   return (
     <AuthShell
       heading={<>Create your<br />account.</>}
-      subheading="Order food, track deliveries to the door, and pick up where you left off across devices."
+      subheading="Order online, track deliveries to the door, and pick up where you left off across devices."
     >
       <h2 className="text-[22px] font-bold">Create account</h2>
       <p className="mt-1.5 mb-6 text-[13.5px] text-[#475569]">Fill in your details to get started.</p>

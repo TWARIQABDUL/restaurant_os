@@ -146,7 +146,7 @@ export default function StaffManagement() {
                   value={formData.role}
                   onChange={handleInputChange}
                 >
-                  <option value="manager">Manager (Can manage menu & orders)</option>
+                  <option value="manager">Manager (can manage products &amp; orders)</option>
                   <option value="delivery">Delivery Driver</option>
                 </select>
               </div>

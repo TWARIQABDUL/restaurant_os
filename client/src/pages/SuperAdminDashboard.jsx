@@ -77,7 +77,7 @@ export default function SuperAdminDashboard() {
       setShowForm(false);
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to provision restaurant');
+      toast.error(err.response?.data?.error || 'Failed to provision store');
     } finally {
       setCreating(false);
     }
@@ -85,7 +85,7 @@ export default function SuperAdminDashboard() {
 
   const toggleStatus = async (tenant) => {
     const suspending = tenant.active;
-    if (suspending && !window.confirm(`Suspend ${tenant.name}? Their storefront and staff logins stop working immediately.`)) return;
+    if (suspending && !window.confirm(`Suspend ${tenant.name}? Their store page and staff logins stop working immediately.`)) return;
     setBusyId(tenant.id);
     try {
       await api.patch(`/tenants/${tenant.id}/toggle`);
@@ -129,9 +129,9 @@ export default function SuperAdminDashboard() {
 
   const kpis = analytics ? [
     { label: 'Platform revenue', value: money(analytics.totalRevenue), icon: Receipt, sub: 'Paid orders, all time' },
-    { label: 'Total orders', value: compact(analytics.totalOrders), icon: ShoppingBag, sub: 'Across every restaurant' },
+    { label: 'Total orders', value: compact(analytics.totalOrders), icon: ShoppingBag, sub: 'Across every store' },
     { label: 'Avg order value', value: money(analytics.totalOrders ? analytics.totalRevenue / analytics.totalOrders : 0), icon: PiggyBank, sub: 'Revenue ÷ orders' },
-    { label: 'Active restaurants', value: compact(analytics.activeTenants), icon: Store, sub: `of ${compact(analytics.totalTenants)} provisioned` },
+    { label: 'Active stores', value: compact(analytics.activeTenants), icon: Store, sub: `of ${compact(analytics.totalTenants)} provisioned` },
     { label: 'Held balances', value: money(analytics.heldBalances), icon: Wallet, sub: 'Pending clearance' },
     { label: 'Cleared balances', value: money(analytics.clearedBalances), icon: Wallet, sub: 'Available to withdraw' },
   ] : [];
@@ -142,11 +142,11 @@ export default function SuperAdminDashboard() {
         <div>
           <h1 className="text-2xl font-bold">Platform</h1>
           <p className="text-sm text-[#475569]">
-            {loading ? 'Loading…' : `${compact(tenants.length)} restaurants · ${compact(activeCount)} active`}
+            {loading ? 'Loading…' : `${compact(tenants.length)} stores · ${compact(activeCount)} active`}
           </p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          <Plus size={16} /> New restaurant
+          <Plus size={16} /> New store
         </button>
       </div>
 
@@ -241,11 +241,11 @@ export default function SuperAdminDashboard() {
         </div>
       </div>
 
-      {/* Restaurants */}
+      {/* Stores */}
       <div className="rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] p-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-[15px] font-semibold">Restaurants</h3>
+            <h3 className="text-[15px] font-semibold">Stores</h3>
             <span className="rounded-full bg-[#f1f5f9] px-2 py-0.5 text-xs font-semibold text-[#475569]">
               {filteredTenants.length}
             </span>
@@ -285,15 +285,15 @@ export default function SuperAdminDashboard() {
         ) : filteredTenants.length === 0 ? (
           <div className="empty-state">
             <Store size={32} strokeWidth={1.25} className="mx-auto mb-3 text-[#cbd5e1]" />
-            <h3>{tenants.length === 0 ? 'No restaurants yet' : 'No matches'}</h3>
-            <p>{tenants.length === 0 ? 'Provision your first restaurant to get started.' : 'Try a different search or filter.'}</p>
+            <h3>{tenants.length === 0 ? 'No stores yet' : 'No matches'}</h3>
+            <p>{tenants.length === 0 ? 'Provision your first store to get started.' : 'Try a different search or filter.'}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-[#e2e8f0] text-left text-[11px] uppercase tracking-wide text-[#94a3b8]">
-                  <th className="px-4 py-3 font-semibold">Restaurant</th>
+                  <th className="px-4 py-3 font-semibold">Store</th>
                   <th className="px-4 py-3 font-semibold">Storefront</th>
                   <th className="px-4 py-3 font-semibold">Status</th>
                   <th className="px-4 py-3 font-semibold">Created</th>
@@ -362,7 +362,7 @@ export default function SuperAdminDashboard() {
         >
           <div className="w-full max-w-lg rounded-2xl border border-[#e2e8f0] bg-white shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
             <div className="flex items-center justify-between border-b border-[#e2e8f0] px-5 py-4">
-              <h3 className="text-[15px] font-semibold">Provision a restaurant</h3>
+              <h3 className="text-[15px] font-semibold">Provision a store</h3>
               <button onClick={() => setShowForm(false)} className="icon-btn p-1 text-[#94a3b8] hover:text-[#0f172a]" aria-label="Close">
                 <X size={18} />
               </button>
@@ -371,7 +371,7 @@ export default function SuperAdminDashboard() {
             <form onSubmit={handleCreate} className="flex flex-col gap-4 p-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="form-label">Restaurant name</label>
+                  <label className="form-label">Store name</label>
                   <input
                     type="text" className="form-input" required
                     value={formData.restaurantName}
@@ -392,7 +392,7 @@ export default function SuperAdminDashboard() {
                     onChange={(e) => setFormData((f) => ({ ...f, slug: e.target.value, slugTouched: true }))}
                   />
                   <p className="mt-1 text-[11px] text-[#94a3b8]">
-                    {formData.slug ? `${window.location.host}/${formData.slug}` : 'e.g. burger-king'}
+                    {formData.slug ? `${window.location.host}/${formData.slug}` : 'e.g. acme-supplies'}
                   </p>
                 </div>
               </div>
@@ -426,7 +426,7 @@ export default function SuperAdminDashboard() {
               <div className="mt-1 flex justify-end gap-2">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowForm(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={creating}>
-                  {creating ? 'Provisioning…' : 'Provision restaurant'}
+                  {creating ? 'Provisioning…' : 'Provision store'}
                 </button>
               </div>
             </form>

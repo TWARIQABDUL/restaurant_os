@@ -15,7 +15,7 @@ export default function Cart() {
         </div>
         <h3 className="text-[#0f172a]">Your cart is empty</h3>
         <p className="mt-2 mb-6 text-[#475569]">Looks like you haven't added anything to your cart yet.</p>
-        <Link to={`/${tenantSlug}`} className="btn btn-primary btn-lg">Browse menu</Link>
+        <Link to={`/${tenantSlug}`} className="btn btn-primary btn-lg">Browse products</Link>
       </div>
     );
   }
@@ -59,7 +59,10 @@ export default function Cart() {
                   {item.selectedAddOns.length > 0 && (
                     <ul className="mt-2 space-y-0.5 text-xs text-[#475569]">
                       {item.selectedAddOns.map(ao => (
-                        <li key={ao.id}>+ {ao.quantity}× {ao.name} (${(ao.price * ao.quantity).toFixed(2)})</li>
+                        <li key={ao.id}>
+                          {ao.single_choice ? ao.name : `+ ${ao.quantity}× ${ao.name}`}
+                          {parseFloat(ao.price) > 0 && ` (+$${(ao.price * ao.quantity).toFixed(2)})`}
+                        </li>
                       ))}
                     </ul>
                   )}

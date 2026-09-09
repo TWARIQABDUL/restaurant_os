@@ -229,7 +229,7 @@ export default function Checkout() {
               )}
 
               <div className={user ? 'mt-4' : 'mt-4'}>
-                <label className="form-label">Notes for the kitchen or driver (optional)</label>
+                <label className="form-label">Notes for the seller or driver (optional)</label>
                 <input type="text" name="delivery_notes" className="form-input" placeholder="e.g. Leave at front door" value={formData.delivery_notes} onChange={handleChange} />
               </div>
             </section>
@@ -298,7 +298,7 @@ export default function Checkout() {
                 <span className="min-w-0 flex-1 text-[13px]">
                   {item.menuItem.name}
                   {item.selectedAddOns.map(ao => (
-                    <span key={ao.id} className="mt-0.5 block text-[11.5px] text-[#94a3b8]">+ {ao.quantity}× {ao.name}</span>
+                    <span key={ao.id} className="mt-0.5 block text-[11.5px] text-[#94a3b8]">{ao.single_choice ? ao.name : `+ ${ao.quantity}× ${ao.name}`}</span>
                   ))}
                 </span>
                 <span className="text-[13px] font-semibold">
@@ -322,7 +322,7 @@ export default function Checkout() {
             {loading ? 'Processing…' : <><ShoppingCart size={16} /> Place order</>}
           </button>
           <p className="mt-3 text-center text-[11.5px] leading-relaxed text-[#94a3b8]">
-            You'll get a tracking link as soon as the kitchen confirms.
+            You'll get a tracking link as soon as the seller confirms.
           </p>
         </aside>
       </div>
