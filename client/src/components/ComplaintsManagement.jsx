@@ -434,7 +434,7 @@ export default function ComplaintsManagement() {
                                 <h5 className="mb-2 mt-4 text-secondary">Complaint Timeline</h5>
                                 <div className="bg-white p-4 rounded border text-sm">
                                   <div className="flex items-start gap-3 mb-4">
-                                    <div className="w-2 h-2 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></div>
+                                    <div className="w-2 h-2 rounded-full bg-red-500 mt-1.5 shrink-0"></div>
                                     <div>
                                       <div className="text-secondary text-xs mb-1">{new Date(complaint.created_at).toLocaleString()}</div>
                                       <div className="font-medium text-red-700 mb-1">Issue Reported: {complaint.issue_type.replace(/_/g, ' ')}</div>
@@ -444,7 +444,7 @@ export default function ComplaintsManagement() {
                                   
                                   {complaint.status === 'resolved' && (
                                     <div className="flex items-start gap-3">
-                                      <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></div>
+                                      <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 shrink-0"></div>
                                       <div>
                                         <div className="text-secondary text-xs mb-1">{new Date(complaint.updated_at).toLocaleString()}</div>
                                         {complaint.status === 'resolved' ? (
@@ -465,7 +465,7 @@ export default function ComplaintsManagement() {
                                   
                                   {complaint.is_escalated && (
                                     <div className="flex items-start gap-3 mt-4">
-                                      <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0"></div>
+                                      <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 shrink-0"></div>
                                       <div>
                                         <div className="font-medium text-orange-700 mb-1">Escalated to Admin</div>
                                         {complaint.escalation_reason && (

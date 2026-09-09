@@ -145,10 +145,10 @@ export default function TrackOrder() {
   const canComplain = order && ['delivered', 'ready', 'assigned'].includes(order.status);
 
   return (
-    <div className="page" style={{ maxWidth: '600px', margin: '0 auto' }}>
-      <h1 className="text-center mb-6">Track Your Order</h1>
+    <div className="page mx-auto max-w-xl px-4">
+      <h1 className="mb-6 text-center text-2xl font-bold">Track your order</h1>
 
-      <form onSubmit={handleSubmit} className="mb-8 p-6 bg-white border rounded-lg shadow-sm">
+      <form onSubmit={handleSubmit} className="mb-8 rounded-xl border border-[#e2e8f0] bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <div className="flex flex-col gap-4">
           <div>
             <label className="form-label">Tracking Code</label>
@@ -194,12 +194,10 @@ export default function TrackOrder() {
 
       {order && (
         <div className="card">
-          <div className="flex justify-between items-center mb-6 pb-4 border-b">
+          <div className="mb-6 flex items-center justify-between border-b border-[#e2e8f0] pb-4">
             <div>
-              <div className="text-sm text-secondary uppercase tracking-wide mb-1">Order Number</div>
-              <div style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700, color: 'var(--color-accent)' }}>
-                {order.tracking_code}
-              </div>
+              <div className="mb-1 text-xs uppercase tracking-wide text-[#94a3b8]">Order number</div>
+              <div className="font-heading text-xl font-bold">{order.tracking_code}</div>
             </div>
             <div className={getStatusBadge(order.status)}>
               {order.status}
@@ -253,9 +251,9 @@ export default function TrackOrder() {
             ))}
           </div>
           
-          <div className="flex justify-between items-center pt-4 border-t mb-6">
-            <span style={{ fontWeight: 600 }}>Total</span>
-            <span style={{ fontWeight: 700 }}>${parseFloat(order.total_amount).toFixed(2)}</span>
+          <div className="mb-6 flex items-center justify-between border-t border-[#e2e8f0] pt-4">
+            <span className="font-semibold">Total</span>
+            <span className="font-heading font-bold">${parseFloat(order.total_amount).toFixed(2)}</span>
           </div>
 
           {canComplain && (
@@ -271,12 +269,11 @@ export default function TrackOrder() {
                   </Link>
                 </div>
               ) : !showComplaintForm ? (
-                <button 
-                  className="btn btn-secondary w-full"
+                <button
+                  className="btn btn-secondary w-full border-[#fecaca] text-[#dc2626] hover:border-[#dc2626]"
                   onClick={() => setShowComplaintForm(true)}
-                  style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
                 >
-                  Report an Issue with this Order
+                  Report an issue with this order
                 </button>
               ) : (
                 <form onSubmit={submitComplaint} className="p-4 bg-red-50 rounded-lg border border-red-100">
@@ -315,13 +312,12 @@ export default function TrackOrder() {
                     >
                       Cancel
                     </button>
-                    <button 
-                      type="submit" 
-                      className="btn btn-primary btn-sm"
-                      style={{ background: 'var(--color-error)' }}
+                    <button
+                      type="submit"
+                      className="btn btn-danger btn-sm"
                       disabled={submittingComplaint}
                     >
-                      {submittingComplaint ? 'Submitting...' : 'Submit Issue'}
+                      {submittingComplaint ? 'Submitting…' : 'Submit issue'}
                     </button>
                   </div>
                 </form>

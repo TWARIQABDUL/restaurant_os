@@ -154,14 +154,9 @@ export default function Navbar() {
                   <ShoppingCart size={16} />
                   Cart
                   {itemCount > 0 && (
-                    <span style={{
-                      background: 'var(--gradient-accent)', color: 'white',
-                      fontSize: '10px', fontWeight: 700,
-                      minWidth: '18px', height: '18px',
-                      borderRadius: '999px', display: 'inline-flex',
-                      alignItems: 'center', justifyContent: 'center',
-                      marginLeft: '2px'
-                    }}>{itemCount}</span>
+                    <span className="ml-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#dc2626] px-1 text-[10px] font-bold text-white">
+                      {itemCount}
+                    </span>
                   )}
                 </Link>
               </li>
@@ -187,25 +182,9 @@ export default function Navbar() {
                   aria-label="Notifications"
                   style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <Bell size={24} />
+                  <Bell size={22} />
                   {unreadCount > 0 && (
-                    <span style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      right: '-8px',
-                      backgroundColor: '#ef4444',
-                      color: 'white',
-                      borderRadius: '9999px',
-                      minWidth: '20px',
-                      height: '20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11px',
-                      fontWeight: 'bold',
-                      zIndex: 50,
-                      border: '2px solid var(--color-surface)'
-                    }}>
+                    <span className="absolute -right-2 -top-1.5 z-50 flex h-5 min-w-[20px] items-center justify-center rounded-full border-2 border-white bg-[#dc2626] px-1 text-[11px] font-bold text-white">
                       {unreadCount}
                     </span>
                   )}
@@ -268,14 +247,7 @@ export default function Navbar() {
     {menuOpen && (
       <div
         onClick={() => setMenuOpen(false)}
-        style={{
-          position: 'fixed', inset: 0, top: '60px',
-          background: 'rgba(0,0,0,0.3)',
-          backdropFilter: 'blur(4px)',
-          zIndex: 99,
-          animation: 'fadeIn 0.2s ease'
-        }}
-        className="navbar-backdrop"
+        className="fixed inset-x-0 bottom-0 top-[3.75rem] z-[99] bg-[#0f172a]/25"
       />
     )}
     </>

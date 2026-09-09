@@ -14,7 +14,7 @@ import { Copy, QrCode, X, Download, MapPin, StickyNote, Phone } from 'lucide-rea
 import { uploadImage } from '../services/supabase';
 import { QRCodeCanvas } from 'qrcode.react';
 
-const COLORS = ['#e8890c', '#2563eb', '#2d8a4e', '#c53030', '#8b5cf6'];
+const COLORS = ['#dc2626', '#2563eb', '#16a34a', '#d97706', '#7c3aed'];
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -307,7 +307,7 @@ export default function AdminDashboard() {
               {`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`}
             </a>
             <button 
-              className="icon-btn ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors flex-shrink-0"
+              className="icon-btn ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors shrink-0"
               onClick={() => {
                 navigator.clipboard.writeText(`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`);
                 toast.success('Storefront link copied!');
@@ -317,7 +317,7 @@ export default function AdminDashboard() {
               <Copy size={16} />
             </button>
             <button 
-              className="icon-btn ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors flex-shrink-0"
+              className="icon-btn ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors shrink-0"
               onClick={() => setShowQrModal(true)}
               title="Generate QR Code"
             >
@@ -328,49 +328,49 @@ export default function AdminDashboard() {
         <div style={{ width: '100%', minWidth: 0, marginTop: 'var(--space-4)' }}>
           <div className="scrollable-tabs">
             <button 
-              className={`btn flex-shrink-0 ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('analytics')}
             >
               Analytics
             </button>
             <button 
-              className={`btn flex-shrink-0 ${activeTab === 'delivery' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 ${activeTab === 'delivery' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('delivery')}
             >
               Dispatch & Delivery
             </button>
             <button 
-              className={`btn flex-shrink-0 ${activeTab === 'wallet' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 ${activeTab === 'wallet' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('wallet')}
             >
               Wallet
             </button>
             <button 
-              className={`btn flex-shrink-0 ${activeTab === 'menu' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 ${activeTab === 'menu' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('menu')}
             >
               Menu Management
             </button>
             <button 
-              className={`btn flex-shrink-0 ${activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 ${activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('staff')}
             >
               Staff
             </button>
             <button 
-              className={`btn flex-shrink-0 ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('complaints')}
             >
               Complaints
             </button>
             <button 
-              className={`btn flex-shrink-0 ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('seo')}
             >
               SEO
             </button>
             <button 
-              className={`btn flex-shrink-0 ${activeTab === 'theme' ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn shrink-0 ${activeTab === 'theme' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab('theme')}
             >
               Theme
@@ -474,7 +474,7 @@ export default function AdminDashboard() {
                         </a>
                       </div>
                       <div className="text-sm text-secondary mb-2 flex items-start gap-1">
-                        <MapPin size={14} className="mt-0.5 text-secondary flex-shrink-0" /> 
+                        <MapPin size={14} className="mt-0.5 text-secondary shrink-0" /> 
                         <span>{order.guest_address || 'Customer Address'}</span>
                       </div>
                       
@@ -489,7 +489,7 @@ export default function AdminDashboard() {
 
                       {order.delivery_notes && (
                         <div className="text-xs text-warning mb-2 bg-warning-light p-2 rounded flex items-start gap-1">
-                          <StickyNote size={14} className="mt-0.5 flex-shrink-0" />
+                          <StickyNote size={14} className="mt-0.5 shrink-0" />
                           <span>{order.delivery_notes}</span>
                         </div>
                       )}

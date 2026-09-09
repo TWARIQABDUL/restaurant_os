@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Minus, Plus } from 'lucide-react';
 
 export default function Cart() {
   const { items, removeItem, updateQuantity, getTotal, clearCart } = useCart();
@@ -9,138 +9,108 @@ export default function Cart() {
 
   if (items.length === 0) {
     return (
-      <div className="page empty-state">
-        <div style={{
-          width: '80px', height: '80px', borderRadius: '50%',
-          background: 'var(--color-accent-light)',
-          color: 'var(--color-accent)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto var(--space-4)'
-        }}><ShoppingCart size={32} /></div>
-        <h3>Your cart is empty</h3>
-        <p className="mb-6">Looks like you haven't added anything to your cart yet.</p>
-        <Link to={`/${tenantSlug}`} className="btn btn-primary btn-lg btn-pill">Browse Menu</Link>
+      <div className="page mx-auto max-w-2xl px-4 text-center">
+        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[#fef2f2] text-[#dc2626]">
+          <ShoppingCart size={32} />
+        </div>
+        <h3 className="text-[#0f172a]">Your cart is empty</h3>
+        <p className="mt-2 mb-6 text-[#475569]">Looks like you haven't added anything to your cart yet.</p>
+        <Link to={`/${tenantSlug}`} className="btn btn-primary btn-lg">Browse menu</Link>
       </div>
     );
   }
 
   return (
-    <div className="page" style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div className="flex justify-between items-center mb-8">
-        <h1>Your Cart</h1>
-        <button className="btn btn-secondary btn-sm" onClick={clearCart}>
-          Clear Cart
-        </button>
+    <div className="page mx-auto max-w-3xl px-4">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Your cart</h1>
+        <button className="btn btn-secondary btn-sm" onClick={clearCart}>Clear cart</button>
       </div>
 
-      <div className="card mb-8" style={{ padding: 0 }}>
-        {items.map((item, index) => {
-          const itemBaseTotal = item.menuItem.price * item.quantity;
-          const addOnsTotal = item.selectedAddOns.reduce((sum, ao) => sum + (ao.price * ao.quantity), 0) * item.quantity;
-          const lineTotal = itemBaseTotal + addOnsTotal;
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+        <div className="overflow-hidden rounded-xl border border-[#e2e8f0] bg-white">
+          {items.map((item, index) => {
+            const itemBaseTotal = item.menuItem.price * item.quantity;
+            const addOnsTotal = item.selectedAddOns.reduce((sum, ao) => sum + (ao.price * ao.quantity), 0) * item.quantity;
+            const lineTotal = itemBaseTotal + addOnsTotal;
 
-          return (
-            <div key={index} style={{ padding: '24px', borderBottom: index < items.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex gap-4">
-                  {item.menuItem.image_url ? (
-                    <img 
-                      src={item.menuItem.image_url} 
-                      alt={item.menuItem.name} 
-                      style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: 'var(--radius-md)' }} 
-                    />
-                  ) : (
-                    <div style={{ width: '80px', height: '80px', background: 'var(--color-bg-alt)', borderRadius: 'var(--radius-md)' }} />
+            return (
+              <div
+                key={index}
+                className={`flex gap-4 p-5 ${index < items.length - 1 ? 'border-b border-[#e2e8f0]' : ''}`}
+              >
+                {item.menuItem.image_url ? (
+                  <img
+                    src={item.menuItem.image_url}
+                    alt={item.menuItem.name}
+                    className="h-20 w-20 shrink-0 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="h-20 w-20 shrink-0 rounded-lg bg-[#eef2f6]" />
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="text-base font-semibold">{item.menuItem.name}</h3>
+                    <div className="text-base font-semibold">${lineTotal.toFixed(2)}</div>
+                  </div>
+                  <div className="mt-0.5 text-sm text-[#94a3b8]">${parseFloat(item.menuItem.price).toFixed(2)} each</div>
+
+                  {item.selectedAddOns.length > 0 && (
+                    <ul className="mt-2 space-y-0.5 text-xs text-[#475569]">
+                      {item.selectedAddOns.map(ao => (
+                        <li key={ao.id}>+ {ao.quantity}× {ao.name} (${(ao.price * ao.quantity).toFixed(2)})</li>
+                      ))}
+                    </ul>
                   )}
-                  
-                  <div>
-                    <h3 style={{ fontSize: 'var(--font-size-lg)' }}>{item.menuItem.name}</h3>
-                    <div className="text-secondary text-sm mb-2">${parseFloat(item.menuItem.price).toFixed(2)}</div>
-                    
-                    {item.selectedAddOns.length > 0 && (
-                      <div className="text-sm text-secondary">
-                        <div style={{ fontWeight: 500, marginBottom: '2px' }}>Add-ons:</div>
-                        <ul style={{ paddingLeft: '16px', margin: 0 }}>
-                          {item.selectedAddOns.map(ao => (
-                            <li key={ao.id}>
-                              {ao.quantity}x {ao.name} (+${(ao.price * ao.quantity).toFixed(2)})
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
 
-                <div className="text-right">
-                  <div style={{ fontWeight: 600, fontSize: 'var(--font-size-lg)', marginBottom: '12px' }}>
-                    ${lineTotal.toFixed(2)}
-                  </div>
-                  
-                  <div className="flex items-center gap-2 bg-white rounded-md border" style={{ padding: '2px' }}>
-                    <button 
-                      className="btn btn-secondary btn-sm" 
-                      onClick={() => updateQuantity(index, item.quantity - 1)}
-                      style={{ border: 'none', padding: '2px 8px' }}
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="flex items-center gap-3 rounded-lg border border-[#e2e8f0] px-2">
+                      <button
+                        onClick={() => updateQuantity(index, item.quantity - 1)}
+                        className="icon-btn p-1.5 text-[#475569] hover:text-[#0f172a]"
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="min-w-[1rem] text-center text-sm font-semibold">{item.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(index, item.quantity + 1)}
+                        className="icon-btn p-1.5 text-[#0f172a]"
+                        aria-label="Increase quantity"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => removeItem(index)}
+                      className="text-xs font-medium text-[#dc2626] hover:underline"
                     >
-                      -
-                    </button>
-                    <span style={{ width: '20px', textAlign: 'center', fontWeight: 500 }}>{item.quantity}</span>
-                    <button 
-                      className="btn btn-secondary btn-sm" 
-                      onClick={() => updateQuantity(index, item.quantity + 1)}
-                      style={{ border: 'none', padding: '2px 8px' }}
-                    >
-                      +
+                      Remove
                     </button>
                   </div>
-                  
-                  <button 
-                    onClick={() => removeItem(index)}
-                    style={{ background: 'none', border: 'none', color: 'var(--color-error)', fontSize: 'var(--font-size-xs)', marginTop: '8px', cursor: 'pointer', textDecoration: 'underline' }}
-                  >
-                    Remove
-                  </button>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="card" style={{
-        background: 'var(--gradient-dark)',
-        color: 'var(--color-text-inverse)',
-        border: 'none'
-      }}>
-        <div className="flex justify-between items-center mb-6">
-          <span style={{ fontSize: 'var(--font-size-lg)', fontWeight: 500, opacity: 0.8 }}>Total</span>
-          <span style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 800 }}>
-            ${getTotal().toFixed(2)}
-          </span>
+            );
+          })}
         </div>
 
-        <button
-          className="btn btn-lg btn-full btn-pill"
-          onClick={() => navigate(`/${tenantSlug}/checkout`)}
-          style={{
-            background: 'var(--gradient-accent)', color: 'white',
-            border: 'none', fontWeight: 700, marginBottom: 'var(--space-3)'
-          }}
-        >
-          Proceed to Checkout
-        </button>
-        <Link
-          to={`/${tenantSlug}`}
-          className="btn btn-full btn-pill"
-          style={{
-            display: 'block', textAlign: 'center',
-            background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.8)',
-            border: '1px solid rgba(255,255,255,0.15)'
-          }}
-        >
-          Continue Shopping
-        </Link>
+        <aside className="rounded-xl border border-[#e2e8f0] bg-white p-5 lg:sticky lg:top-20">
+          <h3 className="text-base font-semibold">Summary</h3>
+          <div className="mt-4 flex items-baseline justify-between border-t border-[#e2e8f0] pt-4">
+            <span className="text-sm font-medium text-[#475569]">Total</span>
+            <span className="font-heading text-2xl font-bold">${getTotal().toFixed(2)}</span>
+          </div>
+          <button
+            className="btn btn-primary btn-full btn-lg mt-4"
+            onClick={() => navigate(`/${tenantSlug}/checkout`)}
+          >
+            Proceed to checkout
+          </button>
+          <Link to={`/${tenantSlug}`} className="btn btn-secondary btn-full mt-2">
+            Continue shopping
+          </Link>
+        </aside>
       </div>
     </div>
   );

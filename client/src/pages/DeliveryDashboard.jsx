@@ -60,58 +60,56 @@ export default function DeliveryDashboard() {
   };
 
   return (
-    <div className="page" style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div className="mb-8 text-center">
-        <h1>Driver Dashboard</h1>
-        <p className="text-secondary">{user.name} • {user.plate_number}</p>
+    <div className="page mx-auto max-w-3xl px-4">
+      <div className="mb-6 text-center">
+        <h1 className="text-2xl font-bold">Driver dashboard</h1>
+        <p className="text-sm text-[#475569]">{user.name} • {user.plate_number}</p>
       </div>
 
       {loading ? (
         <div className="loading-page"><div className="spinner" /></div>
       ) : orders.length === 0 ? (
         <div className="empty-state">
-          <h3>No Active Deliveries</h3>
+          <h3>No active deliveries</h3>
           <p>You currently have no orders assigned to you.</p>
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5">
           {orders.map(order => (
-            <div key={order.id} id={`order-${order.id}`} className="card" style={{ transition: 'box-shadow 0.5s ease' }}>
-              <div className="flex justify-between items-start mb-4 pb-4 border-b">
+            <div key={order.id} id={`order-${order.id}`} className="card transition-shadow">
+              <div className="mb-4 flex items-start justify-between gap-3 border-b border-[#e2e8f0] pb-4">
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700, color: 'var(--color-text)' }}>
-                      #{order.tracking_code}
-                    </span>
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="font-heading text-xl font-bold">#{order.tracking_code}</span>
                     <span className={`badge ${order.status === 'delivered' ? 'badge-delivered' : 'badge-assigned'}`}>
                       {order.status}
                     </span>
                   </div>
-                  <div className="text-secondary text-sm">
+                  <div className="text-sm text-[#94a3b8]">
                     Assigned: {new Date(order.updated_at).toLocaleTimeString()}
                   </div>
                 </div>
-                
+
                 {order.status === 'assigned' && (
                   <button className="btn btn-success btn-lg" onClick={() => markDelivered(order.id)}>
-                    Mark Delivered
+                    Mark delivered
                   </button>
                 )}
               </div>
 
-              <div className="grid grid-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded border">
-                  <div className="text-xs text-secondary uppercase tracking-wide mb-2">Customer Details</div>
-                  <div style={{ fontWeight: 600 }}>{order.guest_name || order.customer?.name}</div>
-                  <div className="text-secondary">{order.guest_phone || order.customer?.phone}</div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
+                  <div className="mb-2 text-xs uppercase tracking-wide text-[#94a3b8]">Customer details</div>
+                  <div className="font-semibold">{order.guest_name || order.customer?.name}</div>
+                  <div className="text-[#475569]">{order.guest_phone || order.customer?.phone}</div>
                   <div className="mt-2 text-sm">
                     <strong>Address:</strong><br />
                     {order.guest_address || 'Address provided on file'}
                   </div>
                 </div>
-                
-                <div className="p-4 bg-gray-50 rounded border">
-                  <div className="text-xs text-secondary uppercase tracking-wide mb-2">Order Info</div>
+
+                <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
+                  <div className="mb-2 text-xs uppercase tracking-wide text-[#94a3b8]">Order info</div>
                   <div className="mb-2">
                     <span className={`badge ${order.payment_status === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>
                       Payment: {order.payment_method.replace(/_/g, ' ')} • {order.payment_status}

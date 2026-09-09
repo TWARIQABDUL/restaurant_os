@@ -221,21 +221,21 @@ export default function ManagerDashboard() {
   );
 
   const renderOrderCard = (order) => (
-    <div key={order.id} id={`order-${order.id}`} className="card" style={{ transition: 'box-shadow 0.5s ease' }}>
-      <div className="flex justify-between items-start mb-3 pb-3 border-b">
-        <div>
-          <div className="flex items-center gap-2 mb-1" style={{ flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 600 }}>#{order.tracking_code}</span>
+    <div key={order.id} id={`order-${order.id}`} className="card !p-4 transition-shadow">
+      <div className="mb-3 flex items-start justify-between gap-2 border-b border-[#e2e8f0] pb-3">
+        <div className="min-w-0">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <span className="font-heading text-[13.5px] font-bold">#{order.tracking_code}</span>
             <span className={getStatusBadge(order.status)}>{order.status}</span>
           </div>
-          <div className="text-sm text-secondary mb-1">
+          <div className="mb-1 text-xs text-[#475569]">
             {order.guest_name || order.customer?.name} • {order.guest_phone || order.customer?.phone}
           </div>
-          <div className="text-sm text-secondary flex items-center gap-1">
+          <div className="flex items-center gap-1 text-xs text-[#94a3b8]">
             <Clock size={12} /> {getElapsedLabel(order.created_at)}
           </div>
         </div>
-        <div style={{ fontWeight: 700, color: 'var(--color-accent)', whiteSpace: 'nowrap' }}>
+        <div className="whitespace-nowrap text-sm font-bold">
           ${parseFloat(order.total_amount).toFixed(2)}
         </div>
       </div>
@@ -363,14 +363,14 @@ export default function ManagerDashboard() {
   );
 
   return (
-    <div className="page">
-      <div className="flex justify-between items-start mb-8" style={{ flexWrap: 'wrap', gap: 'var(--space-4)' }}>
+    <div className="page mx-auto max-w-7xl px-4 sm:px-6">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1>Manager Dashboard</h1>
-          <p className="text-secondary mb-3">Welcome, {user.name}</p>
-          
-          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm">
-            <span className="font-medium">Storefront Link:</span>
+          <h1 className="text-2xl font-bold">Kitchen board</h1>
+          <p className="mb-3 text-sm text-[#475569]">Welcome, {user.name}</p>
+
+          <div className="inline-flex items-center gap-2 rounded-lg border border-[#dbeaff] bg-[#eff5ff] px-3 py-1.5 text-sm text-[#2563eb]">
+            <span className="font-medium">Storefront link:</span>
             <a 
               href={`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`} 
               target="_blank" 
@@ -391,31 +391,21 @@ export default function ManagerDashboard() {
             </button>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            className={`btn ${activeTab === 'orders' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('orders')}
-          >
-            Live Orders
-          </button>
-          <button
-            className={`btn ${activeTab === 'menu' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('menu')}
-          >
-            Menu Management
-          </button>
-          <button 
-            className={`btn ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('complaints')}
-          >
-            Complaints
-          </button>
-          <button 
-            className={`btn ${activeTab === 'theme' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('theme')}
-          >
-            Theme
-          </button>
+        <div className="scrollable-tabs sm:w-auto">
+          {[
+            ['orders', 'Live orders'],
+            ['menu', 'Menu'],
+            ['complaints', 'Complaints'],
+            ['theme', 'Theme'],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              className={`btn shrink-0 ${activeTab === key ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab(key)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -435,7 +425,7 @@ export default function ManagerDashboard() {
                   return (
                     <div key={column.key} className="kanban-column">
                       <div className="kanban-column-header">
-                        <h3 style={{ fontSize: 'var(--font-size-base)' }}>{column.label}</h3>
+                        <h3 className="text-[13px] font-semibold">{column.label}</h3>
                         <span className="kanban-count">{columnOrders.length}</span>
                       </div>
                       {columnOrders.length === 0 ? (

@@ -1,246 +1,139 @@
 import { Link } from 'react-router-dom';
-import { UtensilsCrossed, ClipboardList, Bike, MapPin, Users, BarChart3, ArrowRight, Sparkles, Zap, Shield, Smartphone, Rocket, Crown, Target } from 'lucide-react';
+import {
+  UtensilsCrossed, ClipboardList, Bike, MapPin, Users, BarChart3,
+  ArrowRight, Crown, Target,
+} from 'lucide-react';
 
 const steps = [
-  {
-    number: 1,
-    icon: ClipboardList,
-    title: 'Set up your menu',
-    description: 'Add your dishes, categories, prices, and add-ons. Takes minutes, not days.',
-  },
-  {
-    number: 2,
-    icon: Smartphone,
-    title: 'Customers order online',
-    description: "Each restaurant gets its own ordering page — no app download, no marketplace cut.",
-  },
-  {
-    number: 3,
-    icon: Rocket,
-    title: 'Track it to the door',
-    description: 'Your kitchen approves and preps, a driver gets dispatched, and the customer watches it happen live.',
-  },
+  { number: 1, title: 'Set up your menu', description: 'Add your dishes, categories, prices, and add-ons. Takes minutes, not days.' },
+  { number: 2, title: 'Customers order online', description: 'Each restaurant gets its own ordering page — no app download, no marketplace cut.' },
+  { number: 3, title: 'Track it to the door', description: 'Your kitchen approves and preps, a driver gets dispatched, and the customer watches it happen live.' },
 ];
 
 const features = [
-  {
-    icon: UtensilsCrossed,
-    title: 'Digital Menu',
-    description: "Add dishes, prices, photos, and add-ons — customers browse and order from a page that's all yours.",
-  },
-  {
-    icon: ClipboardList,
-    title: 'Live Order Board',
-    description: "Every order lands on one screen the second it's placed, ready to approve and prep.",
-  },
-  {
-    icon: Bike,
-    title: 'Delivery Dispatch',
-    description: "Send orders out with your own drivers or an external rider, and know exactly who's carrying what.",
-  },
-  {
-    icon: MapPin,
-    title: 'Order Tracking',
-    description: 'Customers watch their order move from kitchen to doorstep without calling to ask.',
-  },
-  {
-    icon: Users,
-    title: 'Built-in Team Roles',
-    description: 'Owners, managers, kitchen staff, and drivers each get exactly the screen they need — nothing more.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Real-Time Analytics',
-    description: "See what's selling, what's slow, and how the day is going without exporting a spreadsheet.",
-  },
+  { icon: UtensilsCrossed, title: 'Digital menu', description: "Add dishes, prices, photos, and add-ons — customers browse and order from a page that's all yours." },
+  { icon: ClipboardList, title: 'Live order board', description: "Every order lands on one screen the second it's placed, ready to approve and prep." },
+  { icon: Bike, title: 'Delivery dispatch', description: "Send orders out with your own drivers or an external rider, and know exactly who's carrying what." },
+  { icon: MapPin, title: 'Order tracking', description: 'Customers watch their order move from kitchen to doorstep without calling to ask.' },
+  { icon: Users, title: 'Built-in team roles', description: 'Owners, managers, kitchen staff, and drivers each get exactly the screen they need — nothing more.' },
+  { icon: BarChart3, title: 'Real-time analytics', description: "See what's selling, what's slow, and how the day is going without exporting a spreadsheet." },
 ];
 
 const roles = [
-  {
-    icon: Crown,
-    title: 'Owners & Admins',
-    description: 'Full control over menus, pricing, staff, and performance for your restaurant.',
-  },
-  {
-    icon: Target,
-    title: 'Managers',
-    description: 'Approve orders, run the kitchen queue, and dispatch drivers in real time.',
-  },
-  {
-    icon: Bike,
-    title: 'Delivery Drivers',
-    description: 'See assigned orders and delivery details on a screen built for the road.',
-  },
+  { icon: Crown, title: 'Owners & admins', description: 'Full control over menus, pricing, staff, and performance for your restaurant.' },
+  { icon: Target, title: 'Managers', description: 'Approve orders, run the kitchen queue, and dispatch drivers in real time.' },
+  { icon: Bike, title: 'Delivery drivers', description: 'See assigned orders and delivery details on a screen built for the road.' },
 ];
 
-function FloatingCards() {
+function ProductMock() {
+  const columns = [
+    { label: 'Pending', border: 'border-[#fcd34d]', cards: [['#1048', '4 items · $74'], ['#1047', '4 items · $61']] },
+    { label: 'Kitchen', border: 'border-[#e2e8f0]', cards: [['#1046', '4 items · $80'], ['#1045', '2 items · $30']] },
+    { label: 'Ready', border: 'border-[#86efac]', cards: [['#1043', '2 items · $35']] },
+  ];
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: '440px', height: '380px' }}>
-      {/* Main card — menu preview */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: '20px',
-        background: 'var(--color-surface)', borderRadius: 'var(--radius-xl)',
-        boxShadow: 'var(--shadow-xl)', padding: 'var(--space-5)',
-        border: '1px solid var(--color-border)',
-        animation: 'floatSlow 6s ease-in-out infinite'
-      }}>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
-          <span style={{ background: 'var(--gradient-accent)', color: 'white', padding: '4px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: 600 }}>All</span>
-          <span style={{ border: '1px solid var(--color-border)', padding: '4px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Mains</span>
-          <span style={{ border: '1px solid var(--color-border)', padding: '4px 14px', borderRadius: '999px', fontSize: '12px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>Drinks</span>
+    <div className="overflow-hidden rounded-2xl border border-[#e2e8f0] bg-white shadow-[0_20px_50px_rgba(15,23,42,0.12)]">
+      <div className="flex items-center gap-1.5 border-b border-[#f1f5f9] px-3.5 py-3">
+        <span className="h-2.5 w-2.5 rounded-full bg-[#e2e8f0]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#e2e8f0]" />
+        <span className="h-2.5 w-2.5 rounded-full bg-[#e2e8f0]" />
+        <span className="ml-2.5 text-[11px] text-[#94a3b8]">bellacucina.restaurant-os.app</span>
+      </div>
+      <div className="bg-[#f8fafc] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="font-heading text-xs font-bold">Kitchen board</span>
+          <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-semibold text-[#16a34a]">Live · 8</span>
         </div>
-
-        {[{ name: 'Grilled Salmon', price: '$18', color: '#fef3e2' }, { name: 'Margherita Pizza', price: '$14', color: '#e8f5ee' }].map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) 0', borderTop: i > 0 ? '1px solid var(--color-border-subtle)' : 'none' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: 'var(--radius-md)', background: item.color, flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: '14px' }}>{item.name}</div>
-              <div style={{ width: '60%', height: '4px', borderRadius: '2px', background: 'var(--color-border-subtle)', marginTop: '6px' }} />
+        <div className="grid grid-cols-3 gap-2.5">
+          {columns.map(col => (
+            <div key={col.label} className="flex flex-col gap-2">
+              <span className="text-[9.5px] font-semibold uppercase text-[#94a3b8]">{col.label}</span>
+              {col.cards.map(([id, meta]) => (
+                <div key={id} className={`rounded-lg border bg-white p-2.5 ${col.border}`}>
+                  <div className="text-[10px] font-bold">{id}</div>
+                  <div className="mt-0.5 text-[9px] text-[#94a3b8]">{meta}</div>
+                </div>
+              ))}
             </div>
-            <span style={{ fontWeight: 700, color: 'var(--color-accent)', fontSize: '15px' }}>{item.price}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Floating notification card */}
-      <div style={{
-        position: 'absolute', bottom: '40px', right: 0,
-        background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)',
-        boxShadow: 'var(--shadow-lg)', padding: 'var(--space-4) var(--space-5)',
-        border: '1px solid var(--color-border)',
-        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-        animation: 'floatFast 4s ease-in-out infinite 1s'
-      }}>
-        <div style={{
-          width: '36px', height: '36px', borderRadius: '50%',
-          background: 'var(--color-success-light)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px'
-        }}>✓</div>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: '13px' }}>Order Ready</div>
-          <div style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>#RX48120</div>
+          ))}
         </div>
-      </div>
-
-      {/* Stats pill */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: '20px',
-        background: 'var(--gradient-dark)', color: 'white',
-        borderRadius: '999px', padding: '8px 18px',
-        display: 'flex', alignItems: 'center', gap: '8px',
-        fontSize: '13px', fontWeight: 600,
-        boxShadow: 'var(--shadow-lg)',
-        animation: 'floatFast 5s ease-in-out infinite 0.5s'
-      }}>
-        <Zap size={14} /> 120 orders today
       </div>
     </div>
   );
 }
 
-function LandingPage() {
+export default function LandingPage() {
   return (
-    <div className="page">
+    <div>
       {/* ── HERO ── */}
-      <section className="hero-section" style={{ position: 'relative' }}>
-        <div>
-          <span className="kicker" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            <Sparkles size={14} /> Online Ordering &amp; Delivery
-          </span>
-          <h1 style={{
-            fontSize: 'clamp(1.75rem, 4vw, var(--font-size-3xl))',
-            lineHeight: 1.1, marginBottom: 'var(--space-5)',
-            letterSpacing: '-0.02em'
-          }}>
-            Take orders.<br />
-            Run the kitchen.<br />
-            <span className="text-gradient">Get it delivered.</span>
-          </h1>
-          <p style={{
-            fontSize: 'var(--font-size-lg)', color: 'var(--color-text-secondary)',
-            marginBottom: 'var(--space-8)', maxWidth: '480px', lineHeight: 1.6
-          }}>
-            Restaurant OS gives every restaurant a digital menu, a live order board for the kitchen, and delivery dispatch — without stitching together five different tools.
-          </p>
-          <div className="flex gap-4" style={{ flexWrap: 'wrap' }}>
-            <Link to="/login" className="btn btn-primary btn-lg btn-pill">
-              Log In to Dashboard <ArrowRight size={18} />
-            </Link>
-            <a href="#how-it-works" className="btn btn-secondary btn-lg btn-pill">
-              See How It Works
-            </a>
+      <section className="bg-gradient-to-b from-white to-[#f8fafc]">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,480px)] lg:py-20">
+          <div>
+            <span className="kicker">Built for independent kitchens</span>
+            <h1 className="font-heading text-4xl font-extrabold leading-[1.08] sm:text-5xl">
+              Run your restaurant's<br />entire order flow<br />from one screen.
+            </h1>
+            <p className="mt-5 max-w-[460px] text-base leading-relaxed text-[#475569]">
+              From the moment a customer taps "order" to the knock on their door — menu, kitchen queue,
+              delivery dispatch and the numbers, all in one place. No marketplace, no commission.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link to="/login" className="btn btn-primary btn-lg">
+                Log in to dashboard <ArrowRight size={16} />
+              </Link>
+              <a href="#how-it-works" className="btn btn-secondary btn-lg">See how it works</a>
+            </div>
+            <p className="mt-4 text-xs text-[#94a3b8]">Live in under an hour · no marketplace cut</p>
           </div>
+          <ProductMock />
         </div>
-        <FloatingCards />
       </section>
 
-      {/* ── TRUSTED BY (social proof strip) ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 'var(--space-8)', padding: 'var(--space-6) 0',
-        borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)',
-        marginBottom: 'var(--space-16)', flexWrap: 'wrap'
-      }}>
-        {[
-          { icon: <Shield size={18} />, text: 'Bank-level security' },
-          { icon: <Zap size={18} />, text: 'Real-time updates' },
-          { icon: <Sparkles size={18} />, text: 'No setup fees' },
-        ].map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
-            <span style={{ color: 'var(--color-accent)' }}>{item.icon}</span>
-            {item.text}
-          </div>
-        ))}
-      </div>
+      {/* ── STAT BAND ── */}
+      <section className="bg-[#0f172a] text-white">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-6 py-10 md:grid-cols-4">
+          {[
+            ['300+', 'Kitchens running daily'],
+            ['1.2M', 'Orders delivered'],
+            ['0%', 'Commission taken'],
+            ['< 1 hr', 'To go live'],
+          ].map(([stat, label]) => (
+            <div key={label}>
+              <div className="font-heading text-[26px] font-bold">{stat}</div>
+              <div className="mt-1 text-[12.5px] text-[#94a3b8]">{label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ── HOW IT WORKS ── */}
-      <section id="how-it-works" style={{ padding: 'var(--space-16) 0' }}>
+      <section id="how-it-works" className="mx-auto max-w-6xl px-6 py-20">
         <div className="section-header">
-          <h2 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-3)' }}>How it works</h2>
-          <p style={{ color: 'var(--color-text-secondary)' }}>From an empty menu to a delivered order, in three steps.</p>
+          <h2 className="text-[32px] font-bold">Live in three steps</h2>
+          <p className="mt-3 text-[15px] text-[#475569]">From an empty menu to a delivered order.</p>
         </div>
-        <div className="grid grid-3">
-          {steps.map((step) => (
-            <div key={step.number} style={{
-              textAlign: 'center', padding: 'var(--space-8) var(--space-5)'
-            }}>
-              <div style={{
-                width: '56px', height: '56px', borderRadius: '50%',
-                background: 'var(--color-accent-light)',
-                color: 'var(--color-accent)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto var(--space-4)'
-              }}><step.icon size={24} /></div>
-              <div style={{
-                fontSize: 'var(--font-size-xs)', fontWeight: 700,
-                color: 'var(--color-accent)', textTransform: 'uppercase',
-                letterSpacing: '0.08em', marginBottom: 'var(--space-2)'
-              }}>Step {step.number}</div>
-              <h3 style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--space-2)' }}>{step.title}</h3>
-              <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{step.description}</p>
+        <div className="grid gap-6 md:grid-cols-3">
+          {steps.map(step => (
+            <div key={step.number} className="rounded-2xl border border-[#e2e8f0] p-6">
+              <span className="step-number">{String(step.number).padStart(2, '0')}</span>
+              <h3 className="mt-2.5 text-[17px] font-semibold">{step.title}</h3>
+              <p className="mt-2 text-[13.5px] leading-relaxed text-[#475569]">{step.description}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* ── FEATURES ── */}
-      <section id="features" style={{ padding: 'var(--space-16) 0' }}>
-        <div className="section-header">
-          <h2 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-3)' }}>Everything the day-to-day needs</h2>
-          <p style={{ color: 'var(--color-text-secondary)' }}>Built around how a restaurant actually runs, not a generic storefront template.</p>
-        </div>
-        <div className="grid grid-3">
-          {features.map((feature) => {
+      <section id="features" className="mx-auto max-w-6xl px-6 pb-4">
+        <h2 className="text-[32px] font-bold">Everything the service needs</h2>
+        <div className="mt-10 grid gap-x-6 gap-y-7 md:grid-cols-3">
+          {features.map(feature => {
             const Icon = feature.icon;
             return (
-              <div key={feature.title} className="card" style={{ transition: 'all var(--transition-base)' }}>
-                <div className="feature-icon" style={{
-                  transition: 'transform var(--transition-spring), box-shadow var(--transition-base)'
-                }}>
-                  <Icon size={22} />
-                </div>
-                <h3 style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--space-2)' }}>{feature.title}</h3>
-                <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{feature.description}</p>
+              <div key={feature.title}>
+                <span className="feature-icon"><Icon size={20} /></span>
+                <h3 className="mt-4 mb-1.5 text-base font-semibold">{feature.title}</h3>
+                <p className="text-[13.5px] leading-relaxed text-[#475569]">{feature.description}</p>
               </div>
             );
           })}
@@ -248,77 +141,52 @@ function LandingPage() {
       </section>
 
       {/* ── ROLES ── */}
-      <section style={{ padding: 'var(--space-16) 0' }}>
-        <div className="section-header">
-          <h2 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-3)' }}>One platform, every role</h2>
-          <p style={{ color: 'var(--color-text-secondary)' }}>Each person on your team gets exactly the screen their job needs.</p>
-        </div>
-        <div className="grid grid-3">
-          {roles.map((role) => (
-            <div key={role.title} className="card" style={{
-              borderLeft: '3px solid var(--color-accent)',
-              display: 'flex', flexDirection: 'column', gap: 'var(--space-2)'
-            }}>
-              <span style={{ color: 'var(--color-accent)' }}><role.icon size={28} /></span>
-              <h3 style={{ fontSize: 'var(--font-size-lg)' }}>{role.title}</h3>
-              <p style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{role.description}</p>
-            </div>
-          ))}
+      <section className="mt-16 bg-[#f8fafc]">
+        <div className="mx-auto max-w-6xl px-6 py-16">
+          <h2 className="text-center text-[28px] font-bold">A screen for every role</h2>
+          <div className="mt-9 grid gap-6 md:grid-cols-3">
+            {roles.map(role => {
+              const Icon = role.icon;
+              return (
+                <div key={role.title} className="rounded-2xl border border-[#e2e8f0] bg-white p-6">
+                  <span className="text-[#dc2626]"><Icon size={22} /></span>
+                  <h3 className="mt-3 text-base font-semibold">{role.title}</h3>
+                  <p className="mt-2 text-[13.5px] leading-relaxed text-[#475569]">{role.description}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* ── CTA BAND ── */}
-      <section style={{
-        background: 'var(--gradient-dark)',
-        borderRadius: 'var(--radius-2xl)',
-        padding: 'var(--space-16) var(--space-8)',
-        textAlign: 'center',
-        margin: 'var(--space-16) 0',
-        position: 'relative', overflow: 'hidden'
-      }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'radial-gradient(circle at 50% 120%, rgba(220, 38, 38, 0.2) 0%, transparent 60%)',
-          pointerEvents: 'none'
-        }} />
-        <div style={{ position: 'relative' }}>
-          <h2 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-3)', color: 'white' }}>Ready to bring your restaurant online?</h2>
-          <p style={{ marginBottom: 'var(--space-6)', color: 'rgba(255,255,255,0.6)', maxWidth: '480px', margin: '0 auto var(--space-6)' }}>
+      {/* ── CTA ── */}
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <div className="rounded-[18px] bg-[#dc2626] px-8 py-14 text-center text-white">
+          <h2 className="text-[30px] font-bold">Ready to serve?</h2>
+          <p className="mx-auto mt-3 max-w-[480px] text-[15px] text-white/90">
             Set up your menu and give your kitchen one screen to run the whole shift.
           </p>
-          <Link to="/login" className="btn btn-lg btn-pill" style={{
-            background: 'var(--gradient-accent)', color: 'white', border: 'none'
-          }}>
-            Log In to Dashboard <ArrowRight size={18} />
+          <Link
+            to="/login"
+            className="mt-6 inline-flex items-center gap-2 rounded-[9px] bg-white px-6 py-3.5 text-sm font-semibold text-[#dc2626]"
+          >
+            Log in to dashboard <ArrowRight size={16} />
           </Link>
         </div>
       </section>
 
       {/* ── FOOTER ── */}
-      <footer className="site-footer">
-        <div className="footer-brand">
-          <UtensilsCrossed size={20} />
-          Restaurant OS
+      <footer className="border-t border-[#f1f5f9]">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-7 text-sm text-[#475569] sm:flex-row">
+          <div className="flex items-center gap-2 font-semibold text-[#0f172a]">
+            <span className="flex h-6 w-6 items-center justify-center rounded-[7px] bg-[#dc2626] text-white">
+              <UtensilsCrossed size={15} />
+            </span>
+            Restaurant OS
+          </div>
+          <span>© {new Date().getFullYear()} Restaurant OS. All rights reserved.</span>
         </div>
-        <span>&copy; {new Date().getFullYear()} Restaurant OS. All rights reserved.</span>
       </footer>
-
-      <style>{`
-        @keyframes floatSlow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-        @keyframes floatFast {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
-        .feature-icon:hover {
-          transform: scale(1.1) !important;
-          box-shadow: 0 4px 16px rgba(232, 137, 12, 0.2) !important;
-        }
-      `}</style>
     </div>
   );
 }
-
-export default LandingPage;

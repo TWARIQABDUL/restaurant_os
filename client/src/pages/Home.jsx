@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import api from '../services/api';
+import { Search, Utensils, Star, Clock, ArrowRight } from 'lucide-react';
 
 export default function Home() {
   const [categories, setCategories] = useState([]);
@@ -137,11 +138,11 @@ export default function Home() {
 
   if (notFound) {
     return (
-      <div className="page flex flex-col items-center justify-center text-center" style={{ minHeight: '60vh' }}>
-        <h1 style={{ fontSize: '3rem', marginBottom: '1rem', color: 'var(--color-text-secondary)' }}>404</h1>
-        <h2>Restaurant Not Found</h2>
-        <p className="text-secondary mt-2 mb-6">We couldn't find a restaurant at this URL.</p>
-        <Link to="/" className="btn btn-primary">Return to Homepage</Link>
+      <div className="page mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
+        <h1 className="font-heading text-5xl font-bold text-[#94a3b8]">404</h1>
+        <h2 className="mt-3">Restaurant not found</h2>
+        <p className="mt-2 mb-6 text-[#475569]">We couldn't find a restaurant at this URL.</p>
+        <Link to="/" className="btn btn-primary">Return to homepage</Link>
       </div>
     );
   }
@@ -149,55 +150,41 @@ export default function Home() {
   const restaurantName = tenantInfo?.name || tenantSlug?.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Restaurant';
 
   return (
-    <div className="page">
-      {/* ── Restaurant Hero Banner ── */}
-      <div style={{
-        background: 'var(--gradient-dark)',
-        borderRadius: 'var(--radius-xl)',
-        padding: 'var(--space-10) var(--space-8)',
-        marginBottom: 'var(--space-8)',
-        position: 'relative',
-        overflow: 'hidden',
-        textAlign: 'center',
-        color: 'var(--color-text-inverse)'
-      }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'radial-gradient(circle at 30% 50%, rgba(232, 137, 12, 0.15) 0%, transparent 60%)',
-          pointerEvents: 'none'
-        }} />
-        {tenantInfo?.logo_url && (
+    <div className="page mx-auto max-w-6xl px-4 sm:px-6">
+      {/* ── Restaurant header ── */}
+      <section className="flex items-center gap-5 pb-6">
+        {tenantInfo?.logo_url ? (
           <img
             src={tenantInfo.logo_url}
             alt={restaurantName}
-            style={{
-              width: '72px', height: '72px', borderRadius: '50%',
-              objectFit: 'cover', margin: '0 auto var(--space-4)',
-              border: '3px solid rgba(255,255,255,0.2)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
-            }}
+            className="h-[76px] w-[76px] shrink-0 rounded-2xl border border-[#e2e8f0] object-cover"
           />
+        ) : (
+          <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-2xl border border-[#fecaca] bg-[#fef2f2] text-[#dc2626]">
+            <Utensils size={30} strokeWidth={1.5} />
+          </div>
         )}
-        <h1 style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--space-2)', position: 'relative' }}>
-          {restaurantName}
-        </h1>
-        <p style={{ opacity: 0.7, fontSize: 'var(--font-size-sm)', position: 'relative' }}>
-          {tenantInfo?.seo?.seoDescription || 'Explore our menu and order your favorites.'}
-        </p>
-      </div>
+        <div className="min-w-0">
+          <h1 className="text-3xl font-bold">{restaurantName}</h1>
+          <p className="mt-1.5 text-[15px] text-[#475569]">
+            {tenantInfo?.seo?.seoDescription || 'Explore our menu and order your favourites.'}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-2.5 py-1 text-xs font-semibold text-[#0f172a]">
+              <Star size={13} className="fill-[#f59e0b] text-[#f59e0b]" /> 4.8
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] px-2.5 py-1 text-xs font-semibold text-[#16a34a]">
+              <Clock size={13} /> Open now
+            </span>
+          </div>
+        </div>
+      </section>
 
-      {/* ── Category Pills + Search ── */}
-      <div style={{
-        display: 'flex', flexDirection: 'column', gap: 'var(--space-4)',
-        marginBottom: 'var(--space-8)'
-      }}>
-        <div style={{
-          display: 'flex', gap: 'var(--space-2)',
-          overflowX: 'auto', paddingBottom: '4px',
-          scrollbarWidth: 'none'
-        }}>
+      {/* ── Filters ── */}
+      <div className="flex flex-col gap-4 border-t border-[#e2e8f0] py-5 md:flex-row md:items-center md:justify-between">
+        <div className="scrollable-tabs">
           <button
-            className={`btn btn-pill ${selectedCategory === '' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn btn-pill shrink-0 ${selectedCategory === '' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setSelectedCategory('')}
           >
             All
@@ -205,7 +192,7 @@ export default function Home() {
           {categories.map((cat) => (
             <button
               key={cat}
-              className={`btn btn-pill ${selectedCategory === cat ? 'btn-primary' : 'btn-secondary'}`}
+              className={`btn btn-pill shrink-0 ${selectedCategory === cat ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setSelectedCategory(cat)}
             >
               {cat}
@@ -213,94 +200,54 @@ export default function Home() {
           ))}
         </div>
 
-        <div style={{ position: 'relative', maxWidth: '360px' }}>
-          <span style={{
-            position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
-            color: 'var(--color-text-muted)', fontSize: '16px', pointerEvents: 'none'
-          }}>🔍</span>
+        <div className="relative w-full md:max-w-[280px]">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]" />
           <input
             type="text"
-            className="form-input"
-            placeholder="Search menu..."
+            className="form-input pl-9"
+            placeholder="Search the menu"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '36px' }}
           />
         </div>
       </div>
 
-      {/* ── Menu Grid ── */}
+      {/* ── Menu grid ── */}
       {loading ? (
-        <div className="loading-page">
-          <div className="spinner" />
-        </div>
+        <div className="loading-page"><div className="spinner" /></div>
       ) : items.length === 0 ? (
         <div className="empty-state">
-          <div style={{ fontSize: '48px', marginBottom: 'var(--space-4)' }}>🍽️</div>
+          <Utensils size={44} strokeWidth={1.25} className="mx-auto mb-4 text-[#cbd5e1]" />
           <h3>No items found</h3>
           <p>Try adjusting your search or category filter.</p>
         </div>
       ) : (
-        <div className="grid grid-3">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
             <Link
               to={`/${tenantSlug}/menu/${item.id}`}
               key={item.id}
-              className="card"
-              style={{
-                display: 'flex', flexDirection: 'column',
-                padding: 0, overflow: 'hidden',
-                textDecoration: 'none', color: 'inherit'
-              }}
+              className="group flex flex-col overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors hover:border-[#cbd5e1]"
             >
-              <div style={{ position: 'relative', overflow: 'hidden' }}>
+              <div className="relative">
                 {item.image_url ? (
-                  <img
-                    src={item.image_url}
-                    alt={item.name}
-                    className="card-image"
-                    style={{
-                      width: '100%', height: '200px', objectFit: 'cover',
-                      margin: 0, borderRadius: '0'
-                    }}
-                  />
+                  <img src={item.image_url} alt={item.name} className="h-44 w-full object-cover" />
                 ) : (
-                  <div className="card-image" style={{
-                    width: '100%', height: '200px',
-                    background: 'var(--color-bg-alt)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    margin: 0, borderRadius: '0'
-                  }}>
-                    <span style={{ color: 'var(--color-text-muted)', fontSize: '2rem' }}>🍴</span>
+                  <div className="flex h-44 w-full items-center justify-center bg-[#eef2f6] text-[#cbd5e1]">
+                    <Utensils size={40} strokeWidth={1.25} />
                   </div>
                 )}
-                {/* Gradient overlay */}
-                <div style={{
-                  position: 'absolute', bottom: 0, left: 0, right: 0,
-                  height: '60px',
-                  background: 'linear-gradient(transparent, rgba(0,0,0,0.04))',
-                  pointerEvents: 'none'
-                }} />
-                {/* Price badge */}
-                <span style={{
-                  position: 'absolute', top: 'var(--space-3)', right: 'var(--space-3)',
-                  background: 'var(--gradient-accent)',
-                  color: 'white', fontWeight: 700,
-                  fontSize: 'var(--font-size-sm)',
-                  padding: '4px 10px', borderRadius: '999px',
-                  boxShadow: 'var(--shadow-md)'
-                }}>
+                <span className="absolute right-3 top-3 rounded-full bg-[#0f172a] px-2.5 py-1 text-xs font-bold text-white">
                   ${parseFloat(item.price).toFixed(2)}
                 </span>
               </div>
-
-              <div style={{ padding: 'var(--space-4) var(--space-5) var(--space-5)', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: 'var(--font-size-base)', marginBottom: 'var(--space-1)' }}>{item.name}</h3>
-                <p className="text-secondary text-sm" style={{ flexGrow: 1, marginBottom: 'var(--space-3)', lineHeight: 1.5 }}>
+              <div className="flex flex-1 flex-col p-4 pt-3.5">
+                <h3 className="text-[15px] font-semibold">{item.name}</h3>
+                <p className="mt-1 flex-1 text-[13px] leading-snug text-[#475569]">
                   {item.description?.length > 80 ? item.description.slice(0, 80) + '…' : item.description}
                 </p>
-                <span className="btn btn-secondary btn-sm btn-pill" style={{ alignSelf: 'flex-start' }}>
-                  View Details →
+                <span className="mt-3.5 inline-flex items-center gap-1.5 self-start rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-1.5 text-xs font-semibold text-[#dc2626]">
+                  View details <ArrowRight size={13} />
                 </span>
               </div>
             </Link>

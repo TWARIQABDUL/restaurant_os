@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import api from '../services/api';
 import { getSocket } from '../services/socket';
 import toast from 'react-hot-toast';
+import { Package } from 'lucide-react';
 
 export default function OrderTracking() {
   const { tenantSlug } = useParams();
@@ -76,39 +77,39 @@ export default function OrderTracking() {
   if (orders.length === 0) {
     return (
       <div className="page empty-state">
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>📦</div>
-        <h3>No Orders Yet</h3>
+        <Package size={44} strokeWidth={1.25} className="mx-auto mb-4 text-[#cbd5e1]" />
+        <h3>No orders yet</h3>
         <p className="mb-6">You haven't placed any orders with us yet.</p>
-        <Link to={`/${tenantSlug}`} className="btn btn-primary">Start Ordering</Link>
+        <Link to={`/${tenantSlug}`} className="btn btn-primary">Start ordering</Link>
       </div>
     );
   }
 
   return (
-    <div className="page" style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <h1 className="mb-8">My Orders</h1>
+    <div className="page mx-auto max-w-3xl px-4">
+      <h1 className="mb-6 text-2xl font-bold">My orders</h1>
 
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5">
         {orders.map((order) => (
           <div key={order.id} className="card">
-            <div className="flex justify-between items-center mb-4 pb-4 border-b">
+            <div className="mb-4 flex items-center justify-between border-b border-[#e2e8f0] pb-4">
               <div>
-                <span className="text-secondary text-sm">Order #{order.tracking_code}</span>
-                <div style={{ fontWeight: 600 }}>{new Date(order.created_at).toLocaleDateString()}</div>
+                <span className="text-sm text-[#94a3b8]">Order #{order.tracking_code}</span>
+                <div className="font-semibold">{new Date(order.created_at).toLocaleDateString()}</div>
               </div>
               <div className="flex flex-col items-end gap-2">
                 <span className={getStatusBadge(order.status)}>{order.status}</span>
-                <Link to={`/${tenantSlug}/track?code=${order.tracking_code}`} className="text-xs text-accent underline">
-                  Live Track
+                <Link to={`/${tenantSlug}/track?code=${order.tracking_code}`} className="text-xs font-medium text-[#dc2626] underline">
+                  Live track
                 </Link>
               </div>
             </div>
 
-            <div className="mb-4">
+            <div className="mb-4 flex flex-col gap-1">
               {order.order_items?.map((item, idx) => (
-                <div key={idx} className="flex justify-between text-sm mb-1">
-                  <span>{item.quantity}x {item.menu_item?.name}</span>
-                  <span className="text-secondary">${(item.quantity * item.unit_price).toFixed(2)}</span>
+                <div key={idx} className="flex justify-between text-sm">
+                  <span>{item.quantity}× {item.menu_item?.name}</span>
+                  <span className="text-[#475569]">${(item.quantity * item.unit_price).toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -129,11 +130,11 @@ export default function OrderTracking() {
               </div>
             )}
 
-            <div className="flex justify-between items-center pt-4 border-t">
+            <div className="flex items-center justify-between border-t border-[#e2e8f0] pt-4">
               <span className={`badge ${order.payment_status === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>
                 {order.payment_method.replace(/_/g, ' ')} • {order.payment_status}
               </span>
-              <span style={{ fontWeight: 700 }}>${parseFloat(order.total_amount).toFixed(2)}</span>
+              <span className="font-heading font-bold">${parseFloat(order.total_amount).toFixed(2)}</span>
             </div>
           </div>
         ))}

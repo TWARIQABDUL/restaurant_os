@@ -58,14 +58,14 @@ export default function SuperAdminDashboard() {
   };
 
   return (
-    <div className="page">
-      <div className="flex justify-between items-center mb-8">
+    <div className="page mx-auto max-w-7xl px-4 sm:px-6">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1>Platform Administration</h1>
-          <p className="text-secondary">Manage SaaS Tenants</p>
+          <h1 className="text-2xl font-bold">Platform analytics</h1>
+          <p className="text-sm text-[#475569]">Manage SaaS tenants</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : '+ New Restaurant'}
+          {showForm ? 'Cancel' : '+ New restaurant'}
         </button>
       </div>
 

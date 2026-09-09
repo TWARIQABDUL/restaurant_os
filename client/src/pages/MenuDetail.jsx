@@ -4,23 +4,22 @@ import api from '../services/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { ArrowLeft, Star, Utensils, Minus, Plus } from 'lucide-react';
 
 export default function MenuDetail() {
   const { id, tenantSlug } = useParams();
   const navigate = useNavigate();
   const { addItem } = useCart();
   const { user } = useAuth();
-  
+
   const [item, setItem] = useState(null);
   const [availableAddOns, setAvailableAddOns] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
-  
-  // State for user selections
+
   const [quantity, setQuantity] = useState(1);
   const [selectedAddOns, setSelectedAddOns] = useState({});
 
-  // State for new review
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -47,11 +46,8 @@ export default function MenuDetail() {
   const toggleAddOn = (addOn) => {
     setSelectedAddOns(prev => {
       const next = { ...prev };
-      if (next[addOn.id]) {
-        delete next[addOn.id];
-      } else {
-        next[addOn.id] = { ...addOn, quantity: 1 };
-      }
+      if (next[addOn.id]) delete next[addOn.id];
+      else next[addOn.id] = { ...addOn, quantity: 1 };
       return next;
     });
   };
@@ -65,10 +61,7 @@ export default function MenuDetail() {
         delete next[addOnId];
         return next;
       }
-      return {
-        ...prev,
-        [addOnId]: { ...prev[addOnId], quantity: nextQty }
-      };
+      return { ...prev, [addOnId]: { ...prev[addOnId], quantity: nextQty } };
     });
   };
 
@@ -118,108 +111,75 @@ export default function MenuDetail() {
   const addOnCategories = [...new Set(availableAddOns.map(a => a.category))];
 
   return (
-    <div className="page" style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {/* Hero Image with overlay */}
-        <div style={{ position: 'relative' }}>
-          {item.image_url ? (
-            <img src={item.image_url} alt={item.name} style={{ width: '100%', height: '320px', objectFit: 'cover', display: 'block' }} />
-          ) : (
-            <div style={{ width: '100%', height: '220px', background: 'var(--gradient-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '3rem', opacity: 0.3 }}>🍴</span>
-            </div>
-          )}
-          {/* Gradient overlay */}
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0, height: '120px',
-            background: 'linear-gradient(transparent, rgba(0,0,0,0.5))',
-            pointerEvents: 'none'
-          }} />
-          {/* Back button */}
-          <button
-            className="btn btn-pill"
-            onClick={() => navigate(-1)}
-            style={{
-              position: 'absolute', top: 'var(--space-4)', left: 'var(--space-4)',
-              background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)',
-              border: 'none', fontWeight: 600, fontSize: 'var(--font-size-sm)',
-              boxShadow: 'var(--shadow-md)'
-            }}
-          >
-            ← Back
-          </button>
-          {/* Price badge */}
-          <span style={{
-            position: 'absolute', bottom: 'var(--space-4)', right: 'var(--space-4)',
-            background: 'var(--gradient-accent)', color: 'white',
-            fontWeight: 800, fontSize: 'var(--font-size-xl)',
-            padding: '6px 16px', borderRadius: '999px',
-            boxShadow: 'var(--shadow-accent)'
-          }}>
-            ${parseFloat(item.price).toFixed(2)}
-          </span>
-        </div>
+    <div className="page mx-auto max-w-4xl px-4">
+      <button
+        onClick={() => navigate(-1)}
+        className="mb-5 inline-flex items-center gap-1.5 text-sm font-medium text-[#475569] hover:text-[#0f172a]"
+      >
+        <ArrowLeft size={16} /> Back to menu
+      </button>
 
-        <div className="p-6">
-          <div className="mb-4">
-            <h1 className="mb-2">{item.name}</h1>
-            <p className="text-secondary">{item.description}</p>
+      <div className="grid gap-9 md:grid-cols-[minmax(0,420px)_minmax(0,1fr)] md:items-start">
+        {item.image_url ? (
+          <img
+            src={item.image_url}
+            alt={item.name}
+            className="h-[420px] w-full rounded-2xl border border-[#e2e8f0] object-cover"
+          />
+        ) : (
+          <div className="flex h-[420px] w-full items-center justify-center rounded-2xl border border-[#e2e8f0] bg-[#eef2f6] text-[#cbd5e1]">
+            <Utensils size={58} strokeWidth={1.1} />
           </div>
+        )}
 
-          <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '24px 0' }} />
+        <div>
+          <h1 className="text-3xl font-bold">{item.name}</h1>
+          <p className="mt-2.5 leading-relaxed text-[#475569]">{item.description}</p>
+          <div className="font-heading mt-4 text-2xl font-bold">${parseFloat(item.price).toFixed(2)}</div>
 
           {availableAddOns.length > 0 && (
-            <div className="mb-8">
-              <h3 className="mb-4">Customize your order</h3>
-              
+            <div className="mt-6 border-t border-[#e2e8f0] pt-5">
+              <h3 className="mb-3 text-[15px] font-semibold">Customize your order</h3>
               {addOnCategories.map(category => (
-                <div key={category} className="mb-6">
-                  <h4 className="mb-3" style={{ textTransform: 'capitalize', color: 'var(--color-text-secondary)' }}>
-                    {category}
-                  </h4>
-                  <div className="grid grid-2">
+                <div key={category} className="mb-5">
+                  <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#94a3b8]">{category}</h4>
+                  <div className="grid gap-2.5 sm:grid-cols-2">
                     {availableAddOns.filter(a => a.category === category).map(addOn => {
                       const isSelected = !!selectedAddOns[addOn.id];
                       return (
-                        <div 
-                          key={addOn.id} 
-                          className={`card ${isSelected ? 'selected' : ''}`}
-                          style={{ 
-                            padding: '12px 16px', 
-                            cursor: 'pointer',
-                            borderColor: isSelected ? 'var(--color-accent)' : 'var(--color-border)',
-                            backgroundColor: isSelected ? 'var(--color-accent-light)' : 'var(--color-surface)',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}
+                        <div
+                          key={addOn.id}
                           onClick={() => !isSelected && toggleAddOn(addOn)}
+                          className={`flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors ${
+                            isSelected
+                              ? 'border-[#dc2626] bg-[#fef2f2]'
+                              : 'cursor-pointer border-[#e2e8f0] bg-white hover:border-[#cbd5e1]'
+                          }`}
                         >
-                          <div>
-                            <div style={{ fontWeight: 500 }}>{addOn.name}</div>
-                            <div className="text-sm text-secondary">+${parseFloat(addOn.price).toFixed(2)}</div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium">{addOn.name}</div>
+                            <div className="text-xs font-semibold text-[#475569]">+${parseFloat(addOn.price).toFixed(2)}</div>
                           </div>
-                          
                           {isSelected ? (
                             <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                              <button 
-                                className="btn btn-secondary btn-sm" 
-                                style={{ padding: '2px 8px' }}
+                              <button
+                                className="icon-btn p-1 text-[#475569] hover:text-[#0f172a]"
                                 onClick={() => updateAddOnQuantity(addOn.id, -1)}
+                                aria-label="Decrease"
                               >
-                                -
+                                <Minus size={14} />
                               </button>
-                              <span>{selectedAddOns[addOn.id].quantity}</span>
-                              <button 
-                                className="btn btn-secondary btn-sm"
-                                style={{ padding: '2px 8px' }}
+                              <span className="min-w-[1rem] text-center text-sm font-semibold">{selectedAddOns[addOn.id].quantity}</span>
+                              <button
+                                className="icon-btn p-1 text-[#0f172a]"
                                 onClick={() => updateAddOnQuantity(addOn.id, 1)}
+                                aria-label="Increase"
                               >
-                                +
+                                <Plus size={14} />
                               </button>
                             </div>
                           ) : (
-                            <div style={{ width: '20px', height: '20px', border: '1px solid var(--color-border)', borderRadius: '4px' }}></div>
+                            <span className="h-5 w-5 shrink-0 rounded-md border border-[#cbd5e1]" />
                           )}
                         </div>
                       );
@@ -230,105 +190,102 @@ export default function MenuDetail() {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-8 p-4" style={{ background: 'var(--color-bg)', borderRadius: 'var(--radius-lg)' }}>
-            <div className="flex items-center gap-4">
-              <span style={{ fontWeight: 500 }}>Quantity:</span>
-              <div className="flex items-center gap-2 bg-white rounded-md border" style={{ padding: '4px' }}>
-                <button 
-                  className="btn btn-secondary btn-sm" 
-                  onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                  style={{ border: 'none' }}
-                >
-                  -
-                </button>
-                <span style={{ width: '30px', textAlign: 'center', fontWeight: 600 }}>{quantity}</span>
-                <button 
-                  className="btn btn-secondary btn-sm" 
-                  onClick={() => setQuantity(q => q + 1)}
-                  style={{ border: 'none' }}
-                >
-                  +
-                </button>
-              </div>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <div className="flex items-center gap-4 rounded-lg border border-[#e2e8f0] bg-white px-4">
+              <button
+                className="icon-btn p-2 text-[#475569] hover:text-[#0f172a]"
+                onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                aria-label="Decrease quantity"
+              >
+                <Minus size={16} />
+              </button>
+              <span className="font-heading min-w-[1.5rem] text-center text-[15px] font-bold">{quantity}</span>
+              <button
+                className="icon-btn p-2 text-[#0f172a]"
+                onClick={() => setQuantity(q => q + 1)}
+                aria-label="Increase quantity"
+              >
+                <Plus size={16} />
+              </button>
             </div>
-
-            <button className="btn btn-primary btn-lg flex-1 sm:flex-none" onClick={handleAddToCart}>
-              Add to Cart • ${calculateTotal().toFixed(2)}
+            <button className="btn btn-primary btn-lg flex-1" onClick={handleAddToCart}>
+              Add to cart
+              <span className="opacity-80">· ${calculateTotal().toFixed(2)}</span>
             </button>
           </div>
         </div>
       </div>
 
-      <div className="card mt-8">
-        <h3 className="mb-4">Customer Reviews</h3>
-        
+      <div className="card mt-9">
+        <h3 className="mb-4 text-[15px] font-semibold">Customer reviews</h3>
+
         {user ? (
-          <form onSubmit={submitReview} className="mb-8 p-4" style={{ background: 'var(--color-bg)', borderRadius: 'var(--radius-md)' }}>
-            <h4 className="mb-3">Leave a Review</h4>
+          <form onSubmit={submitReview} className="mb-6 rounded-lg bg-[#f8fafc] p-4">
+            <h4 className="mb-3 text-sm font-semibold">Leave a review</h4>
             <div className="flex flex-col gap-4">
               <div>
-                <label className="form-label">Rating</label>
-                <div className="flex gap-2">
+                <span className="form-label">Rating</span>
+                <div className="flex gap-1">
                   {[1, 2, 3, 4, 5].map(star => (
                     <button
                       key={star}
                       type="button"
                       onClick={() => setReviewRating(star)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        fontSize: '24px',
-                        cursor: 'pointer',
-                        color: star <= reviewRating ? 'var(--color-accent)' : 'var(--color-border)'
-                      }}
+                      className="icon-btn p-0.5"
+                      aria-label={`${star} star${star > 1 ? 's' : ''}`}
                     >
-                      ★
+                      <Star
+                        size={22}
+                        className={star <= reviewRating ? 'fill-[#f59e0b] text-[#f59e0b]' : 'text-[#cbd5e1]'}
+                      />
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="form-label">Comment (Optional)</label>
-                <textarea 
-                  className="form-input" 
+                <label className="form-label">Comment (optional)</label>
+                <textarea
+                  className="form-textarea"
                   rows="3"
                   value={reviewComment}
                   onChange={e => setReviewComment(e.target.value)}
                   placeholder="What did you think about this item?"
-                ></textarea>
+                />
               </div>
               <div className="flex justify-end">
-                <button 
-                  type="submit" 
-                  className="btn btn-primary"
-                  disabled={submittingReview}
-                >
-                  {submittingReview ? 'Submitting...' : 'Submit Review'}
+                <button type="submit" className="btn btn-primary" disabled={submittingReview}>
+                  {submittingReview ? 'Submitting…' : 'Submit review'}
                 </button>
               </div>
             </div>
           </form>
         ) : (
-          <div className="mb-8 p-4 text-center" style={{ background: 'var(--color-bg)', borderRadius: 'var(--radius-md)' }}>
-            <p className="text-secondary mb-3">Log in to leave a review</p>
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/${tenantSlug}/login`)}>Log In</button>
+          <div className="mb-6 rounded-lg bg-[#f8fafc] p-4 text-center">
+            <p className="mb-3 text-sm text-[#475569]">Log in to leave a review</p>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/${tenantSlug}/login`)}>Log in</button>
           </div>
         )}
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col">
           {reviews.length === 0 ? (
-            <p className="text-secondary text-center py-4">No reviews yet. Be the first to review this item!</p>
+            <p className="py-4 text-center text-sm text-[#94a3b8]">No reviews yet. Be the first to review this item.</p>
           ) : (
             reviews.map(review => (
-              <div key={review.id} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
-                <div className="flex justify-between items-center mb-2">
-                  <div className="font-bold">{review.users?.name || 'Anonymous'}</div>
-                  <div className="text-sm text-secondary">{new Date(review.created_at).toLocaleDateString()}</div>
+              <div key={review.id} className="border-b border-[#e2e8f0] py-4 last:border-b-0">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <div className="text-sm font-semibold">{review.users?.name || 'Anonymous'}</div>
+                  <div className="text-xs text-[#94a3b8]">{new Date(review.created_at).toLocaleDateString()}</div>
                 </div>
-                <div className="mb-2" style={{ color: 'var(--color-accent)' }}>
-                  {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                <div className="mb-1.5 flex gap-0.5">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <Star
+                      key={n}
+                      size={13}
+                      className={n <= review.rating ? 'fill-[#f59e0b] text-[#f59e0b]' : 'text-[#cbd5e1]'}
+                    />
+                  ))}
                 </div>
-                {review.comment && <p className="text-secondary m-0">{review.comment}</p>}
+                {review.comment && <p className="text-sm text-[#475569]">{review.comment}</p>}
               </div>
             ))
           )}

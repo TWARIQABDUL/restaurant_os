@@ -142,26 +142,26 @@ export default function Checkout() {
 
   if (paymentStatus) {
     return (
-      <div className="page" style={{ maxWidth: '440px', margin: '0 auto' }}>
-        <div className="card p-8 text-center">
+      <div className="page mx-auto max-w-md px-4">
+        <div className="card text-center">
           {paymentStatus === 'waiting' && (
             <>
-              <div className="spinner" style={{ margin: '0 auto var(--space-4)' }} />
-              <h3 className="mb-2">Check your phone</h3>
-              <p className="text-secondary">We've sent a MoMo payment request to your phone. Approve it there to confirm your order.</p>
+              <div className="spinner mx-auto mb-4" />
+              <h3 className="mb-2 text-lg font-semibold">Check your phone</h3>
+              <p className="text-sm text-[#475569]">We've sent a MoMo payment request to your phone. Approve it there to confirm your order.</p>
             </>
           )}
           {paymentStatus === 'paid' && (
             <>
-              <h3 className="mb-2">Payment confirmed!</h3>
-              <p className="text-secondary">Taking you to your order…</p>
+              <h3 className="mb-2 text-lg font-semibold">Payment confirmed</h3>
+              <p className="text-sm text-[#475569]">Taking you to your order…</p>
             </>
           )}
           {paymentStatus === 'timeout' && (
             <>
-              <h3 className="mb-2">Still waiting on confirmation</h3>
-              <p className="text-secondary mb-4">This is taking longer than expected, but your order has been placed — we'll keep checking in the background. You can come back to this any time.</p>
-              <Link to={`/${tenantSlug}/track?code=${trackingCode}`} className="btn btn-primary">View Order Status</Link>
+              <h3 className="mb-2 text-lg font-semibold">Still waiting on confirmation</h3>
+              <p className="mb-4 text-sm text-[#475569]">This is taking longer than expected, but your order has been placed — we'll keep checking in the background. You can come back to this any time.</p>
+              <Link to={`/${tenantSlug}/track?code=${trackingCode}`} className="btn btn-primary">View order status</Link>
             </>
           )}
         </div>
@@ -169,160 +169,163 @@ export default function Checkout() {
     );
   }
 
+  const paymentOptions = [
+    { value: 'cash_on_delivery', label: 'Cash on delivery', hint: 'Pay the driver when your order arrives', icon: Banknote },
+    { value: 'mobile_money', label: 'Mobile Money', hint: 'Approve the prompt on your phone', icon: Smartphone },
+    { value: 'bank_transfer', label: 'Bank transfer', hint: 'Details sent after you place the order', icon: Landmark },
+  ].filter(method => acceptedMethods.includes(method.value));
+
   return (
-    <div className="page grid grid-2" style={{ maxWidth: '1000px', margin: '0 auto', gap: 'var(--space-8)' }}>
-      
-      <div>
-        <h1 className="mb-6">Checkout</h1>
+    <div className="page mx-auto max-w-5xl px-4">
+      <h1 className="text-2xl font-bold">Checkout</h1>
+      <p className="mt-1 mb-6 text-sm text-[#475569]">Delivery to your address</p>
 
-        {!user && (
-          <div className="card mb-6" style={{ background: 'var(--color-info-light)', borderColor: 'var(--color-info)' }}>
-            <p className="text-sm" style={{ color: 'var(--color-info)' }}>
-              <strong>Want to save your details?</strong> <Link to="/register" style={{ textDecoration: 'underline' }}>Create an account</Link> or <Link to="/login" style={{ textDecoration: 'underline' }}>log in</Link>. You can also continue as a guest.
-            </p>
-          </div>
-        )}
-
-        {error && <div className="form-error mb-4 p-3 bg-red-50 text-red-700 rounded">{error}</div>}
-
-        <form onSubmit={handleSubmit}>
-          <div className="card mb-6">
-            <h3 className="mb-4">Delivery Details</h3>
-            
-            {!user && (
-              <>
-                <div className="form-group">
-                  <label className="form-label">Full Name</label>
-                  <input type="text" name="guest_name" className="form-input" required value={formData.guest_name} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email (for receipt)</label>
-                  <input type="email" name="guest_email" className="form-input" required value={formData.guest_email} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Phone Number</label>
-                  <input type="tel" name="guest_phone" className="form-input" required value={formData.guest_phone} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Delivery Address</label>
-                  <textarea name="guest_address" className="form-textarea" required value={formData.guest_address} onChange={handleChange} style={{ minHeight: '80px' }}></textarea>
-                </div>
-              </>
-            )}
-
-            {user && (
-              <div className="mb-4 p-4 rounded bg-gray-50 border">
-                <p><strong>Deliver to:</strong> {user.name}</p>
-                <p className="text-secondary text-sm">We'll contact you at {user.phone || user.email} upon arrival.</p>
-              </div>
-            )}
-
-            <div className="form-group">
-              <label className="form-label">Delivery Instructions (Optional)</label>
-              <input type="text" name="delivery_notes" className="form-input" placeholder="e.g. Leave at front door" value={formData.delivery_notes} onChange={handleChange} />
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <div>
+          {!user && (
+            <div className="mb-5 rounded-xl border border-[#dbeaff] bg-[#eff5ff] p-4 text-sm text-[#2563eb]">
+              <strong className="font-semibold">Want to save your details?</strong>{' '}
+              <Link to="/register" className="underline">Create an account</Link> or{' '}
+              <Link to="/login" className="underline">log in</Link>. You can also continue as a guest.
             </div>
-          </div>
+          )}
 
-          <div className="card mb-8">
-            <h3 className="mb-4">Payment Method</h3>
-            <p className="text-sm text-secondary mb-4">
-              {formData.payment_method === 'mobile_money'
-                ? "You'll get a MoMo payment prompt on your phone as soon as you place the order."
-                : formData.payment_method === 'cash_on_delivery'
-                ? 'Pay in cash when your order arrives.'
-                : 'Your payment will be verified manually by our staff.'}
-            </p>
+          {error && (
+            <div className="mb-5 rounded-lg border border-[#fecaca] bg-[#fee2e2] px-4 py-3 text-sm font-medium text-[#dc2626]">
+              {error}
+            </div>
+          )}
 
-            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
-              {[
-                { value: 'cash_on_delivery', label: 'Cash on Delivery', icon: Banknote },
-                { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone },
-                { value: 'bank_transfer', label: 'Bank Transfer', icon: Landmark },
-              ].filter(method => acceptedMethods.includes(method.value)).map(method => {
-                const Icon = method.icon;
-                return (
-                  <button
-                  type="button"
-                  key={method.value}
-                  onClick={() => setFormData(prev => ({ ...prev, payment_method: method.value }))}
-                  style={{
-                    flex: '1 1 120px',
-                    padding: 'var(--space-4)',
-                    borderRadius: 'var(--radius-lg)',
-                    border: formData.payment_method === method.value
-                      ? '2px solid var(--color-accent)'
-                      : '1px solid var(--color-border)',
-                    background: formData.payment_method === method.value
-                      ? 'var(--color-accent-light)'
-                      : 'var(--color-surface)',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    transition: 'all var(--transition-base)',
-                    fontFamily: 'var(--font-family)'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
-                    <Icon size={24} />
+          <form id="checkout-form" onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <section className="card">
+              <h3 className="mb-4 text-[15px] font-semibold">Delivery details</h3>
+
+              {!user && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="form-label">Full name</label>
+                    <input type="text" name="guest_name" className="form-input" required value={formData.guest_name} onChange={handleChange} />
                   </div>
-                  <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' }}>{method.label}</div>
-                </button>
-                );
-              })}
-            </div>
+                  <div>
+                    <label className="form-label">Email (for receipt)</label>
+                    <input type="email" name="guest_email" className="form-input" required value={formData.guest_email} onChange={handleChange} />
+                  </div>
+                  <div>
+                    <label className="form-label">Phone number</label>
+                    <input type="tel" name="guest_phone" className="form-input" required value={formData.guest_phone} onChange={handleChange} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="form-label">Delivery address</label>
+                    <textarea name="guest_address" className="form-textarea min-h-20" required value={formData.guest_address} onChange={handleChange} />
+                  </div>
+                </div>
+              )}
 
-            {formData.payment_method === 'mobile_money' && (
-              <div className="form-group mt-4">
-                <label className="form-label">MoMo Phone Number</label>
-                <input 
-                  type="tel" 
-                  name="payment_phone" 
-                  className="form-input" 
-                  required 
-                  value={formData.payment_phone} 
-                  onChange={handleChange} 
-                  placeholder="e.g. 0780000000"
-                />
+              {user && (
+                <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
+                  <p className="text-sm"><strong className="font-semibold">Deliver to:</strong> {user.name}</p>
+                  <p className="mt-1 text-xs text-[#475569]">We'll contact you at {user.phone || user.email} on arrival.</p>
+                </div>
+              )}
+
+              <div className={user ? 'mt-4' : 'mt-4'}>
+                <label className="form-label">Notes for the kitchen or driver (optional)</label>
+                <input type="text" name="delivery_notes" className="form-input" placeholder="e.g. Leave at front door" value={formData.delivery_notes} onChange={handleChange} />
               </div>
-            )}
-          </div>
+            </section>
 
-          <button type="submit" className="btn btn-primary btn-lg btn-full btn-pill" disabled={loading} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            {loading ? 'Processing...' : <><ShoppingCart size={18} /> Place Order</>}
-          </button>
-        </form>
-      </div>
+            <section className="card">
+              <h3 className="mb-4 text-[15px] font-semibold">Payment method</h3>
+              <div className="flex flex-col gap-3">
+                {paymentOptions.map(method => {
+                  const Icon = method.icon;
+                  const selected = formData.payment_method === method.value;
+                  return (
+                    <button
+                      type="button"
+                      key={method.value}
+                      onClick={() => setFormData(prev => ({ ...prev, payment_method: method.value }))}
+                      className={`flex items-center gap-3.5 rounded-lg border p-4 text-left transition-colors ${
+                        selected ? 'border-[#dc2626] bg-[#fef2f2]' : 'border-[#e2e8f0] bg-white hover:border-[#cbd5e1]'
+                      }`}
+                    >
+                      <span
+                        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border ${
+                          selected ? 'border-[5px] border-[#dc2626]' : 'border-[1.5px] border-[#cbd5e1]'
+                        }`}
+                      />
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
+                        selected ? 'border-[#fecaca] bg-white text-[#dc2626]' : 'border-[#e2e8f0] bg-[#f8fafc] text-[#475569]'
+                      }`}>
+                        <Icon size={17} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">{method.label}</span>
+                        <span className="mt-0.5 block text-xs text-[#475569]">{method.hint}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
 
-      <div>
-        <div className="card sticky" style={{ top: '80px' }}>
-          <h3 className="mb-4">Order Summary</h3>
-          
-          <div style={{ maxHeight: '300px', overflowY: 'auto', margin: '0 -24px', padding: '0 24px' }}>
+              {formData.payment_method === 'mobile_money' && (
+                <div className="mt-4">
+                  <label className="form-label">MoMo phone number</label>
+                  <input
+                    type="tel"
+                    name="payment_phone"
+                    className="form-input"
+                    required
+                    value={formData.payment_phone}
+                    onChange={handleChange}
+                    placeholder="e.g. 0780000000"
+                  />
+                </div>
+              )}
+            </section>
+          </form>
+        </div>
+
+        <aside className="card lg:sticky lg:top-20">
+          <h3 className="mb-4 text-[15px] font-semibold">Order summary</h3>
+
+          <div className="flex flex-col gap-3.5 border-b border-[#e2e8f0] pb-4">
             {items.map((item, index) => (
-              <div key={index} className="flex justify-between items-start mb-4 pb-4 border-b">
-                <div>
-                  <div style={{ fontWeight: 500 }}>{item.quantity}x {item.menuItem.name}</div>
+              <div key={index} className="flex gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#0f172a] text-xs font-bold text-white">
+                  {item.quantity}
+                </span>
+                <span className="min-w-0 flex-1 text-[13px]">
+                  {item.menuItem.name}
                   {item.selectedAddOns.map(ao => (
-                    <div key={ao.id} className="text-xs text-secondary pl-4">
-                      + {ao.quantity}x {ao.name}
-                    </div>
+                    <span key={ao.id} className="mt-0.5 block text-[11.5px] text-[#94a3b8]">+ {ao.quantity}× {ao.name}</span>
                   ))}
-                </div>
-                <div style={{ fontWeight: 500 }}>
+                </span>
+                <span className="text-[13px] font-semibold">
                   ${((item.menuItem.price * item.quantity) + item.selectedAddOns.reduce((s, ao) => s + (ao.price * ao.quantity * item.quantity), 0)).toFixed(2)}
-                </div>
+                </span>
               </div>
             ))}
           </div>
 
-          <div className="flex justify-between items-center mt-4 pt-4 border-t">
-            <span style={{ fontWeight: 600, fontSize: 'var(--font-size-lg)' }}>Total</span>
-            <span style={{ fontWeight: 700, fontSize: 'var(--font-size-xl)', color: 'var(--color-accent)' }}>
-              ${getTotal().toFixed(2)}
-            </span>
+          <div className="flex items-baseline justify-between py-4">
+            <span className="text-sm font-semibold">Total</span>
+            <span className="font-heading text-[22px] font-bold">${getTotal().toFixed(2)}</span>
           </div>
-        </div>
-      </div>
 
+          <button
+            type="submit"
+            form="checkout-form"
+            className="btn btn-primary btn-full"
+            disabled={loading}
+          >
+            {loading ? 'Processing…' : <><ShoppingCart size={16} /> Place order</>}
+          </button>
+          <p className="mt-3 text-center text-[11.5px] leading-relaxed text-[#94a3b8]">
+            You'll get a tracking link as soon as the kitchen confirms.
+          </p>
+        </aside>
+      </div>
     </div>
   );
 }
