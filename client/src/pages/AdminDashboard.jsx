@@ -2,34 +2,97 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { getSocket } from '../services/socket';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Cell, AreaChart, Area,
 } from 'recharts';
 import MenuManagement from '../components/MenuManagement';
 import StaffManagement from '../components/StaffManagement';
 import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
-import { Copy, QrCode, X, Download, MapPin, StickyNote, Phone } from 'lucide-react';
+import {
+  Copy, QrCode, X, Download, MapPin, StickyNote, Phone,
+  BarChart3, Bike, Wallet, UtensilsCrossed, Users, MessageSquare, Globe, Palette,
+  ShoppingBag, Package, CheckCircle2, Clock, ArrowUpRight,
+} from 'lucide-react';
 import { uploadImage } from '../services/supabase';
 import { QRCodeCanvas } from 'qrcode.react';
 
 const COLORS = ['#dc2626', '#2563eb', '#16a34a', '#d97706', '#7c3aed'];
 
+const NAV = [
+  { group: 'Operations', items: [
+    { key: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { key: 'delivery', label: 'Dispatch', icon: Bike },
+    { key: 'wallet', label: 'Wallet', icon: Wallet },
+  ] },
+  { group: 'Catalogue', items: [
+    { key: 'menu', label: 'Menu', icon: UtensilsCrossed },
+    { key: 'staff', label: 'Staff', icon: Users },
+  ] },
+  { group: 'Support', items: [
+    { key: 'complaints', label: 'Complaints', icon: MessageSquare },
+  ] },
+  { group: 'Settings', items: [
+    { key: 'seo', label: 'SEO', icon: Globe },
+    { key: 'theme', label: 'Theme', icon: Palette },
+  ] },
+];
+const ALL_TABS = NAV.flatMap((g) => g.items);
+
+const money = (n) => `$${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function Kpi({ label, value, icon: Icon, sub, accent }) {
+  return (
+    <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex items-center justify-between">
+        <span className="text-[12.5px] font-medium text-[#475569]">{label}</span>
+        <Icon size={15} className="text-[#94a3b8]" />
+      </div>
+      <div className={`font-heading mt-2 text-[22px] font-bold leading-none ${accent ? 'text-[#dc2626]' : ''}`}>{value}</div>
+      {sub && <div className="mt-2 text-[11px] text-[#94a3b8]">{sub}</div>}
+    </div>
+  );
+}
+
+function ColorField({ label, value, hint, onChange }) {
+  return (
+    <div>
+      <label className="form-label">{label}</label>
+      <div className="flex items-center gap-3">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-10 w-10 cursor-pointer rounded-lg border border-[#e2e8f0] bg-transparent p-0.5"
+        />
+        <input
+          type="text"
+          className="form-input w-32 font-mono text-sm uppercase"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+      {hint && <p className="mt-1 text-[11px] text-[#94a3b8]">{hint}</p>}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('analytics');
-  
+
   // Analytics State
   const [summary, setSummary] = useState(null);
   const [revenue, setRevenue] = useState([]);
   const [topItems, setTopItems] = useState([]);
-  
+
   // Delivery State
   const [readyOrders, setReadyOrders] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dispatchState, setDispatchState] = useState({});
+  const [assigningId, setAssigningId] = useState(null);
 
   // Wallet State
   const [wallet, setWallet] = useState(null);
@@ -42,38 +105,32 @@ export default function AdminDashboard() {
   const [savingSettings, setSavingSettings] = useState(false);
 
   // SEO State
-  const [seoSettings, setSeoSettings] = useState({ 
+  const [seoSettings, setSeoSettings] = useState({
     seoTitle: '', seoDescription: '', seoKeywords: '',
-    faviconUrl: '', themeColor: '#ffffff', twitterHandle: '', ogLocale: 'en_US', author: ''
+    faviconUrl: '', themeColor: '#ffffff', twitterHandle: '', ogLocale: 'en_US', author: '',
   });
   const [faviconFile, setFaviconFile] = useState(null);
   const [savingSeo, setSavingSeo] = useState(false);
 
   // Theme State
-  const [themeSettings, setThemeSettings] = useState({ 
-    primaryColor: '#DC2626', 
-    accentColor: '#A16207',
-    secondaryColor: '#F87171',
-    backgroundColor: '#FEF2F2',
-    textColor: '#450A0A'
+  const [themeSettings, setThemeSettings] = useState({
+    primaryColor: '#DC2626', accentColor: '#A16207', secondaryColor: '#F87171',
+    backgroundColor: '#FEF2F2', textColor: '#450A0A',
   });
   const [savingTheme, setSavingTheme] = useState(false);
 
   // QR Code State
   const [showQrModal, setShowQrModal] = useState(false);
 
+  const storefrontUrl = `${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`;
+
   useEffect(() => {
-    if (activeTab === 'analytics') {
-      fetchAnalytics();
-    } else if (activeTab === 'delivery') {
-      fetchDeliveryData();
-    } else if (activeTab === 'wallet') {
-      fetchWallet();
-    } else if (activeTab === 'seo') {
-      fetchSeoSettings();
-    } else if (activeTab === 'theme') {
-      fetchThemeSettings();
-    }
+    if (activeTab === 'analytics') fetchAnalytics();
+    else if (activeTab === 'delivery') fetchDeliveryData();
+    else if (activeTab === 'wallet') fetchWallet();
+    else if (activeTab === 'seo') fetchSeoSettings();
+    else if (activeTab === 'theme') fetchThemeSettings();
+    else setLoading(false);
   }, [activeTab]);
 
   useEffect(() => {
@@ -83,17 +140,22 @@ export default function AdminDashboard() {
       toast.success('An order is ready for dispatch!');
       if (activeTab === 'delivery') fetchDeliveryData();
     });
-
     socket.on('newOrder', () => {
       toast.success('A new order has been placed!');
       if (activeTab === 'analytics') fetchAnalytics();
     });
-
     return () => {
       socket.off('orderReady');
       socket.off('newOrder');
     };
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!showQrModal) return;
+    const onKey = (e) => e.key === 'Escape' && setShowQrModal(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showQrModal]);
 
   const fetchAnalytics = async () => {
     setLoading(true);
@@ -101,7 +163,7 @@ export default function AdminDashboard() {
       const [sumRes, revRes, topRes] = await Promise.all([
         api.get('/analytics/summary'),
         api.get('/analytics/revenue'),
-        api.get('/analytics/top-items')
+        api.get('/analytics/top-items'),
       ]);
       setSummary(sumRes.data.summary);
       setRevenue(revRes.data.revenue);
@@ -118,7 +180,7 @@ export default function AdminDashboard() {
     try {
       const [ordersRes, driversRes] = await Promise.all([
         api.get('/orders', { params: { status: 'ready' } }),
-        api.get('/delivery/drivers')
+        api.get('/delivery/drivers'),
       ]);
       setReadyOrders(ordersRes.data.orders);
       setDrivers(driversRes.data.drivers);
@@ -197,7 +259,7 @@ export default function AdminDashboard() {
         themeColor: data.seo_settings?.themeColor || '#ffffff',
         twitterHandle: data.seo_settings?.twitterHandle || '',
         ogLocale: data.seo_settings?.ogLocale || 'en_US',
-        author: data.seo_settings?.author || ''
+        author: data.seo_settings?.author || '',
       });
     } catch (err) {
       console.error('Failed to load SEO settings', err);
@@ -211,11 +273,9 @@ export default function AdminDashboard() {
     setSavingSeo(true);
     try {
       let finalFaviconUrl = seoSettings.faviconUrl;
-      
       if (faviconFile) {
         finalFaviconUrl = await uploadImage(faviconFile, 'blog-images', 'favicons');
       }
-
       await api.patch('/tenants/me/seo-settings', { ...seoSettings, faviconUrl: finalFaviconUrl });
       setFaviconFile(null);
       toast.success('SEO settings saved!');
@@ -258,21 +318,25 @@ export default function AdminDashboard() {
   };
 
   const assignDriver = async (orderId, payload) => {
+    setAssigningId(orderId);
     try {
       await api.patch(`/orders/${orderId}/assign`, payload);
+      toast.success('Driver assigned');
       fetchDeliveryData();
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to assign driver');
+      toast.error(err.response?.data?.error || 'Failed to assign driver');
+    } finally {
+      setAssigningId(null);
     }
   };
 
   const handleDispatchState = (orderId, field, value) => {
-    setDispatchState(prev => ({
+    setDispatchState((prev) => ({
       ...prev,
       [orderId]: {
-        ...(prev[orderId] || { type: 'internal', name: '', phone: '', plate: '' }),
-        [field]: value
-      }
+        ...(prev[orderId] || { type: 'internal', driverId: '', name: '', phone: '', plate: '' }),
+        [field]: value,
+      },
     }));
   };
 
@@ -280,790 +344,651 @@ export default function AdminDashboard() {
     const canvas = document.getElementById('tenant-qr-code');
     if (canvas) {
       const pngUrl = canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream');
-      const downloadLink = document.createElement('a');
-      downloadLink.href = pngUrl;
-      downloadLink.download = `${user?.tenants?.slug || 'restaurant'}-qr-code.png`;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
+      const link = document.createElement('a');
+      link.href = pngUrl;
+      link.download = `${user?.tenants?.slug || 'restaurant'}-qr-code.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
+  const copyStorefront = () => {
+    navigator.clipboard.writeText(storefrontUrl);
+    toast.success('Storefront link copied');
+  };
+
+  const activeMeta = ALL_TABS.find((t) => t.key === activeTab);
+
   return (
-    <div className="page" style={{ maxWidth: '100vw', overflowX: 'hidden', position: 'relative' }}>
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 w-full max-w-full">
-        <div className="w-full md:w-auto min-w-0">
-          <h1>Admin Dashboard</h1>
-          <p className="text-secondary mb-3">Overview & Analytics</p>
-          
-          <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-800 px-3 py-1.5 rounded-lg text-sm w-full md:w-auto overflow-hidden">
-            <span className="font-medium whitespace-nowrap">Storefront:</span>
-            <a 
-              href={`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`} 
-              target="_blank" 
-              rel="noreferrer"
-              className="text-blue-600 hover:underline hover:text-blue-800 truncate block"
-            >
-              {`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`}
-            </a>
-            <button 
-              className="icon-btn ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors shrink-0"
-              onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`);
-                toast.success('Storefront link copied!');
-              }}
-              title="Copy Link"
-            >
-              <Copy size={16} />
-            </button>
-            <button 
-              className="icon-btn ml-2 text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100 transition-colors shrink-0"
-              onClick={() => setShowQrModal(true)}
-              title="Generate QR Code"
-            >
-              <QrCode size={16} />
-            </button>
-          </div>
+    <div className="page mx-auto max-w-7xl px-4 sm:px-6">
+      {/* Header */}
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold">Admin</h1>
+          <p className="text-sm text-[#475569]">{user?.tenants?.name || 'Your restaurant'}</p>
         </div>
-        <div style={{ width: '100%', minWidth: 0, marginTop: 'var(--space-4)' }}>
-          <div className="scrollable-tabs">
-            <button 
-              className={`btn shrink-0 ${activeTab === 'analytics' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveTab('analytics')}
-            >
-              Analytics
-            </button>
-            <button 
-              className={`btn shrink-0 ${activeTab === 'delivery' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveTab('delivery')}
-            >
-              Dispatch & Delivery
-            </button>
-            <button 
-              className={`btn shrink-0 ${activeTab === 'wallet' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveTab('wallet')}
-            >
-              Wallet
-            </button>
-            <button 
-              className={`btn shrink-0 ${activeTab === 'menu' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveTab('menu')}
-            >
-              Menu Management
-            </button>
-            <button 
-              className={`btn shrink-0 ${activeTab === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveTab('staff')}
-            >
-              Staff
-            </button>
-            <button 
-              className={`btn shrink-0 ${activeTab === 'complaints' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveTab('complaints')}
-            >
-              Complaints
-            </button>
-            <button 
-              className={`btn shrink-0 ${activeTab === 'seo' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveTab('seo')}
-            >
-              SEO
-            </button>
-            <button 
-              className={`btn shrink-0 ${activeTab === 'theme' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveTab('theme')}
-            >
-              Theme
-            </button>
-          </div>
+        <div className="flex min-w-0 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-2.5 py-1.5">
+          <a
+            href={storefrontUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="truncate text-xs font-medium text-[#475569] hover:text-[#0f172a]"
+          >
+            {storefrontUrl.replace(/^https?:\/\//, '')}
+          </a>
+          <button onClick={copyStorefront} className="icon-btn shrink-0 p-1 text-[#94a3b8] hover:text-[#0f172a]" title="Copy link">
+            <Copy size={15} />
+          </button>
+          <button onClick={() => setShowQrModal(true)} className="icon-btn shrink-0 p-1 text-[#94a3b8] hover:text-[#0f172a]" title="QR code">
+            <QrCode size={15} />
+          </button>
         </div>
       </div>
 
-      {loading && <div className="loading-page"><div className="spinner" /></div>}
+      <div className="grid gap-6 lg:grid-cols-[196px_minmax(0,1fr)]">
+        {/* Mobile tab strip */}
+        <div className="scrollable-tabs lg:hidden">
+          {ALL_TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`btn shrink-0 ${activeTab === t.key ? 'btn-primary' : 'btn-secondary'}`}
+            >
+              <t.icon size={14} /> {t.label}
+            </button>
+          ))}
+        </div>
 
-      {!loading && activeTab === 'analytics' && summary && (
-        <>
-          <div className="stats-grid mb-8">
-            <div className="stat-card">
-              <div className="stat-card-label">Today's Revenue</div>
-              <div className="stat-card-value text-accent">${summary.totalRevenue.toFixed(2)}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-label">Total Orders</div>
-              <div className="stat-card-value">{summary.totalOrders}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-label">Pending / Ready</div>
-              <div className="stat-card-value">{summary.pendingOrders} / {summary.readyOrders}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-label">Delivered</div>
-              <div className="stat-card-value">{summary.deliveredOrders}</div>
-            </div>
+        {/* Sidebar nav */}
+        <nav className="hidden lg:block">
+          <div className="sticky top-20 flex flex-col gap-5">
+            {NAV.map((group) => (
+              <div key={group.group}>
+                <div className="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wide text-[#94a3b8]">{group.group}</div>
+                <div className="flex flex-col gap-0.5">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const on = activeTab === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        onClick={() => setActiveTab(item.key)}
+                        className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13.5px] font-medium transition-colors ${
+                          on ? 'bg-[#fef2f2] text-[#dc2626]' : 'text-[#475569] hover:bg-[#f1f5f9] hover:text-[#0f172a]'
+                        }`}
+                      >
+                        <Icon size={16} className={on ? 'text-[#dc2626]' : 'text-[#94a3b8]'} />
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </nav>
+
+        {/* Content */}
+        <div className="min-w-0">
+          <div className="mb-4 hidden items-center gap-2 lg:flex">
+            {activeMeta && <activeMeta.icon size={18} className="text-[#dc2626]" />}
+            <h2 className="text-lg font-semibold">{activeMeta?.label}</h2>
           </div>
 
-          <div className="grid grid-2 mb-8">
-            <div className="card">
-              <h3 className="mb-6">Revenue Trend</h3>
-              <div style={{ height: 300 }}>
-                {revenue.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={revenue}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                      <XAxis dataKey="date" tick={{fontSize: 12}} tickLine={false} axisLine={false} />
-                      <YAxis tick={{fontSize: 12}} tickLine={false} axisLine={false} tickFormatter={val => `$${val}`} />
-                      <Tooltip formatter={(value) => [`$${parseFloat(value).toFixed(2)}`, 'Revenue']} />
-                      <Line type="monotone" dataKey="amount" stroke="var(--color-accent)" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted">No revenue data available</div>
-                )}
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 className="mb-6">Top Selling Items</h3>
-              <div style={{ height: 300 }}>
-                {topItems.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={topItems} layout="vertical" margin={{ left: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#eee" />
-                      <XAxis type="number" hide />
-                      <YAxis dataKey="name" type="category" tick={{fontSize: 12}} tickLine={false} axisLine={false} width={100} />
-                      <Tooltip />
-                      <Bar dataKey="totalQuantity" fill="var(--color-info)" radius={[0, 4, 4, 0]}>
-                        {topItems.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted">No order data available</div>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {!loading && activeTab === 'delivery' && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-6)' }}>
-          <div style={{ flex: '2 1 400px', minWidth: 0 }}>
-            <h3 className="mb-4">Orders Ready for Dispatch</h3>
-            {readyOrders.length === 0 ? (
-              <div className="card text-center p-8 text-secondary">
-                No orders currently waiting for dispatch.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {readyOrders.map(order => (
-                  <div key={order.id} className="card" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-4)', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ flex: '1 1 200px', minWidth: 0 }}>
-                      <div className="font-bold mb-1">
-                        #{order.tracking_code}
-                        <span className="text-sm font-normal text-accent ml-2">${parseFloat(order.total_amount).toFixed(2)}</span>
-                      </div>
-                      <div className="text-sm text-secondary mb-1 flex items-center gap-1">
-                        {order.guest_name || order.customer?.name} 
-                        {' • '} 
-                        <a href={`tel:${order.guest_phone || order.customer?.phone}`} className="text-blue-600 hover:underline flex items-center gap-1">
-                          <Phone size={12} />
-                          {order.guest_phone || order.customer?.phone || 'No phone'}
-                        </a>
-                      </div>
-                      <div className="text-sm text-secondary mb-2 flex items-start gap-1">
-                        <MapPin size={14} className="mt-0.5 text-secondary shrink-0" /> 
-                        <span>{order.guest_address || 'Customer Address'}</span>
-                      </div>
-                      
-                      {/* Order items summary */}
-                      <div className="text-xs text-secondary mb-2 bg-gray-50 p-2 rounded border border-gray-100">
-                        {order.order_items?.map((item, i) => (
-                          <div key={i} className="truncate">
-                            {item.quantity}x {item.menu_item?.name || 'Unknown item'}
-                          </div>
-                        ))}
-                      </div>
-
-                      {order.delivery_notes && (
-                        <div className="text-xs text-warning mb-2 bg-warning-light p-2 rounded flex items-start gap-1">
-                          <StickyNote size={14} className="mt-0.5 shrink-0" />
-                          <span>{order.delivery_notes}</span>
-                        </div>
-                      )}
-                      
-                      <div className="text-xs text-muted">
-                        Ready since: {new Date(order.updated_at).toLocaleTimeString()}
-                      </div>
-                    </div>
-                    <div style={{ flex: '2 1 300px', minWidth: 0 }}>
-                      {(() => {
-                        const state = dispatchState[order.id] || { type: 'internal', name: '', phone: '', plate: '' };
-                        return (
-                          <div className="flex flex-col gap-2 w-full">
-                            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-2)', width: '100%' }}>
-                              <select 
-                                className="form-select form-select-sm"
-                                value={state.type}
-                                onChange={e => handleDispatchState(order.id, 'type', e.target.value)}
-                                style={{ width: '130px' }}
-                              >
-                                <option value="internal">Internal Driver</option>
-                                <option value="external">External Rider</option>
-                              </select>
-                              
-                              {state.type === 'internal' ? (
-                                <select 
-                                  className="form-select form-select-sm" 
-                                  id={`driver-select-${order.id}`}
-                                  defaultValue=""
-                                  style={{ flex: '1 1 150px', minWidth: 0 }}
-                                >
-                                  <option value="" disabled>Select Driver...</option>
-                                  {drivers.map(driver => (
-                                    <option key={driver.id} value={driver.id}>
-                                      {driver.name} ({driver.plate_number || 'No Plate'})
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)', flex: '1 1 200px', minWidth: 0 }}>
-                                  <input type="text" className="form-input form-input-sm" style={{ padding: '4px 8px', flex: '1 1 80px', minWidth: 0 }} placeholder="Name" value={state.name} onChange={e => handleDispatchState(order.id, 'name', e.target.value)} />
-                                  <input type="text" className="form-input form-input-sm" style={{ padding: '4px 8px', flex: '1 1 80px', minWidth: 0 }} placeholder="Phone" value={state.phone} onChange={e => handleDispatchState(order.id, 'phone', e.target.value)} />
-                                  <input type="text" className="form-input form-input-sm" style={{ padding: '4px 8px', flex: '1 1 80px', minWidth: 0 }} placeholder="Plate" value={state.plate} onChange={e => handleDispatchState(order.id, 'plate', e.target.value)} />
-                                </div>
-                              )}
-                              
-                              <button 
-                                className="btn btn-primary btn-sm whitespace-nowrap"
-                                onClick={() => {
-                                  if (state.type === 'internal') {
-                                    const select = document.getElementById(`driver-select-${order.id}`);
-                                    if (select.value) {
-                                      assignDriver(order.id, { assign_type: 'internal', delivery_person_id: select.value });
-                                    } else {
-                                      alert('Please select a driver first');
-                                    }
-                                  } else {
-                                    if (!state.name || !state.phone) return alert('Name and phone are required for external riders');
-                                    assignDriver(order.id, { 
-                                      assign_type: 'external', 
-                                      external_rider_info: { name: state.name, phone: state.phone, plateNumber: state.plate }
-                                    });
-                                  }
-                                }}
-                              >
-                                Assign
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
+          {loading ? (
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-24 animate-pulse rounded-xl border border-[#e2e8f0] bg-white" />
                 ))}
               </div>
-            )}
-          </div>
-
-          {/* Active Deliveries */}
-          <div style={{ flex: '1 1 300px', minWidth: 0 }}>
-            <h3 className="mb-4">Available Drivers</h3>
-            <div className="card">
-              {drivers.map((driver, idx) => (
-                <div key={driver.id} className="flex items-center gap-3 py-3" style={{ borderBottom: idx < drivers.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--color-bg-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'var(--color-text-secondary)' }}>
-                    {driver.name.charAt(0)}
+              <div className="h-64 animate-pulse rounded-xl border border-[#e2e8f0] bg-white" />
+            </div>
+          ) : (
+            <>
+              {activeTab === 'analytics' && summary && (
+                <div className="flex flex-col gap-5">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    <Kpi label="Today's revenue" value={money(summary.totalRevenue)} icon={ArrowUpRight} sub="Paid orders today" accent />
+                    <Kpi label="Total orders" value={summary.totalOrders} icon={ShoppingBag} sub="Today" />
+                    <Kpi label="Pending" value={summary.pendingOrders} icon={Clock} sub="Awaiting approval" />
+                    <Kpi label="Ready" value={summary.readyOrders} icon={Package} sub="For dispatch" />
+                    <Kpi label="Delivered" value={summary.deliveredOrders} icon={CheckCircle2} sub="Today" />
                   </div>
+
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                      <h3 className="mb-4 text-[15px] font-semibold">Revenue trend</h3>
+                      <div className="h-[260px]">
+                        {revenue.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={revenue} margin={{ top: 4, right: 8, bottom: 0, left: 4 }}>
+                              <defs>
+                                <linearGradient id="adminRev" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#dc2626" stopOpacity={0.16} />
+                                  <stop offset="100%" stopColor="#dc2626" stopOpacity={0} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} minTickGap={24} />
+                              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} width={48} tickFormatter={(v) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`)} />
+                              <Tooltip
+                                contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12 }}
+                                formatter={(value) => [money(value), 'Revenue']}
+                              />
+                              <Area type="monotone" dataKey="amount" stroke="#dc2626" strokeWidth={2} fill="url(#adminRev)" activeDot={{ r: 4 }} />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-sm text-[#94a3b8]">No revenue data yet</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                      <h3 className="mb-4 text-[15px] font-semibold">Top selling items</h3>
+                      <div className="h-[260px]">
+                        {topItems.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={topItems} layout="vertical" margin={{ left: 12, right: 12 }}>
+                              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                              <XAxis type="number" hide />
+                              <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: '#475569' }} tickLine={false} axisLine={false} width={110} />
+                              <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                              <Bar dataKey="totalQuantity" radius={[0, 4, 4, 0]} maxBarSize={22}>
+                                {topItems.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-sm text-[#94a3b8]">No order data yet</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'delivery' && (
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start">
                   <div>
-                    <div style={{ fontWeight: 500 }}>{driver.name}</div>
-                    <div className="text-xs text-secondary">{driver.phone} • {driver.plate_number || 'N/A'}</div>
+                    <h3 className="mb-3 text-[15px] font-semibold">Ready for dispatch ({readyOrders.length})</h3>
+                    {readyOrders.length === 0 ? (
+                      <div className="empty-state rounded-xl border border-[#e2e8f0] bg-white">
+                        <Bike size={30} strokeWidth={1.25} className="mx-auto mb-3 text-[#cbd5e1]" />
+                        <h3>Nothing waiting</h3>
+                        <p>Orders show here the moment the kitchen marks them ready.</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {readyOrders.map((order) => {
+                          const state = dispatchState[order.id] || { type: 'internal', driverId: '', name: '', phone: '', plate: '' };
+                          const canAssign = state.type === 'internal' ? !!state.driverId : (state.name.trim() && state.phone.trim());
+                          return (
+                            <div key={order.id} className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="font-heading text-sm font-bold">
+                                    #{order.tracking_code}
+                                    <span className="ml-2 font-sans text-xs font-semibold text-[#dc2626]">${parseFloat(order.total_amount).toFixed(2)}</span>
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#475569]">
+                                    <span>{order.guest_name || order.customer?.name}</span>
+                                    <a href={`tel:${order.guest_phone || order.customer?.phone}`} className="inline-flex items-center gap-1 text-[#2563eb] hover:underline">
+                                      <Phone size={11} />{order.guest_phone || order.customer?.phone || 'No phone'}
+                                    </a>
+                                  </div>
+                                  <div className="mt-1 flex items-start gap-1 text-xs text-[#475569]">
+                                    <MapPin size={13} className="mt-0.5 shrink-0 text-[#94a3b8]" />
+                                    <span>{order.guest_address || 'Customer address'}</span>
+                                  </div>
+                                </div>
+                                <span className="whitespace-nowrap text-[11px] text-[#94a3b8]">
+                                  Ready {new Date(order.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+
+                              <div className="mt-3 rounded-lg border border-[#f1f5f9] bg-[#f8fafc] p-2 text-xs text-[#475569]">
+                                {order.order_items?.map((item, i) => (
+                                  <div key={i} className="truncate">{item.quantity}× {item.menu_item?.name || 'Unknown item'}</div>
+                                ))}
+                              </div>
+
+                              {order.delivery_notes && (
+                                <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-[#fef3c7] p-2 text-xs text-[#92400e]">
+                                  <StickyNote size={13} className="mt-0.5 shrink-0" />
+                                  <span>{order.delivery_notes}</span>
+                                </div>
+                              )}
+
+                              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#f1f5f9] pt-3">
+                                <select
+                                  className="form-select w-36 !py-1.5 text-sm"
+                                  value={state.type}
+                                  onChange={(e) => handleDispatchState(order.id, 'type', e.target.value)}
+                                >
+                                  <option value="internal">Internal driver</option>
+                                  <option value="external">External rider</option>
+                                </select>
+
+                                {state.type === 'internal' ? (
+                                  <select
+                                    className="form-select min-w-[10rem] flex-1 !py-1.5 text-sm"
+                                    value={state.driverId}
+                                    onChange={(e) => handleDispatchState(order.id, 'driverId', e.target.value)}
+                                  >
+                                    <option value="">Select driver…</option>
+                                    {drivers.map((driver) => (
+                                      <option key={driver.id} value={driver.id}>
+                                        {driver.name} ({driver.plate_number || 'no plate'})
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <div className="flex min-w-[12rem] flex-1 flex-wrap gap-1.5">
+                                    <input type="text" className="form-input !py-1.5 min-w-[5rem] flex-1 text-sm" placeholder="Name" value={state.name} onChange={(e) => handleDispatchState(order.id, 'name', e.target.value)} />
+                                    <input type="text" className="form-input !py-1.5 min-w-[5rem] flex-1 text-sm" placeholder="Phone" value={state.phone} onChange={(e) => handleDispatchState(order.id, 'phone', e.target.value)} />
+                                    <input type="text" className="form-input !py-1.5 min-w-[5rem] flex-1 text-sm" placeholder="Plate" value={state.plate} onChange={(e) => handleDispatchState(order.id, 'plate', e.target.value)} />
+                                  </div>
+                                )}
+
+                                <button
+                                  className="btn btn-primary btn-sm whitespace-nowrap"
+                                  disabled={!canAssign || assigningId === order.id}
+                                  onClick={() => {
+                                    if (state.type === 'internal') {
+                                      assignDriver(order.id, { assign_type: 'internal', delivery_person_id: state.driverId });
+                                    } else {
+                                      assignDriver(order.id, {
+                                        assign_type: 'external',
+                                        external_rider_info: { name: state.name, phone: state.phone, plateNumber: state.plate },
+                                      });
+                                    }
+                                  }}
+                                >
+                                  {assigningId === order.id ? '…' : 'Assign'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                    <h3 className="mb-3 text-[15px] font-semibold">Drivers ({drivers.length})</h3>
+                    {drivers.length === 0 ? (
+                      <p className="text-sm text-[#94a3b8]">No drivers on staff yet.</p>
+                    ) : (
+                      <div className="flex flex-col">
+                        {drivers.map((driver) => (
+                          <div key={driver.id} className="flex items-center gap-3 border-b border-[#f1f5f9] py-2.5 last:border-b-0">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f1f5f9] text-sm font-bold text-[#475569]">
+                              {driver.name.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium">{driver.name}</div>
+                              <div className="truncate text-xs text-[#94a3b8]">{driver.phone} • {driver.plate_number || 'N/A'}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+              )}
 
-      {!loading && activeTab === 'wallet' && wallet && (
-        <>
-          <div className="stats-grid mb-8">
-            <div className="stat-card">
-              <div className="stat-card-label">Available to withdraw</div>
-              <div className="stat-card-value text-accent">${parseFloat(wallet.available_balance).toFixed(2)}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-card-label">Pending (in hold window)</div>
-              <div className="stat-card-value">${parseFloat(wallet.pending_balance).toFixed(2)}</div>
-            </div>
-          </div>
+              {activeTab === 'wallet' && wallet && (
+                <div className="flex flex-col gap-5">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Kpi label="Available to withdraw" value={money(wallet.available_balance)} icon={Wallet} sub="Cleared the hold window" accent />
+                    <Kpi label="Pending" value={money(wallet.pending_balance)} icon={Clock} sub="Still in hold window" />
+                  </div>
 
-          <div className="grid grid-2 mb-8">
-            <div className="card">
-              <h3 className="mb-4">Withdraw funds</h3>
-              <div className="flex flex-col gap-3">
-                <div>
-                  <label className="form-label">Amount</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-input"
-                    placeholder={`Full available balance ($${parseFloat(wallet.available_balance).toFixed(2)})`}
-                    value={withdrawAmount}
-                    onChange={e => setWithdrawAmount(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="form-label">MoMo phone number</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="e.g. 25078xxxxxxx"
-                    value={withdrawPhone}
-                    onChange={e => setWithdrawPhone(e.target.value)}
-                  />
-                </div>
-                <button
-                  className="btn btn-primary"
-                  disabled={withdrawing || parseFloat(wallet.available_balance) <= 0}
-                  onClick={handleWithdraw}
-                >
-                  {withdrawing ? 'Processing…' : 'Request Withdrawal'}
-                </button>
-                {parseFloat(wallet.available_balance) <= 0 && (
-                  <p className="text-xs text-muted">No available balance yet — paid orders clear their hold window before they can be withdrawn.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="card">
-              <h3 className="mb-4">Payment settings</h3>
-              <div className="flex flex-col gap-3">
-
-                {/* Accepted payment methods */}
-                <div>
-                  <label className="form-label" style={{ marginBottom: 'var(--space-3)' }}>Accepted payment methods</label>
-                  <p className="text-xs text-muted" style={{ marginBottom: 'var(--space-3)' }}>
-                    Choose which payment methods your customers can use at checkout.
-                  </p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                    {[
-                      { value: 'cash_on_delivery', label: 'Cash on Delivery' },
-                      { value: 'mobile_money', label: 'Mobile Money (MoMo)' },
-                      { value: 'bank_transfer', label: 'Bank Transfer' },
-                    ].map(method => {
-                      const isChecked = (paymentSettings.acceptedPaymentMethods || []).includes(method.value);
-                      const isOnly = isChecked && (paymentSettings.acceptedPaymentMethods || []).length === 1;
-                      return (
-                        <label key={method.value} style={{
-                          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-                          padding: 'var(--space-3) var(--space-4)',
-                          borderRadius: 'var(--radius-md)',
-                          border: `1px solid ${isChecked ? 'var(--color-accent)' : 'var(--color-border)'}`,
-                          background: isChecked ? 'var(--color-accent-light)' : 'var(--color-surface)',
-                          cursor: isOnly ? 'not-allowed' : 'pointer',
-                          transition: 'all var(--transition-base)',
-                          opacity: isOnly ? 0.7 : 1
-                        }}>
+                  <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+                    <div className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                      <h3 className="mb-4 text-[15px] font-semibold">Withdraw funds</h3>
+                      <div className="flex flex-col gap-3">
+                        <div>
+                          <label className="form-label">Amount</label>
                           <input
-                            type="checkbox"
-                            checked={isChecked}
-                            disabled={isOnly}
-                            onChange={() => {
-                              setPaymentSettings(prev => {
-                                const current = prev.acceptedPaymentMethods || [];
-                                const next = isChecked
-                                  ? current.filter(m => m !== method.value)
-                                  : [...current, method.value];
-                                return { ...prev, acceptedPaymentMethods: next };
-                              });
-                            }}
-                            style={{ width: '18px', height: '18px', accentColor: 'var(--color-accent)', cursor: 'inherit' }}
+                            type="number" step="0.01" className="form-input"
+                            placeholder={`Full balance (${money(wallet.available_balance)})`}
+                            value={withdrawAmount}
+                            onChange={(e) => setWithdrawAmount(e.target.value)}
                           />
-                          <span style={{ fontWeight: 500, fontSize: 'var(--font-size-sm)' }}>{method.label}</span>
-                        </label>
-                      );
-                    })}
+                        </div>
+                        <div>
+                          <label className="form-label">MoMo phone number</label>
+                          <input
+                            type="text" className="form-input" placeholder="e.g. 25078xxxxxxx"
+                            value={withdrawPhone} onChange={(e) => setWithdrawPhone(e.target.value)}
+                          />
+                        </div>
+                        <button
+                          className="btn btn-primary"
+                          disabled={withdrawing || parseFloat(wallet.available_balance) <= 0}
+                          onClick={handleWithdraw}
+                        >
+                          {withdrawing ? 'Processing…' : 'Request withdrawal'}
+                        </button>
+                        {parseFloat(wallet.available_balance) <= 0 && (
+                          <p className="text-xs text-[#94a3b8]">No available balance yet — paid orders clear their hold window before they can be withdrawn.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                      <h3 className="mb-4 text-[15px] font-semibold">Payment settings</h3>
+                      <div className="flex flex-col gap-4">
+                        <div>
+                          <label className="form-label">Accepted payment methods</label>
+                          <p className="mb-2 text-xs text-[#94a3b8]">What customers can use at checkout. At least one is required.</p>
+                          <div className="flex flex-col gap-2">
+                            {[
+                              { value: 'cash_on_delivery', label: 'Cash on delivery' },
+                              { value: 'mobile_money', label: 'Mobile Money (MoMo)' },
+                              { value: 'bank_transfer', label: 'Bank transfer' },
+                            ].map((method) => {
+                              const isChecked = (paymentSettings.acceptedPaymentMethods || []).includes(method.value);
+                              const isOnly = isChecked && (paymentSettings.acceptedPaymentMethods || []).length === 1;
+                              return (
+                                <label
+                                  key={method.value}
+                                  className={`flex items-center gap-3 rounded-lg border p-3 text-sm transition-colors ${
+                                    isChecked ? 'border-[#dc2626] bg-[#fef2f2]' : 'border-[#e2e8f0] bg-white'
+                                  } ${isOnly ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    disabled={isOnly}
+                                    className="h-[18px] w-[18px] accent-[#dc2626]"
+                                    onChange={() => {
+                                      setPaymentSettings((prev) => {
+                                        const current = prev.acceptedPaymentMethods || [];
+                                        const next = isChecked ? current.filter((m) => m !== method.value) : [...current, method.value];
+                                        return { ...prev, acceptedPaymentMethods: next };
+                                      });
+                                    }}
+                                  />
+                                  <span className="font-medium">{method.label}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="border-t border-[#e2e8f0] pt-4">
+                          <label className="form-label">Settlement mode</label>
+                          <select
+                            className="form-select"
+                            value={paymentSettings.settlementMode}
+                            onChange={(e) => setPaymentSettings((prev) => ({ ...prev, settlementMode: e.target.value }))}
+                          >
+                            <option value="manual">Manual — I'll request withdrawals myself</option>
+                            <option value="auto">Automatic — pay out as soon as funds clear</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="form-label">Default payout phone</label>
+                          <input
+                            type="text" className="form-input" placeholder="e.g. 25078xxxxxxx"
+                            value={paymentSettings.payoutPhone}
+                            onChange={(e) => setPaymentSettings((prev) => ({ ...prev, payoutPhone: e.target.value }))}
+                          />
+                        </div>
+                        {paymentSettings.settlementMode === 'auto' && !paymentSettings.payoutPhone && (
+                          <p className="rounded-lg bg-[#fef3c7] px-3 py-2 text-xs text-[#92400e]">Automatic mode needs a default payout phone to actually pay out.</p>
+                        )}
+                        <button className="btn btn-secondary self-start" disabled={savingSettings} onClick={savePaymentSettings}>
+                          {savingSettings ? 'Saving…' : 'Save settings'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="mb-3 text-[15px] font-semibold">Recent withdrawals</h3>
+                    {withdrawals.length === 0 ? (
+                      <div className="rounded-xl border border-[#e2e8f0] bg-white p-6 text-center text-sm text-[#94a3b8]">No withdrawals yet.</div>
+                    ) : (
+                      <div className="table-wrapper">
+                        <table>
+                          <thead><tr><th>Date</th><th>Amount</th><th>Phone</th><th>Status</th><th>Initiated</th></tr></thead>
+                          <tbody>
+                            {withdrawals.map((w) => (
+                              <tr key={w.id}>
+                                <td>{new Date(w.requested_at).toLocaleString()}</td>
+                                <td className="font-semibold">${parseFloat(w.amount).toFixed(2)}</td>
+                                <td>{w.phone_number}</td>
+                                <td>
+                                  <span className={`badge ${w.status === 'completed' ? 'badge-delivered' : (w.status === 'failed' || w.status === 'rejected') ? 'badge-rejected' : 'badge-pending'}`}>
+                                    {w.status}
+                                  </span>
+                                </td>
+                                <td className="text-sm text-[#475569]">{w.initiated_by}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="mb-3 text-[15px] font-semibold">Ledger</h3>
+                    {ledger.length === 0 ? (
+                      <div className="rounded-xl border border-[#e2e8f0] bg-white p-6 text-center text-sm text-[#94a3b8]">No transactions yet.</div>
+                    ) : (
+                      <div className="table-wrapper">
+                        <table>
+                          <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Note</th></tr></thead>
+                          <tbody>
+                            {ledger.map((entry) => (
+                              <tr key={entry.id}>
+                                <td className="text-sm">{new Date(entry.created_at).toLocaleString()}</td>
+                                <td className="text-sm capitalize">{entry.entry_type.replace(/_/g, ' ')}</td>
+                                <td className={`font-semibold ${parseFloat(entry.amount) < 0 ? 'text-[#dc2626]' : 'text-[#16a34a]'}`}>
+                                  {parseFloat(entry.amount) >= 0 ? '+' : ''}{parseFloat(entry.amount).toFixed(2)}
+                                </td>
+                                <td className="text-sm text-[#475569]">{entry.note}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 </div>
+              )}
 
-                <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-3)', marginTop: 'var(--space-1)' }}>
-                  <label className="form-label">Settlement mode</label>
-                  <select
-                    className="form-select"
-                    value={paymentSettings.settlementMode}
-                    onChange={e => setPaymentSettings(prev => ({ ...prev, settlementMode: e.target.value }))}
-                  >
-                    <option value="manual">Manual — I'll request withdrawals myself</option>
-                    <option value="auto">Automatic — pay out as soon as funds clear</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Default payout phone</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="e.g. 25078xxxxxxx"
-                    value={paymentSettings.payoutPhone}
-                    onChange={e => setPaymentSettings(prev => ({ ...prev, payoutPhone: e.target.value }))}
-                  />
-                </div>
-                <button className="btn btn-secondary" disabled={savingSettings} onClick={savePaymentSettings}>
-                  {savingSettings ? 'Saving…' : 'Save Settings'}
-                </button>
-                {paymentSettings.settlementMode === 'auto' && !paymentSettings.payoutPhone && (
-                  <p className="text-xs text-yellow-800">Automatic mode needs a default payout phone to actually pay out — add one above.</p>
-                )}
-              </div>
-            </div>
-          </div>
+              {activeTab === 'menu' && <MenuManagement />}
+              {activeTab === 'staff' && <StaffManagement />}
+              {activeTab === 'complaints' && <ComplaintsManagement />}
 
-          <div className="mb-8">
-            <h3 className="mb-4">Recent withdrawals</h3>
-            {withdrawals.length === 0 ? (
-              <div className="card text-center p-8 text-secondary">No withdrawals yet.</div>
-            ) : (
-              <div className="table-wrapper">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Amount</th>
-                      <th>Phone</th>
-                      <th>Status</th>
-                      <th>Initiated</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {withdrawals.map(w => (
-                      <tr key={w.id}>
-                        <td>{new Date(w.requested_at).toLocaleString()}</td>
-                        <td>${parseFloat(w.amount).toFixed(2)}</td>
-                        <td>{w.phone_number}</td>
-                        <td>
-                          <span className={`badge ${w.status === 'completed' ? 'badge-delivered' : w.status === 'failed' || w.status === 'rejected' ? 'badge-rejected' : 'badge-pending'}`}>
-                            {w.status}
+              {activeTab === 'seo' && (
+                <form onSubmit={saveSeoSettings} className="max-w-2xl">
+                  <div className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                    <h3 className="text-[15px] font-semibold">Search &amp; social</h3>
+                    <p className="mt-0.5 mb-4 text-xs text-[#94a3b8]">How your storefront appears in Google and when shared.</p>
+
+                    <div className="flex flex-col gap-4">
+                      <div>
+                        <label className="form-label">Page title</label>
+                        <input
+                          type="text" className="form-input" maxLength={60}
+                          value={seoSettings.seoTitle}
+                          onChange={(e) => setSeoSettings({ ...seoSettings, seoTitle: e.target.value })}
+                          placeholder="e.g. Burger Bros — the best burgers in town"
+                        />
+                        <p className="mt-1 text-[11px] text-[#94a3b8]">{seoSettings.seoTitle.length}/60 · leave empty to use your restaurant name.</p>
+                      </div>
+
+                      <div>
+                        <label className="form-label">Meta description</label>
+                        <textarea
+                          className="form-textarea" rows="3" maxLength={160}
+                          value={seoSettings.seoDescription}
+                          onChange={(e) => setSeoSettings({ ...seoSettings, seoDescription: e.target.value })}
+                          placeholder="Brief description that appears under the title in search results."
+                        />
+                        <p className="mt-1 text-[11px] text-[#94a3b8]">{seoSettings.seoDescription.length}/160</p>
+                      </div>
+
+                      <div>
+                        <label className="form-label">Keywords</label>
+                        <input
+                          type="text" className="form-input"
+                          value={seoSettings.seoKeywords}
+                          onChange={(e) => setSeoSettings({ ...seoSettings, seoKeywords: e.target.value })}
+                          placeholder="burgers, fast food, delivery, local"
+                        />
+                        <p className="mt-1 text-[11px] text-[#94a3b8]">Comma-separated.</p>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="form-label">Favicon</label>
+                          <input
+                            type="file" accept="image/*" className="form-input !py-1.5 text-sm"
+                            onChange={(e) => e.target.files?.[0] && setFaviconFile(e.target.files[0])}
+                          />
+                          {(seoSettings.faviconUrl || faviconFile) && (
+                            <p className="mt-1 text-[11px] text-[#94a3b8]">{faviconFile ? `Selected: ${faviconFile.name}` : 'Current favicon active'}</p>
+                          )}
+                        </div>
+                        <ColorField
+                          label="Browser theme colour"
+                          value={seoSettings.themeColor}
+                          hint="Mobile browser header tint."
+                          onChange={(v) => setSeoSettings({ ...seoSettings, themeColor: v })}
+                        />
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="form-label">Twitter / X handle</label>
+                          <input
+                            type="text" className="form-input"
+                            value={seoSettings.twitterHandle}
+                            onChange={(e) => setSeoSettings({ ...seoSettings, twitterHandle: e.target.value })}
+                            placeholder="@yourrestaurant"
+                          />
+                        </div>
+                        <div>
+                          <label className="form-label">Author &amp; locale</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text" className="form-input flex-1"
+                              value={seoSettings.author}
+                              onChange={(e) => setSeoSettings({ ...seoSettings, author: e.target.value })}
+                              placeholder="Author name"
+                            />
+                            <input
+                              type="text" className="form-input w-20"
+                              value={seoSettings.ogLocale}
+                              onChange={(e) => setSeoSettings({ ...seoSettings, ogLocale: e.target.value })}
+                              placeholder="en_US"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="btn btn-primary mt-4" disabled={savingSeo}>
+                    {savingSeo ? 'Saving…' : 'Save SEO settings'}
+                  </button>
+                </form>
+              )}
+
+              {activeTab === 'theme' && (
+                <form onSubmit={saveThemeSettings} className="max-w-2xl">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
+                    <div className="rounded-xl border border-[#e2e8f0] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                      <h3 className="text-[15px] font-semibold">Storefront colours</h3>
+                      <p className="mt-0.5 mb-4 text-xs text-[#94a3b8]">Applied to your customer-facing ordering page.</p>
+                      <div className="flex flex-col gap-4">
+                        <ColorField label="Primary" hint="Buttons and key highlights." value={themeSettings.primaryColor} onChange={(v) => setThemeSettings({ ...themeSettings, primaryColor: v })} />
+                        <ColorField label="Accent" hint="Links and secondary highlights." value={themeSettings.accentColor} onChange={(v) => setThemeSettings({ ...themeSettings, accentColor: v })} />
+                        <ColorField label="Secondary" hint="Alternative buttons and badges." value={themeSettings.secondaryColor} onChange={(v) => setThemeSettings({ ...themeSettings, secondaryColor: v })} />
+                        <ColorField label="Background" hint="Page background." value={themeSettings.backgroundColor} onChange={(v) => setThemeSettings({ ...themeSettings, backgroundColor: v })} />
+                        <ColorField label="Text" hint="Primary text — check contrast with the background." value={themeSettings.textColor} onChange={(v) => setThemeSettings({ ...themeSettings, textColor: v })} />
+                      </div>
+                    </div>
+
+                    <div
+                      className="sticky top-20 overflow-hidden rounded-xl border border-[#e2e8f0]"
+                      style={{ background: themeSettings.backgroundColor, color: themeSettings.textColor }}
+                    >
+                      <div className="p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide opacity-60">Preview</div>
+                        <div className="mt-2 text-lg font-bold">Today's specials</div>
+                        <div className="mt-1 text-xs opacity-70">Fresh from the kitchen</div>
+                        <button
+                          type="button"
+                          className="mt-3 rounded-lg px-3 py-2 text-sm font-semibold"
+                          style={{ background: themeSettings.primaryColor, color: '#fff' }}
+                        >
+                          Add to cart
+                        </button>
+                        <div className="mt-3">
+                          <span
+                            className="inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                            style={{ background: themeSettings.secondaryColor, color: '#fff' }}
+                          >
+                            Popular
                           </span>
-                        </td>
-                        <td className="text-secondary text-sm">{w.initiated_by}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                        </div>
+                        <a href="#" onClick={(e) => e.preventDefault()} className="mt-3 block text-xs font-medium underline" style={{ color: themeSettings.accentColor }}>
+                          View full menu
+                        </a>
+                      </div>
+                    </div>
+                  </div>
 
-          <div>
-            <h3 className="mb-4">Ledger</h3>
-            {ledger.length === 0 ? (
-              <div className="card text-center p-8 text-secondary">No transactions yet.</div>
-            ) : (
-              <div className="table-wrapper">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Type</th>
-                      <th>Amount</th>
-                      <th>Note</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ledger.map(entry => (
-                      <tr key={entry.id}>
-                        <td className="text-sm">{new Date(entry.created_at).toLocaleString()}</td>
-                        <td className="text-sm">{entry.entry_type.replace(/_/g, ' ')}</td>
-                        <td className={parseFloat(entry.amount) < 0 ? 'text-red-700' : ''}>
-                          {parseFloat(entry.amount) >= 0 ? '+' : ''}{parseFloat(entry.amount).toFixed(2)}
-                        </td>
-                        <td className="text-sm text-secondary">{entry.note}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {!loading && activeTab === 'menu' && (
-        <MenuManagement />
-      )}
-
-      {!loading && activeTab === 'staff' && (
-        <StaffManagement />
-      )}
-
-      {!loading && activeTab === 'complaints' && (
-        <ComplaintsManagement />
-      )}
-
-      {!loading && activeTab === 'seo' && (
-        <div className="card max-w-2xl mx-auto">
-          <h2 className="mb-4">SEO Settings</h2>
-          <p className="text-secondary mb-6">Optimize your restaurant's storefront for search engines.</p>
-          <form onSubmit={saveSeoSettings}>
-            <div className="form-group">
-              <label className="form-label">SEO Page Title</label>
-              <input 
-                type="text" 
-                className="form-input" 
-                value={seoSettings.seoTitle}
-                onChange={(e) => setSeoSettings({ ...seoSettings, seoTitle: e.target.value })}
-                placeholder="e.g. Burger Bros - The Best Burgers in Town"
-              />
-              <p className="text-xs text-secondary mt-1">Leave empty to use your restaurant name.</p>
-            </div>
-            
-            <div className="form-group">
-              <label className="form-label">Meta Description</label>
-              <textarea 
-                className="form-input" 
-                rows="3"
-                value={seoSettings.seoDescription}
-                onChange={(e) => setSeoSettings({ ...seoSettings, seoDescription: e.target.value })}
-                placeholder="Brief description of your restaurant that appears in search results."
-              />
-              <p className="text-xs text-secondary mt-1">Leave empty to use a default description.</p>
-            </div>
-
-            <div className="form-group mb-4">
-              <label className="form-label">Meta Keywords</label>
-              <input 
-                type="text" 
-                className="form-input" 
-                value={seoSettings.seoKeywords}
-                onChange={(e) => setSeoSettings({ ...seoSettings, seoKeywords: e.target.value })}
-                placeholder="burgers, fast food, delivery, local"
-              />
-              <p className="text-xs text-secondary mt-1">Comma-separated list of keywords.</p>
-            </div>
-
-            <div className="grid grid-2 gap-4 mb-4">
-              <div className="form-group mb-0">
-                <label className="form-label">Favicon Upload</label>
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  className="form-input" 
-                  onChange={e => {
-                    if (e.target.files && e.target.files[0]) {
-                      setFaviconFile(e.target.files[0]);
-                    }
-                  }} 
-                  style={{ padding: '6px' }}
-                />
-                {(seoSettings.faviconUrl || faviconFile) && (
-                  <p className="text-xs text-secondary mt-1">
-                    {faviconFile ? `Selected: ${faviconFile.name}` : 'Current favicon active'}
-                  </p>
-                )}
-              </div>
-              <div className="form-group mb-0">
-                <label className="form-label">Theme Color</label>
-                <input 
-                  type="color" 
-                  className="form-input" 
-                  style={{ height: '42px', padding: '4px' }}
-                  value={seoSettings.themeColor}
-                  onChange={(e) => setSeoSettings({ ...seoSettings, themeColor: e.target.value })}
-                />
-                <p className="text-xs text-secondary mt-1">Mobile browser header color.</p>
-              </div>
-            </div>
-
-            <div className="grid grid-2 gap-4 mb-6">
-              <div className="form-group mb-0">
-                <label className="form-label">Twitter Handle</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  value={seoSettings.twitterHandle}
-                  onChange={(e) => setSeoSettings({ ...seoSettings, twitterHandle: e.target.value })}
-                  placeholder="@yourrestaurant"
-                />
-              </div>
-              <div className="form-group mb-0">
-                <label className="form-label">Author / Locale</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    className="form-input flex-1" 
-                    value={seoSettings.author}
-                    onChange={(e) => setSeoSettings({ ...seoSettings, author: e.target.value })}
-                    placeholder="Author Name"
-                  />
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    style={{ width: '80px' }}
-                    value={seoSettings.ogLocale}
-                    onChange={(e) => setSeoSettings({ ...seoSettings, ogLocale: e.target.value })}
-                    placeholder="en_US"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <button type="submit" className="btn btn-primary" disabled={savingSeo}>
-              {savingSeo ? 'Saving...' : 'Save Advanced SEO Settings'}
-            </button>
-          </form>
+                  <button type="submit" className="btn btn-primary mt-4" disabled={savingTheme}>
+                    {savingTheme ? 'Saving…' : 'Save theme'}
+                  </button>
+                </form>
+              )}
+            </>
+          )}
         </div>
-      )}
+      </div>
 
-      {!loading && activeTab === 'theme' && (
-        <div className="card max-w-2xl mx-auto">
-          <h2 className="mb-4">Storefront Theme</h2>
-          <p className="text-secondary mb-6">Customize the primary and accent colors of your customer-facing storefront.</p>
-          <form onSubmit={saveThemeSettings}>
-            <div className="form-group">
-              <label className="form-label">Primary Color</label>
-              <div className="flex items-center gap-3">
-                <input 
-                  type="color" 
-                  value={themeSettings.primaryColor}
-                  onChange={(e) => setThemeSettings({ ...themeSettings, primaryColor: e.target.value })}
-                  style={{ width: '50px', height: '50px', padding: '0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                />
-                <input
-                  type="text"
-                  className="form-input"
-                  value={themeSettings.primaryColor}
-                  onChange={(e) => setThemeSettings({ ...themeSettings, primaryColor: e.target.value })}
-                  style={{ width: '120px' }}
-                />
-              </div>
-              <p className="text-xs text-secondary mt-1">Used for primary buttons and main highlights.</p>
-            </div>
-            
-            <div className="form-group mb-6">
-              <label className="form-label">Accent Color</label>
-              <div className="flex items-center gap-3">
-                <input 
-                  type="color" 
-                  value={themeSettings.accentColor}
-                  onChange={(e) => setThemeSettings({ ...themeSettings, accentColor: e.target.value })}
-                  style={{ width: '50px', height: '50px', padding: '0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                />
-                <input
-                  type="text"
-                  className="form-input"
-                  value={themeSettings.accentColor}
-                  onChange={(e) => setThemeSettings({ ...themeSettings, accentColor: e.target.value })}
-                  style={{ width: '120px' }}
-                />
-              </div>
-              <p className="text-xs text-secondary mt-1">Used for gradients, links, and secondary highlights.</p>
-            </div>
-
-            <div className="form-group mb-6">
-              <label className="form-label">Secondary Color</label>
-              <div className="flex items-center gap-3">
-                <input 
-                  type="color" 
-                  value={themeSettings.secondaryColor}
-                  onChange={(e) => setThemeSettings({ ...themeSettings, secondaryColor: e.target.value })}
-                  style={{ width: '50px', height: '50px', padding: '0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                />
-                <input
-                  type="text"
-                  className="form-input"
-                  value={themeSettings.secondaryColor}
-                  onChange={(e) => setThemeSettings({ ...themeSettings, secondaryColor: e.target.value })}
-                  style={{ width: '120px' }}
-                />
-              </div>
-              <p className="text-xs text-secondary mt-1">Used for alternative buttons and badges.</p>
-            </div>
-
-            <div className="form-group mb-6">
-              <label className="form-label">Background Color</label>
-              <div className="flex items-center gap-3">
-                <input 
-                  type="color" 
-                  value={themeSettings.backgroundColor}
-                  onChange={(e) => setThemeSettings({ ...themeSettings, backgroundColor: e.target.value })}
-                  style={{ width: '50px', height: '50px', padding: '0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                />
-                <input
-                  type="text"
-                  className="form-input"
-                  value={themeSettings.backgroundColor}
-                  onChange={(e) => setThemeSettings({ ...themeSettings, backgroundColor: e.target.value })}
-                  style={{ width: '120px' }}
-                />
-              </div>
-              <p className="text-xs text-secondary mt-1">The main background color of the storefront.</p>
-            </div>
-
-            <div className="form-group mb-6">
-              <label className="form-label">Text Color</label>
-              <div className="flex items-center gap-3">
-                <input 
-                  type="color" 
-                  value={themeSettings.textColor}
-                  onChange={(e) => setThemeSettings({ ...themeSettings, textColor: e.target.value })}
-                  style={{ width: '50px', height: '50px', padding: '0', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-                />
-                <input
-                  type="text"
-                  className="form-input"
-                  value={themeSettings.textColor}
-                  onChange={(e) => setThemeSettings({ ...themeSettings, textColor: e.target.value })}
-                  style={{ width: '120px' }}
-                />
-              </div>
-              <p className="text-xs text-secondary mt-1">The primary text color (ensure it contrasts well with the background).</p>
-            </div>
-
-            <button type="submit" className="btn btn-primary" disabled={savingTheme}>
-              {savingTheme ? 'Saving...' : 'Save Theme'}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* QR Code Modal */}
+      {/* QR modal */}
       {showQrModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <div className="card" style={{ background: 'var(--color-surface)', width: '100%', maxWidth: '400px', padding: 'var(--space-6)', position: 'relative' }}>
-            <button 
-              onClick={() => setShowQrModal(false)}
-              style={{ position: 'absolute', top: 'var(--space-4)', right: 'var(--space-4)', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              <X size={20} className="text-muted" />
-            </button>
-            <h3 className="mb-2 text-center">Storefront QR Code</h3>
-            <p className="text-sm text-secondary text-center mb-6">Scan to visit the restaurant page</p>
-            
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-6)', background: 'white', padding: 'var(--space-4)', borderRadius: 'var(--radius-md)' }}>
-              <QRCodeCanvas 
-                id="tenant-qr-code"
-                value={`${window.location.origin}/${user?.tenants?.slug || localStorage.getItem('tenantSlug')}`}
-                size={256}
-                level={"H"}
-                includeMargin={true}
-              />
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0f172a]/40 p-4"
+          onMouseDown={(e) => e.target === e.currentTarget && setShowQrModal(false)}
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-[#e2e8f0] bg-white p-6 shadow-[0_24px_48px_rgba(15,23,42,0.18)]">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-[15px] font-semibold">Storefront QR code</h3>
+                <p className="text-xs text-[#94a3b8]">Print it or add it to your menu — it opens your ordering page.</p>
+              </div>
+              <button onClick={() => setShowQrModal(false)} className="icon-btn p-1 text-[#94a3b8] hover:text-[#0f172a]" aria-label="Close">
+                <X size={18} />
+              </button>
             </div>
-            
-            <button className="btn btn-primary w-full" onClick={downloadQRCode} style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: 'var(--space-2)' }}>
-              <Download size={18} />
-              Download QR Code
+
+            <div className="my-5 flex justify-center rounded-xl border border-[#e2e8f0] bg-white p-4">
+              <QRCodeCanvas id="tenant-qr-code" value={storefrontUrl} size={220} level="H" includeMargin />
+            </div>
+
+            <button className="btn btn-primary btn-full" onClick={downloadQRCode}>
+              <Download size={16} /> Download PNG
             </button>
           </div>
         </div>
       )}
-
     </div>
   );
 }
