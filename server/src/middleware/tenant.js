@@ -9,6 +9,15 @@ async function resolveTenant(req, res, next) {
   try {
     const slug = req.headers['x-tenant-slug'] || req.params.tenantSlug;
 
+    // Did the caller actually name a store, or are we about to guess one?
+    //
+    // Login needs to tell these apart. A storefront login happens in the
+    // context of one store and should only ever match accounts there. A login
+    // from the global /login page has no store context at all — guessing one
+    // and scoping to it looks up the wrong account entirely for anyone whose
+    // store is not the guess.
+    req.tenantExplicit = Boolean(slug);
+
     let query = supabase
       .from('tenants')
       .select('id, name, slug, logo_url, settings, active');

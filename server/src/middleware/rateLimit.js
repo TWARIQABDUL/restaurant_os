@@ -8,12 +8,26 @@ const message = (retryAfterHint) => ({
   error: `Too many requests. Please wait ${retryAfterHint} and try again.`,
 });
 
+/**
+ * Integration tests drive many logins from one address, which is exactly what
+ * these limiters exist to stop. Opt out explicitly by env var rather than by
+ * sniffing NODE_ENV, so it can never be true by accident in a deployment: a
+ * variable nobody sets is off, whereas NODE_ENV is set to all sorts of things.
+ */
+const disabled = () => process.env.RATE_LIMIT_DISABLED === 'true';
+
+/** Shared config so every limiter behaves the same way. */
+const base = {
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: disabled,
+};
+
 /** Credential endpoints: brute force and account-creation spam. */
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
+  ...base,
   message: message('a few minutes'),
   // Only failed attempts count, so a legitimately busy shared IP (an office,
   // a mobile carrier NAT) isn't locked out by its own successful logins.
@@ -24,8 +38,7 @@ const authLimiter = rateLimit({
 const signupLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
-  standardHeaders: true,
-  legacyHeaders: false,
+  ...base,
   message: message('an hour'),
 });
 
@@ -33,8 +46,7 @@ const signupLimiter = rateLimit({
 const orderLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
+  ...base,
   message: message('a few minutes'),
 });
 
@@ -42,8 +54,7 @@ const orderLimiter = rateLimit({
 const trackingLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
+  ...base,
   message: message('a few minutes'),
 });
 
@@ -55,8 +66,7 @@ const trackingLimiter = rateLimit({
 const webhookLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
+  ...base,
   message: message('a moment'),
 });
 
@@ -64,8 +74,7 @@ const webhookLimiter = rateLimit({
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 300,
-  standardHeaders: true,
-  legacyHeaders: false,
+  ...base,
   message: message('a moment'),
 });
 

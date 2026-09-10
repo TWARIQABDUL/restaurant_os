@@ -17,6 +17,37 @@ const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex
 // Slugs that must not become storefronts: they collide with the client's own
 // routes (see GLOBAL_ROUTES in client/src/services/api.js), with the Vercel
 // rewrites, or would let someone impersonate the platform itself.
+// One address can legitimately exist in several stores — UNIQUE is on
+// (email, tenant_id) — so a login may have more than one candidate. Bounded so
+// a single attempt cannot cost an unbounded number of bcrypt comparisons.
+const MAX_LOGIN_CANDIDATES = 10;
+
+// When several accounts share an address AND a password, this decides which one
+// the person meant. Most privileged first: someone signing in to run a store is
+// the common case, and a customer account is the one you would rather land on
+// by accident than the reverse.
+const ROLE_RANK = { super_admin: 0, admin: 1, manager: 2, delivery: 3, customer: 4 };
+
+/**
+ * The account a set of password matches refers to.
+ *
+ * @param matches         accounts whose password verified
+ * @param preferTenantId  the store the request named, if any — a tiebreak only
+ */
+function pickAccount(matches, preferTenantId) {
+  if (matches.length === 0) return null;
+  if (matches.length === 1) return matches[0];
+
+  if (preferTenantId) {
+    const local = matches.filter((m) => m.tenant_id === preferTenantId);
+    if (local.length > 0) matches = local;
+  }
+
+  return [...matches].sort(
+    (a, b) => (ROLE_RANK[a.role] ?? 99) - (ROLE_RANK[b.role] ?? 99)
+  )[0];
+}
+
 const RESERVED_SLUGS = new Set([
   'admin', 'manager', 'delivery', 'super-admin', 'login', 'register', 'logout',
   'api', 'backend', 'www', 'app', 'static', 'assets', 'public', 'track',
@@ -197,52 +228,47 @@ router.post(
       }
 
       const { email, password } = req.body;
-      const tenantId = req.tenant.id;
 
-      // Scoped to the store this login was made against. Without the tenant
-      // filter this fetched every account on the platform sharing the address
-      // and bcrypt-compared against each in turn — which turned any storefront
-      // into a credential-testing oracle for every other store, and made one
-      // login attempt cost N hashes. UNIQUE(email, tenant_id) makes this at
-      // most one row.
-      const SELECT = `
-        id, name, email, password_hash, role, phone, plate_number, tenant_id,
-        tenants ( slug )
-      `;
-
-      const { data: scopedUser, error } = await supabase
+      // Authentication resolves an identity. It must not depend on ambient
+      // state — a slug remembered from browsing some other storefront, a cached
+      // user, a hardcoded default. Any of those can name the wrong store, and a
+      // lookup filtered by the wrong store rejects a correct password.
+      //
+      // So the email is looked up across the platform and the PASSWORD decides
+      // which account it is. A store, when one is named, is only a preference
+      // for disambiguating between several matches — never a filter that can
+      // exclude the right account.
+      //
+      // This does not weaken anything. Filtering by store never closed the
+      // cross-tenant oracle it appeared to: /login is public, so anyone holding
+      // valid credentials could always test them there regardless of what a
+      // storefront allowed. What actually bounds abuse here is the rate limiter
+      // on this route, the LIMIT below (so one address cannot turn a single
+      // attempt into unbounded bcrypt work), and the uniform error response.
+      const { data: found, error } = await supabase
         .from('users')
-        .select(SELECT)
+        .select(`
+          id, name, email, password_hash, role, phone, plate_number, tenant_id,
+          tenants ( slug )
+        `)
         .eq('email', email)
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
+        .limit(MAX_LOGIN_CANDIDATES);
 
-      let candidate = error ? null : scopedUser;
+      const candidates = error ? [] : (found || []);
 
-      // super_admin is the one role that legitimately signs in from anywhere:
-      // it acts across tenants, and the dashboard it lands on has no slug in
-      // the URL, so the store this request resolved to is arbitrary. Restricted
-      // to that single role, so it cannot be used to probe ordinary accounts on
-      // other stores — which is what the unscoped query above used to allow.
-      if (!candidate) {
-        const { data: superAdmin } = await supabase
-          .from('users')
-          .select(SELECT)
-          .eq('email', email)
-          .eq('role', 'super_admin')
-          .maybeSingle();
-        candidate = superAdmin || null;
+      // Always spend one comparison, against a fixed hash when there is no
+      // candidate, so a miss costs what a wrong password costs and timing does
+      // not reveal which addresses are registered.
+      let user = null;
+      if (candidates.length === 0) {
+        await bcrypt.compare(password, DUMMY_PASSWORD_HASH);
+      } else {
+        const matches = [];
+        for (const c of candidates) {
+          if (await bcrypt.compare(password, c.password_hash)) matches.push(c);
+        }
+        user = pickAccount(matches, req.tenantExplicit ? req.tenant.id : null);
       }
-
-      // Compare against a dummy hash when there's no such user, so a miss costs
-      // the same time as a wrong password and the response can't be used to
-      // enumerate which addresses are registered.
-      const validPassword = await bcrypt.compare(
-        password,
-        candidate?.password_hash || DUMMY_PASSWORD_HASH
-      );
-
-      const user = candidate && validPassword ? candidate : null;
 
       if (!user) {
         return res.status(401).json({ error: 'Invalid email or password' });

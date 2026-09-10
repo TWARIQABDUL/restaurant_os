@@ -41,17 +41,42 @@ function ownStoreSlug() {
  * interceptor below, which clears a slug the server rejects. Without that, one
  * bad URL used to poison every later request, login included.
  */
-function resolveTenantSlug() {
+/**
+ * The store named by the URL itself, or null.
+ *
+ * Unambiguous by construction: it is whatever the visitor actually navigated
+ * to, with nothing remembered folded in. Sign-in uses this and only this — see
+ * IDENTITY_ROUTES.
+ */
+function urlTenantSlug() {
   const [first] = window.location.pathname.split('/').filter(Boolean);
+  if (first && !GLOBAL_ROUTES.includes(first) && !first.includes('.')) return first;
+  return null;
+}
 
-  if (first && !GLOBAL_ROUTES.includes(first) && !first.includes('.')) {
-    localStorage.setItem('tenantSlug', first);
-    return first;
+/**
+ * Requests where the store must come from the URL alone.
+ *
+ * Signing in resolves an identity, and identity must not depend on ambient
+ * state. A slug left in localStorage by browsing some other storefront would
+ * otherwise name the wrong store on the sign-in page — which is exactly how a
+ * correct password came to be rejected.
+ */
+const IDENTITY_ROUTES = ['/auth/login'];
+
+function resolveTenantSlug() {
+  const fromUrl = urlTenantSlug();
+
+  if (fromUrl) {
+    localStorage.setItem('tenantSlug', fromUrl);
+    return fromUrl;
   }
 
-  // Prefer the signed-in user's own store over a remembered slug — it can't be
-  // poisoned, and it's the right answer on every dashboard route.
-  return ownStoreSlug() || localStorage.getItem('tenantSlug') || 'demo';
+  // Off a storefront URL, prefer the signed-in user's own store over a
+  // remembered slug — it can't be poisoned, and it's the right answer on every
+  // dashboard route. Returns null rather than guessing: the old `|| 'demo'`
+  // fallback silently pointed every store-less request at one particular store.
+  return ownStoreSlug() || localStorage.getItem('tenantSlug') || null;
 }
 
 api.interceptors.request.use((config) => {
@@ -64,7 +89,19 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${legacyToken}`;
   }
 
-  config.headers['X-Tenant-Slug'] = resolveTenantSlug();
+  // Sign-in takes the URL's store or nothing at all; everything else may use
+  // the best-known store, remembered values included.
+  const isIdentityRequest = IDENTITY_ROUTES.some((route) => (config.url || '').startsWith(route));
+  const slug = isIdentityRequest ? urlTenantSlug() : resolveTenantSlug();
+
+  if (slug) {
+    config.headers['X-Tenant-Slug'] = slug;
+  } else {
+    // Send nothing rather than a guess. The server treats an absent slug as
+    // "no store named" and, for login, searches across the platform instead of
+    // scoping to an arbitrary one.
+    delete config.headers['X-Tenant-Slug'];
+  }
 
   return config;
 });
