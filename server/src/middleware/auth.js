@@ -25,6 +25,17 @@ async function authenticate(req, res, next) {
       return res.status(401).json({ error: 'User not found' });
     }
 
+    // The tenant comes from a client-controlled header (X-Tenant-Slug), so a
+    // valid token for store A must not be usable against store B. Without this,
+    // any admin could read or write another store's data by changing one header
+    // — routes scope on req.tenant.id, which the caller chooses.
+    //
+    // super_admin is exempt: it legitimately acts across tenants (e.g. escalated
+    // complaints in routes/complaints.js).
+    if (req.tenant && user.role !== 'super_admin' && user.tenant_id !== req.tenant.id) {
+      return res.status(403).json({ error: 'Not authorized for this store' });
+    }
+
     req.user = user;
     next();
   } catch (err) {
@@ -81,6 +92,16 @@ async function optionalAuth(req, res, next) {
       .select('id, tenant_id, name, email, role, phone, plate_number')
       .eq('id', decoded.userId)
       .single();
+
+    // Same cross-tenant rule as authenticate(), but these routes are open to
+    // guests, so a token belonging to another store is downgraded to "guest"
+    // rather than rejected. That keeps guest checkout working for someone who
+    // has an account at a different store, without letting their identity —
+    // and their customer_id — leak onto this store's orders.
+    if (user && req.tenant && user.role !== 'super_admin' && user.tenant_id !== req.tenant.id) {
+      req.user = null;
+      return next();
+    }
 
     req.user = user || null;
     next();
