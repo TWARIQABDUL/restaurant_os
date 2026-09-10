@@ -77,10 +77,16 @@ export default function DeliveryDashboard() {
         <div className="flex flex-col gap-5">
           {orders.map(order => (
             <div key={order.id} id={`order-${order.id}`} className="card transition-shadow">
-              <div className="mb-4 flex items-start justify-between gap-3 border-b border-[#e2e8f0] pb-4">
-                <div>
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className="font-heading text-xl font-bold">#{order.tracking_code}</span>
+              {/* Wraps on a narrow screen. `.btn` is white-space: nowrap and flex
+                  items don't shrink below their content, so without wrapping the
+                  button pushed past the card edge and squeezed the tracking code
+                  into two lines. On a phone it gets its own full-width row —
+                  which is also a far better tap target for someone holding a
+                  delivery bag. */}
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-[#e2e8f0] pb-4">
+                <div className="min-w-0">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <span className="font-heading whitespace-nowrap text-xl font-bold">#{order.tracking_code}</span>
                     <span className={`badge ${order.status === 'delivered' ? 'badge-delivered' : 'badge-assigned'}`}>
                       {order.status}
                     </span>
@@ -91,7 +97,10 @@ export default function DeliveryDashboard() {
                 </div>
 
                 {order.status === 'assigned' && (
-                  <button className="btn btn-success btn-lg" onClick={() => markDelivered(order.id)}>
+                  <button
+                    className="btn btn-success btn-lg w-full sm:w-auto"
+                    onClick={() => markDelivered(order.id)}
+                  >
                     Mark delivered
                   </button>
                 )}
@@ -101,8 +110,15 @@ export default function DeliveryDashboard() {
                 <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
                   <div className="mb-2 text-xs uppercase tracking-wide text-[#94a3b8]">Customer details</div>
                   <div className="font-semibold">{order.guest_name || order.customer?.name}</div>
-                  <div className="text-[#475569]">{order.guest_phone || order.customer?.phone}</div>
-                  <div className="mt-2 text-sm">
+                  {(order.guest_phone || order.customer?.phone) && (
+                    <a
+                      href={`tel:${order.guest_phone || order.customer?.phone}`}
+                      className="text-[#2563eb] underline underline-offset-2"
+                    >
+                      {order.guest_phone || order.customer?.phone}
+                    </a>
+                  )}
+                  <div className="mt-2 break-words text-sm">
                     <strong>Address:</strong><br />
                     {order.guest_address || 'Address provided on file'}
                   </div>

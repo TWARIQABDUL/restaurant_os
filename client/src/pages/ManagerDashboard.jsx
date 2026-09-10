@@ -231,7 +231,7 @@ export default function ManagerDashboard() {
             <span className="font-heading text-[13.5px] font-bold">#{order.tracking_code}</span>
             <span className={getStatusBadge(order.status)}>{order.status}</span>
           </div>
-          <div className="mb-1 text-xs text-[#475569]">
+          <div className="mb-1 break-words text-xs text-[#475569]">
             {order.guest_name || order.customer?.name} • {order.guest_phone || order.customer?.phone}
           </div>
           <div className="flex items-center gap-1 text-xs text-[#94a3b8]">

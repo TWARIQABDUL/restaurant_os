@@ -133,7 +133,7 @@ export default function OrderTracking() {
               </div>
             )}
 
-            <div className="flex items-center justify-between border-t border-[#e2e8f0] pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e2e8f0] pt-4">
               <span className={`badge ${order.payment_status === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>
                 {order.payment_method.replace(/_/g, ' ')} • {order.payment_status}
               </span>
