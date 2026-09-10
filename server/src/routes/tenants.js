@@ -273,7 +273,7 @@ router.get('/public', async (req, res) => {
   try {
     const { data: tenants, error } = await supabase
       .from('tenants')
-      .select('slug, name, updated_at')
+      .select('slug, name, created_at')
       .eq('active', true)
       .order('name', { ascending: true });
 

@@ -30,9 +30,12 @@ services:
         sync: false
       - key: VITE_SUPABASE_URL
         sync: false
-      - key: VITE_SUPABASE_ANON_KEY
+      # SERVER ONLY — bypasses RLS. The backend authenticates with this, never
+      # with the anon key (which is public and, since lockdown-anon.sql, has no
+      # privileges). Must never be given a VITE_ prefix or set on the client.
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      
+
       # MoMo Variables
       - key: MOMO_ENVIRONMENT
         value: sandbox
