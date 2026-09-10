@@ -1,11 +1,14 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useTenant } from '../context/TenantContext';
 
 export default function TenantThemeInjector() {
   const location = useLocation();
   const { user } = useAuth();
+  // The store profile is fetched once by TenantProvider; this used to make the
+  // same request again on every navigation.
+  const { tenant: tenantFromContext } = useTenant();
 
   useEffect(() => {
     // Attempt to extract tenantSlug from the URL path.
@@ -39,56 +42,49 @@ export default function TenantThemeInjector() {
       return;
     }
 
-    api.get(`/tenants/public/${tenantSlug}`)
-      .then(res => {
-        const tenant = res.data?.tenant;
-        const root = document.documentElement;
-        
-        if (tenant?.theme) {
-          const { primaryColor, accentColor, secondaryColor, backgroundColor, textColor } = tenant.theme;
-          
-          if (primaryColor) {
-            root.style.setProperty('--color-primary', primaryColor);
-            root.style.setProperty('--gradient-dark', `linear-gradient(135deg, ${primaryColor} 0%, #7F1D1D 100%)`);
-          } else {
-            root.style.removeProperty('--color-primary');
-            root.style.removeProperty('--gradient-dark');
-          }
-          
-          if (accentColor) {
-            root.style.setProperty('--color-accent', accentColor);
-            root.style.setProperty('--gradient-accent', `linear-gradient(135deg, ${primaryColor || '#DC2626'} 0%, ${accentColor} 100%)`);
-          } else {
-            root.style.removeProperty('--color-accent');
-            root.style.removeProperty('--gradient-accent');
-          }
+    const tenant = tenantFromContext;
+    const root = document.documentElement;
 
-          if (secondaryColor) {
-            root.style.setProperty('--color-secondary', secondaryColor);
-          } else {
-            root.style.removeProperty('--color-secondary');
-          }
+    if (tenant?.theme) {
+      const { primaryColor, accentColor, secondaryColor, backgroundColor, textColor } = tenant.theme;
 
-          if (backgroundColor) {
-            root.style.setProperty('--color-bg', backgroundColor);
-            root.style.setProperty('--color-surface-hover', backgroundColor); // ensure hover states adapt to the custom bg
-          } else {
-            root.style.removeProperty('--color-bg');
-            root.style.removeProperty('--color-surface-hover');
-          }
+      if (primaryColor) {
+        root.style.setProperty('--color-primary', primaryColor);
+        root.style.setProperty('--gradient-dark', `linear-gradient(135deg, ${primaryColor} 0%, #7F1D1D 100%)`);
+      } else {
+        root.style.removeProperty('--color-primary');
+        root.style.removeProperty('--gradient-dark');
+      }
 
-          if (textColor) {
-            root.style.setProperty('--color-text', textColor);
-          } else {
-            root.style.removeProperty('--color-text');
-          }
-        }
-      })
-      .catch(err => {
-        // If tenant is not found or error, don't break the app but log
-        console.error('Failed to load theme for tenant', err);
-      });
-  }, [location.pathname, user?.tenants?.slug]);
+      if (accentColor) {
+        root.style.setProperty('--color-accent', accentColor);
+        root.style.setProperty('--gradient-accent', `linear-gradient(135deg, ${primaryColor || '#DC2626'} 0%, ${accentColor} 100%)`);
+      } else {
+        root.style.removeProperty('--color-accent');
+        root.style.removeProperty('--gradient-accent');
+      }
+
+      if (secondaryColor) {
+        root.style.setProperty('--color-secondary', secondaryColor);
+      } else {
+        root.style.removeProperty('--color-secondary');
+      }
+
+      if (backgroundColor) {
+        root.style.setProperty('--color-bg', backgroundColor);
+        root.style.setProperty('--color-surface-hover', backgroundColor); // ensure hover states adapt to the custom bg
+      } else {
+        root.style.removeProperty('--color-bg');
+        root.style.removeProperty('--color-surface-hover');
+      }
+
+      if (textColor) {
+        root.style.setProperty('--color-text', textColor);
+      } else {
+        root.style.removeProperty('--color-text');
+      }
+    }
+  }, [location.pathname, user?.tenants?.slug, tenantFromContext]);
 
   return null;
 }

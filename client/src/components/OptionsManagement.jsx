@@ -3,6 +3,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 import { Plus, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
 
+import { useMoney } from '../context/TenantContext';
 /** Suggested option groups — free text, so sellers can type their own. */
 const GROUP_SUGGESTIONS = ['extras', 'packaging', 'warranty', 'gift'];
 
@@ -10,6 +11,8 @@ const ALL_PRODUCTS = '__all__';
 const EMPTY = { name: '', price: '', category: 'extras', product_category: ALL_PRODUCTS, single_choice: false };
 
 export default function OptionsManagement({ categories = [] }) {
+  const { delta } = useMoney();
+
   const [options, setOptions] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -201,7 +204,7 @@ export default function OptionsManagement({ categories = [] }) {
                         {option.product_category || 'All products'}
                       </span>
                       <span className="shrink-0 text-sm font-semibold text-[#475569]">
-                        {parseFloat(option.price) > 0 ? `+$${parseFloat(option.price).toFixed(2)}` : 'Free'}
+                        {parseFloat(option.price) > 0 ? delta(option.price) : 'Free'}
                       </span>
                       <button onClick={() => handleEdit(option)} className="icon-btn p-1.5 text-[#94a3b8] hover:text-[#0f172a]" title="Edit">
                         <Pencil size={14} />

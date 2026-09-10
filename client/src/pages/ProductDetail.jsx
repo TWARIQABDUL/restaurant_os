@@ -6,7 +6,10 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Star, Package, Minus, Plus } from 'lucide-react';
 
+import { useMoney } from '../context/TenantContext';
 export default function ProductDetail() {
+  const { money, delta } = useMoney();
+
   const { id, tenantSlug } = useParams();
   const navigate = useNavigate();
   const { addItem } = useCart();
@@ -165,7 +168,7 @@ export default function ProductDetail() {
         <div>
           <h1 className="text-3xl font-bold">{item.name}</h1>
           <p className="mt-2.5 leading-relaxed text-[#475569]">{item.description}</p>
-          <div className="font-heading mt-4 text-2xl font-bold">${parseFloat(item.price).toFixed(2)}</div>
+          <div className="font-heading mt-4 text-2xl font-bold">{money(item.price)}</div>
           {soldOut && (
             <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[#fee2e2] px-3 py-2 text-sm font-semibold text-[#dc2626]">
               Out of stock — check back soon
@@ -209,7 +212,7 @@ export default function ProductDetail() {
                               }`}
                             >
                               {opt.name}
-                              {parseFloat(opt.price) > 0 && <span className="ml-1 font-medium">+${parseFloat(opt.price).toFixed(2)}</span>}
+                              {parseFloat(opt.price) > 0 && <span className="ml-1 font-medium">{delta(opt.price)}</span>}
                               {opt.low_stock && !oos && <span className="ml-1 text-[10px] font-medium text-[#d97706]">({opt.stock_quantity} left)</span>}
                             </button>
                           );
@@ -240,7 +243,7 @@ export default function ProductDetail() {
                           >
                             <div className="min-w-0">
                               <div className="text-sm font-medium">{addOn.name}{oos && <span className="ml-1.5 text-xs text-[#94a3b8]">· out of stock</span>}</div>
-                              <div className="text-xs font-semibold text-[#475569]">+${parseFloat(addOn.price).toFixed(2)}</div>
+                              <div className="text-xs font-semibold text-[#475569]">{delta(addOn.price)}</div>
                             </div>
                             {isSelected ? (
                               <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
@@ -290,7 +293,7 @@ export default function ProductDetail() {
               disabled={soldOut}
             >
               {soldOut ? 'Out of stock' : (
-                <>Add to cart <span className="opacity-80">· ${calculateTotal().toFixed(2)}</span></>
+                <>Add to cart <span className="opacity-80">· {money(calculateTotal())}</span></>
               )}
             </button>
           </div>

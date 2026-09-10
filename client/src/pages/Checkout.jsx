@@ -6,7 +6,10 @@ import api from '../services/api';
 import { Banknote, Smartphone, Landmark, ShoppingCart } from 'lucide-react';
 
 
+import { useMoney } from '../context/TenantContext';
 export default function Checkout() {
+  const { money } = useMoney();
+
   const { user } = useAuth();
   const { items, getTotal, clearCart } = useCart();
   const navigate = useNavigate();
@@ -302,7 +305,7 @@ export default function Checkout() {
                   ))}
                 </span>
                 <span className="text-[13px] font-semibold">
-                  ${((item.menuItem.price * item.quantity) + item.selectedAddOns.reduce((s, ao) => s + (ao.price * ao.quantity * item.quantity), 0)).toFixed(2)}
+                  {money((item.menuItem.price * item.quantity) + item.selectedAddOns.reduce((s, ao) => s + (ao.price * ao.quantity * item.quantity), 0))}
                 </span>
               </div>
             ))}
@@ -310,7 +313,7 @@ export default function Checkout() {
 
           <div className="flex items-baseline justify-between py-4">
             <span className="text-sm font-semibold">Total</span>
-            <span className="font-heading text-[22px] font-bold">${getTotal().toFixed(2)}</span>
+            <span className="font-heading text-[22px] font-bold">{money(getTotal())}</span>
           </div>
 
           <button

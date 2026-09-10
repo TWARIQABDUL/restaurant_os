@@ -73,6 +73,7 @@ Both must be live before step 3.
 cd server
 node scripts/run-refund-hardening.js    # run at or BEFORE the API roll
 node scripts/run-lockdown-storage.js    # ONLY after step 2 is live
+node scripts/run-currency.js            # safe any time (see docs/currency.md)
 ```
 
 **If `run-lockdown-storage.js` reports a statement timeout**, that is lock

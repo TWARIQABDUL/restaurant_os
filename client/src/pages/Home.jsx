@@ -4,7 +4,11 @@ import api from '../services/api';
 import { Search, Package, Star, Clock, ArrowRight } from 'lucide-react';
 import { BRAND } from '../config/brand';
 
+import { useMoney, useTenant } from '../context/TenantContext';
 export default function Home() {
+  const { money } = useMoney();
+  const { tenant: tenantFromContext } = useTenant();
+
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -123,15 +127,12 @@ export default function Home() {
     if (tenant && !tenantInfo) setTenantInfo(tenant);
   };
 
-  // Patch: store tenant info inside fetchData
+  // The store profile comes from TenantProvider, which already fetched it for
+  // currency and theme — this page used to request the same endpoint a second
+  // time purely for the hero.
   useEffect(() => {
-    // This runs once to capture the tenant data for the hero
-    if (!tenantInfo && !loading) {
-      api.get(`/tenants/public/${tenantSlug}`).then(res => {
-        if (res.data?.tenant) setTenantInfo(res.data.tenant);
-      }).catch(() => {});
-    }
-  }, [loading, tenantSlug, tenantInfo]);
+    if (tenantFromContext) setTenantInfo(tenantFromContext);
+  }, [tenantFromContext]);
 
   if (isStaticAssetPath) {
     return null;
@@ -239,7 +240,7 @@ export default function Home() {
                   </div>
                 )}
                 <span className="absolute right-3 top-3 rounded-full bg-[#0f172a] px-2.5 py-1 text-xs font-bold text-white">
-                  ${parseFloat(item.price).toFixed(2)}
+                  {money(item.price)}
                 </span>
                 {item.in_stock === false && (
                   <span className="absolute left-3 top-3 rounded-full bg-[#dc2626] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">

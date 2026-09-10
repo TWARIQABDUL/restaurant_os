@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const supabase = require('../config/supabase');
 const { authenticate, authorize, superAdminOnly } = require('../middleware/auth');
+const momoConfig = require('../config/momo');
 
 const router = express.Router();
 
@@ -12,6 +13,47 @@ const router = express.Router();
 // depending on that escaping staying correct.
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+// ── Currency ───────────────────────────────────────────────────────────────
+// Currency is a STORE-level setting, not a per-product one, because the money
+// path only ever handles one currency at a time: an order carries a single
+// `total_amount`, a tenant has a single wallet balance, and a MoMo
+// request-to-pay takes exactly one currency. Per-product currency would need FX
+// rates on every cart total and a wallet per currency.
+//
+// It is also not merely a label. momoClient sends `momoConfig.currency` — the
+// platform's settlement currency — so a store displaying USD while MoMo settles
+// in RWF would show a price it cannot actually charge. The setting is therefore
+// pinned to the settlement currency and validated on write.
+const SETTLEMENT_CURRENCY = momoConfig.currency;
+
+/** ISO 4217 codes: three uppercase letters. */
+const CURRENCY_CODE = /^[A-Z]{3}$/;
+
+/**
+ * The store's currency.
+ *
+ * A stored value is honoured only if we can actually settle in it. Existing
+ * tenants predate this setting — the seeded demo store carries
+ * `settings.currency = 'USD'` from before MoMo existed — and returning that
+ * while the platform collects in RWF is precisely the quote-one-amount,
+ * charge-another failure this is meant to prevent. A stale or unsettleable
+ * value is therefore ignored rather than trusted, so no storefront can display
+ * a price we cannot take.
+ */
+function tenantCurrency(settings) {
+  const stored = settings?.currency;
+  if (stored && String(stored).toUpperCase() === SETTLEMENT_CURRENCY) {
+    return SETTLEMENT_CURRENCY;
+  }
+  return SETTLEMENT_CURRENCY;
+}
+
+/** True when a tenant has a stored currency we cannot settle in. */
+function hasStaleCurrency(settings) {
+  const stored = settings?.currency;
+  return Boolean(stored) && String(stored).toUpperCase() !== SETTLEMENT_CURRENCY;
+}
 const TWITTER_HANDLE = /^@?[A-Za-z0-9_]{1,15}$/;
 const OG_LOCALE = /^[a-z]{2}(?:_[A-Z]{2})?$/;
 
@@ -206,6 +248,17 @@ router.get('/me/payment-settings', authenticate, authorize('admin'), async (req,
         settlementMode: tenant.settings?.payments?.settlementMode || 'manual',
         payoutPhone: tenant.settings?.payments?.payoutPhone || '',
         acceptedPaymentMethods: tenant.settings?.payments?.acceptedPaymentMethods || ['cash_on_delivery', 'mobile_money', 'bank_transfer'],
+        currency: tenantCurrency(tenant.settings),
+        // What the platform's MoMo account actually settles in. Surfaced so an
+        // admin can see why the currency is fixed rather than assuming the
+        // field is broken.
+        settlementCurrency: SETTLEMENT_CURRENCY,
+        currencyLocked: true,
+        // A leftover currency from before this setting was enforced. It is not
+        // being used — prices already show the settlement currency — but the
+        // admin should know their stored value was overridden rather than
+        // wonder why the field does not say what the database says.
+        staleCurrency: hasStaleCurrency(tenant.settings) ? String(tenant.settings.currency).toUpperCase() : null,
       },
     });
   } catch (err) {
@@ -222,7 +275,22 @@ router.patch(
   authorize('admin'),
   async (req, res) => {
     try {
-      const { settlementMode, payoutPhone, acceptedPaymentMethods } = req.body;
+      const { settlementMode, payoutPhone, acceptedPaymentMethods, currency } = req.body;
+
+      if (currency !== undefined) {
+        const code = String(currency).toUpperCase();
+        if (!CURRENCY_CODE.test(code)) {
+          return res.status(400).json({ error: 'Currency must be a 3-letter ISO code, e.g. RWF' });
+        }
+        if (code !== SETTLEMENT_CURRENCY) {
+          return res.status(400).json({
+            error: `This platform settles in ${SETTLEMENT_CURRENCY}, so your store must price in ${SETTLEMENT_CURRENCY}. `
+              + 'Displaying a different currency would show customers a price we cannot charge them.',
+            code: 'CURRENCY_NOT_SETTLEABLE',
+            settlementCurrency: SETTLEMENT_CURRENCY,
+          });
+        }
+      }
 
       if (settlementMode !== undefined && !['manual', 'auto'].includes(settlementMode)) {
         return res.status(400).json({ error: 'settlementMode must be "manual" or "auto"' });
@@ -251,6 +319,9 @@ router.patch(
 
       const nextSettings = {
         ...current.settings,
+        // Currency sits at the top of settings rather than under `payments`: it
+        // governs how every price is displayed, not just how money is taken.
+        ...(currency !== undefined ? { currency: String(currency).toUpperCase() } : {}),
         payments: {
           ...(current.settings?.payments || {}),
           ...(settlementMode !== undefined ? { settlementMode } : {}),
@@ -350,6 +421,7 @@ router.get('/public/:slug', async (req, res) => {
         logo_url: tenant.logo_url,
         seo: tenant.settings?.seo || {},
         theme: tenant.settings?.theme || {},
+        currency: tenantCurrency(tenant.settings),
         acceptedPaymentMethods: tenant.settings?.payments?.acceptedPaymentMethods || ['cash_on_delivery', 'mobile_money', 'bank_transfer']
       }
     });

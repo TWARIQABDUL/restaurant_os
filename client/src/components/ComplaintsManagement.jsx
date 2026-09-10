@@ -3,7 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
+import { useMoney } from '../context/TenantContext';
 export default function ComplaintsManagement() {
+  const { money } = useMoney();
+
   const { user } = useAuth();
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -408,7 +411,7 @@ export default function ComplaintsManagement() {
                                   </div>
                                   <div className="flex justify-between pt-2 mt-2 border-t font-bold">
                                     <span>Total Amount:</span>
-                                    <span>${parseFloat(complaint.orders?.total_amount || 0).toFixed(2)}</span>
+                                    <span>{money(complaint.orders?.total_amount || 0)}</span>
                                   </div>
                                 </div>
                               </div>
@@ -420,7 +423,7 @@ export default function ComplaintsManagement() {
                                     <div key={idx} className="mb-3 pb-3 border-b last:border-0 last:mb-0 last:pb-0">
                                       <div className="flex justify-between font-medium">
                                         <span>{item.quantity}x {item.menu_item?.name}</span>
-                                        <span>${(item.quantity * parseFloat(item.unit_price)).toFixed(2)}</span>
+                                        <span>{money(item.quantity * parseFloat(item.unit_price))}</span>
                                       </div>
                                       {item.order_item_addons?.length > 0 && (
                                         <div className="text-secondary text-xs mt-1 pl-2 border-l-2 border-gray-200">

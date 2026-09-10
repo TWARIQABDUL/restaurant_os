@@ -8,6 +8,7 @@ import ComplaintsManagement from '../components/ComplaintsManagement';
 import toast from 'react-hot-toast';
 import { Clock, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 
+import { useMoney } from '../context/TenantContext';
 const COLUMNS = [
   { key: 'pending', label: 'Pending', statuses: ['pending'] },
   { key: 'packing', label: 'Packing', statuses: ['approved', 'preparing'] },
@@ -16,6 +17,7 @@ const COLUMNS = [
 ];
 
 function getElapsedLabel(dateString) {
+
   const diffMs = Date.now() - new Date(dateString).getTime();
   const diffMin = Math.max(0, Math.floor(diffMs / 60000));
   if (diffMin < 1) return 'just now';
@@ -26,6 +28,7 @@ function getElapsedLabel(dateString) {
 }
 
 export default function ManagerDashboard() {
+  const { money } = useMoney();
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [drivers, setDrivers] = useState([]);
@@ -236,7 +239,7 @@ export default function ManagerDashboard() {
           </div>
         </div>
         <div className="whitespace-nowrap text-sm font-bold">
-          ${parseFloat(order.total_amount).toFixed(2)}
+          {money(order.total_amount)}
         </div>
       </div>
 
@@ -462,7 +465,7 @@ export default function ManagerDashboard() {
                               <td>#{order.tracking_code}</td>
                               <td><span className={getStatusBadge(order.status)}>{order.status}</span></td>
                               <td>{order.guest_name || order.customer?.name}</td>
-                              <td>${parseFloat(order.total_amount).toFixed(2)}</td>
+                              <td>{money(order.total_amount)}</td>
                               <td>{new Date(order.updated_at || order.created_at).toLocaleString()}</td>
                             </tr>
                           ))}

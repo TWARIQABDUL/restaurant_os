@@ -1,4 +1,5 @@
 const supabase = require('../config/supabase');
+const { isUpstreamTimeout } = require('../config/supabase');
 
 /**
  * Resolve tenant from request.
@@ -21,6 +22,18 @@ async function resolveTenant(req, res, next) {
 
     const { data: tenant, error } = await query.single();
 
+    // A timeout is not "no such store". supabase-js returns it as an ordinary
+    // error, so without this check an outage reads as a 404 and sends people
+    // hunting for a store that exists perfectly well.
+    if (isUpstreamTimeout(error)) {
+      console.error('Tenant resolution timed out — Supabase API unreachable');
+      res.set('Retry-After', '30');
+      return res.status(503).json({
+        error: 'The store is temporarily unavailable. Please try again in a moment.',
+        code: 'UPSTREAM_UNAVAILABLE',
+      });
+    }
+
     if (error || !tenant) {
       return res.status(404).json({ error: 'Store not found' });
     }
@@ -32,6 +45,18 @@ async function resolveTenant(req, res, next) {
     req.tenant = tenant;
     next();
   } catch (err) {
+    // A timeout here means the Supabase API is not answering (it can be down
+    // while Postgres itself is healthy). Say so with a 503 and a Retry-After
+    // rather than a 500: it is upstream, it is transient, and the caller should
+    // try again rather than treat the store as broken.
+    if (err?.code === 'SUPABASE_TIMEOUT') {
+      console.error('Tenant resolution timed out — Supabase API unreachable');
+      res.set('Retry-After', '30');
+      return res.status(503).json({
+        error: 'The store is temporarily unavailable. Please try again in a moment.',
+        code: 'UPSTREAM_UNAVAILABLE',
+      });
+    }
     console.error('Tenant resolution error:', err.message);
     return res.status(500).json({ error: 'Failed to resolve store' });
   }

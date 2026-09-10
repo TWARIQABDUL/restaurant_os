@@ -59,6 +59,10 @@ async function handleCollectionResult(txn, result) {
       p_tenant_id: txn.tenant_id,
       p_order_id: txn.order_id,
       p_amount: txn.amount,
+      // Record what the balance is actually denominated in. Without this the
+      // wallet row keeps the schema's sandbox-era 'EUR' default while holding
+      // whatever the platform really settles in.
+      p_currency: txn.currency || momoConfig.currency,
     });
   } else if (result.status === 'FAILED') {
     await updateMomoTransactionResult(txn.id, {

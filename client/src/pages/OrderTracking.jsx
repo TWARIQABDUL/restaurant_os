@@ -5,7 +5,10 @@ import { getSocket } from '../services/socket';
 import toast from 'react-hot-toast';
 import { Package } from 'lucide-react';
 
+import { useMoney } from '../context/TenantContext';
 export default function OrderTracking() {
+  const { money } = useMoney();
+
   const { tenantSlug } = useParams();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +112,7 @@ export default function OrderTracking() {
               {order.order_items?.map((item, idx) => (
                 <div key={idx} className="flex justify-between text-sm">
                   <span>{item.quantity}× {item.menu_item?.name}</span>
-                  <span className="text-[#475569]">${(item.quantity * item.unit_price).toFixed(2)}</span>
+                  <span className="text-[#475569]">{money(item.quantity * item.unit_price)}</span>
                 </div>
               ))}
             </div>
@@ -134,7 +137,7 @@ export default function OrderTracking() {
               <span className={`badge ${order.payment_status === 'paid' ? 'badge-paid' : 'badge-unpaid'}`}>
                 {order.payment_method.replace(/_/g, ' ')} • {order.payment_status}
               </span>
-              <span className="font-heading font-bold">${parseFloat(order.total_amount).toFixed(2)}</span>
+              <span className="font-heading font-bold">{money(order.total_amount)}</span>
             </div>
           </div>
         ))}

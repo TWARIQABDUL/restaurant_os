@@ -18,6 +18,8 @@ import {
 import { uploadImage } from '../services/supabase';
 import { QRCodeCanvas } from 'qrcode.react';
 
+import { useMoney } from '../context/TenantContext';
+import { formatMoney } from '../config/money';
 const COLORS = ['#dc2626', '#2563eb', '#16a34a', '#d97706', '#7c3aed'];
 
 const NAV = [
@@ -43,6 +45,7 @@ const ALL_TABS = NAV.flatMap((g) => g.items);
 const money = (n) => `$${(Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function Kpi({ label, value, icon: Icon, sub, accent }) {
+
   return (
     <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex items-center justify-between">
@@ -79,6 +82,7 @@ function ColorField({ label, value, hint, onChange }) {
 }
 
 export default function AdminDashboard() {
+  const { money, delta } = useMoney();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('analytics');
 
@@ -98,7 +102,7 @@ export default function AdminDashboard() {
   const [wallet, setWallet] = useState(null);
   const [ledger, setLedger] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
-  const [paymentSettings, setPaymentSettings] = useState({ settlementMode: 'manual', payoutPhone: '', acceptedPaymentMethods: ['cash_on_delivery', 'mobile_money', 'bank_transfer'] });
+  const [paymentSettings, setPaymentSettings] = useState({ settlementMode: 'manual', payoutPhone: '', acceptedPaymentMethods: ['cash_on_delivery', 'mobile_money', 'bank_transfer'], currency: '', settlementCurrency: '', currencyLocked: true, staleCurrency: null });
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawPhone, setWithdrawPhone] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -533,7 +537,7 @@ export default function AdminDashboard() {
                                 <div className="min-w-0">
                                   <div className="font-heading text-sm font-bold">
                                     #{order.tracking_code}
-                                    <span className="ml-2 font-sans text-xs font-semibold text-[#dc2626]">${parseFloat(order.total_amount).toFixed(2)}</span>
+                                    <span className="ml-2 font-sans text-xs font-semibold text-[#dc2626]">{money(order.total_amount)}</span>
                                   </div>
                                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#475569]">
                                     <span>{order.guest_name || order.customer?.name}</span>
@@ -686,6 +690,46 @@ export default function AdminDashboard() {
                       <h3 className="mb-4 text-[15px] font-semibold">Payment settings</h3>
                       <div className="flex flex-col gap-4">
                         <div>
+                          <label className="form-label">Currency</label>
+                          <p className="mb-2 text-xs text-[#94a3b8]">
+                            Every price in your store — products, options, orders, your wallet — is shown in this currency.
+                            It is set by the payment account this platform collects through, so it is the same for every store
+                            and cannot be changed here. Showing a price in a currency we cannot charge would mean quoting a
+                            customer one amount and taking another.
+                          </p>
+                          <select
+                            className="form-input"
+                            value={paymentSettings.currency || paymentSettings.settlementCurrency || ''}
+                            disabled
+                            onChange={(e) => setPaymentSettings((prev) => ({ ...prev, currency: e.target.value }))}
+                          >
+                            <option value={paymentSettings.settlementCurrency}>
+                              {paymentSettings.settlementCurrency || '—'}
+                            </option>
+                          </select>
+                          {paymentSettings.staleCurrency && (
+                            <p className="mt-2 rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#92400e]">
+                              Your store was previously set to <strong>{paymentSettings.staleCurrency}</strong>, which this
+                              platform cannot collect. Prices are shown in {paymentSettings.settlementCurrency} instead.
+                              Check that your product prices are the right numbers for {paymentSettings.settlementCurrency} —
+                              they were not converted.
+                            </p>
+                          )}
+                          {paymentSettings.settlementCurrency && (
+                            <p className="mt-2 text-xs text-[#64748b]">
+                              Prices will look like{' '}
+                              <span className="font-semibold text-[#0f172a]">
+                                {formatMoney(1500, paymentSettings.settlementCurrency)}
+                              </span>
+                              {' '}and{' '}
+                              <span className="font-semibold text-[#0f172a]">
+                                {formatMoney(24990, paymentSettings.settlementCurrency)}
+                              </span>.
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
                           <label className="form-label">Accepted payment methods</label>
                           <p className="mb-2 text-xs text-[#94a3b8]">What customers can use at checkout. At least one is required.</p>
                           <div className="flex flex-col gap-2">
@@ -764,7 +808,7 @@ export default function AdminDashboard() {
                             {withdrawals.map((w) => (
                               <tr key={w.id}>
                                 <td>{new Date(w.requested_at).toLocaleString()}</td>
-                                <td className="font-semibold">${parseFloat(w.amount).toFixed(2)}</td>
+                                <td className="font-semibold">{money(w.amount)}</td>
                                 <td>{w.phone_number}</td>
                                 <td>
                                   <span className={`badge ${w.status === 'completed' ? 'badge-delivered' : (w.status === 'failed' || w.status === 'rejected') ? 'badge-rejected' : 'badge-pending'}`}>
@@ -794,7 +838,7 @@ export default function AdminDashboard() {
                                 <td className="text-sm">{new Date(entry.created_at).toLocaleString()}</td>
                                 <td className="text-sm capitalize">{entry.entry_type.replace(/_/g, ' ')}</td>
                                 <td className={`font-semibold ${parseFloat(entry.amount) < 0 ? 'text-[#dc2626]' : 'text-[#16a34a]'}`}>
-                                  {parseFloat(entry.amount) >= 0 ? '+' : ''}{parseFloat(entry.amount).toFixed(2)}
+                                  {delta(entry.amount) || money(0)}
                                 </td>
                                 <td className="text-sm text-[#475569]">{entry.note}</td>
                               </tr>

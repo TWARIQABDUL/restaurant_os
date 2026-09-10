@@ -2,7 +2,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { ShoppingCart, Minus, Plus } from 'lucide-react';
 
+import { useMoney } from '../context/TenantContext';
 export default function Cart() {
+  const { money, delta } = useMoney();
+
   const { items, removeItem, updateQuantity, getTotal, clearCart } = useCart();
   const navigate = useNavigate();
   const { tenantSlug } = useParams();
@@ -52,16 +55,16 @@ export default function Cart() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="text-base font-semibold">{item.menuItem.name}</h3>
-                    <div className="text-base font-semibold">${lineTotal.toFixed(2)}</div>
+                    <div className="text-base font-semibold">{money(lineTotal)}</div>
                   </div>
-                  <div className="mt-0.5 text-sm text-[#94a3b8]">${parseFloat(item.menuItem.price).toFixed(2)} each</div>
+                  <div className="mt-0.5 text-sm text-[#94a3b8]">{money(item.menuItem.price)} each</div>
 
                   {item.selectedAddOns.length > 0 && (
                     <ul className="mt-2 space-y-0.5 text-xs text-[#475569]">
                       {item.selectedAddOns.map(ao => (
                         <li key={ao.id}>
                           {ao.single_choice ? ao.name : `+ ${ao.quantity}× ${ao.name}`}
-                          {parseFloat(ao.price) > 0 && ` (+$${(ao.price * ao.quantity).toFixed(2)})`}
+                          {parseFloat(ao.price) > 0 && ` (${delta(ao.price * ao.quantity)})`}
                         </li>
                       ))}
                     </ul>
@@ -102,7 +105,7 @@ export default function Cart() {
           <h3 className="text-base font-semibold">Summary</h3>
           <div className="mt-4 flex items-baseline justify-between border-t border-[#e2e8f0] pt-4">
             <span className="text-sm font-medium text-[#475569]">Total</span>
-            <span className="font-heading text-2xl font-bold">${getTotal().toFixed(2)}</span>
+            <span className="font-heading text-2xl font-bold">{money(getTotal())}</span>
           </div>
           <button
             className="btn btn-primary btn-full btn-lg mt-4"

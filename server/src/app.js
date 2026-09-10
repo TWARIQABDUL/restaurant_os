@@ -93,6 +93,18 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, _next) => {
+  // Supabase unreachable: upstream and transient, not our bug. A 503 with
+  // Retry-After tells the caller to try again, instead of a 500 that reads as
+  // "this is broken" — or, without the client timeout, no answer at all until
+  // the platform gateway returns a 502.
+  if (err?.code === 'SUPABASE_TIMEOUT') {
+    console.error('Upstream timeout:', err.message);
+    res.set('Retry-After', '30');
+    return res.status(503).json({
+      error: 'Temporarily unavailable. Please try again in a moment.',
+      code: 'UPSTREAM_UNAVAILABLE',
+    });
+  }
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });

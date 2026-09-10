@@ -5,7 +5,10 @@ import { getSocket } from '../services/socket';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
+import { useMoney } from '../context/TenantContext';
 export default function TrackOrder() {
+  const { money } = useMoney();
+
   const { tenantSlug } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -253,7 +256,7 @@ export default function TrackOrder() {
           
           <div className="mb-6 flex items-center justify-between border-t border-[#e2e8f0] pt-4">
             <span className="font-semibold">Total</span>
-            <span className="font-heading font-bold">${parseFloat(order.total_amount).toFixed(2)}</span>
+            <span className="font-heading font-bold">{money(order.total_amount)}</span>
           </div>
 
           {canComplain && (

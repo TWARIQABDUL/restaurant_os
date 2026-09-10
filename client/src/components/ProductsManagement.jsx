@@ -6,6 +6,7 @@ import CategoriesManagement from './CategoriesManagement';
 import toast from 'react-hot-toast';
 import { Plus, Minus, Pencil, Trash2, Package, Search, AlertTriangle, EyeOff } from 'lucide-react';
 
+import { useMoney } from '../context/TenantContext';
 const EMPTY = {
   name: '', description: '', price: '', category: '', image_url: '',
   track_inventory: false, stock_quantity: '', low_stock_threshold: 5, sku: '',
@@ -16,6 +17,7 @@ const EMPTY_VARIANT = { name: '', price: '', stock_quantity: '' };
 
 /** Worst stock state across a product's variants, or null if it has none. */
 function variantState(p) {
+
   const vs = p.variants || [];
   if (vs.length === 0) return null;
   if (vs.some((v) => v.stock_quantity <= 0)) return 'out';
@@ -39,6 +41,7 @@ function stockState(p) {
 }
 
 export default function ProductsManagement() {
+  const { money } = useMoney();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
@@ -526,7 +529,7 @@ export default function ProductsManagement() {
                         </div>
                       </td>
                       <td className="text-sm text-[#475569]">{product.category}</td>
-                      <td className="text-sm font-semibold">${parseFloat(product.price).toFixed(2)}</td>
+                      <td className="text-sm font-semibold">{money(product.price)}</td>
                       <td>
                         {product.variants?.length > 0 ? (
                           <button
