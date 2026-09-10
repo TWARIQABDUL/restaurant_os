@@ -583,6 +583,49 @@
   .notification-content p { margin: 0 0 0.25rem; font-size: 0.85rem; color: var(--color-content); line-height: 1.4; }
   .notification-content small { color: var(--color-content-muted); font-size: 0.75rem; }
 
+  /* On a small screen the bell lives inside .navbar-links, which is a 17.5rem
+     fixed panel with `overflow-y: auto`. Per CSS, a non-visible overflow on one
+     axis forces the other axis to `auto` too — so that panel clips horizontally
+     as well. A 20rem absolutely-positioned dropdown inside a 17.5rem clipping
+     panel is cut off and pushed into a horizontal scrollbar, which is why it
+     appeared not to open.
+     
+     Fixed positioning takes it out of that box entirely and lets it span the
+     viewport instead, which is the right shape for a phone anyway. */
+  @media (max-width: 768px) {
+    /* Nothing to anchor to any more — the dropdown is viewport-positioned. */
+    .notification-container { position: static; }
+
+    .notification-dropdown {
+      position: fixed;
+      top: calc(3.75rem + 0.5rem);   /* clear the navbar */
+      left: 0.75rem;
+      right: 0.75rem;
+      width: auto;
+      margin-top: 0;
+      /* Above .navbar-links (200), so it reads as a sheet over the open menu
+         rather than being buried behind it. */
+      z-index: 300;
+      /* Never taller than the space actually available, so the last item and
+         the page behind it both stay reachable. */
+      max-height: calc(100dvh - 3.75rem - 1.5rem);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* The header stays put and only the list scrolls, so "Mark all read" is
+       always reachable however many notifications there are. */
+    .notification-header { flex: none; }
+    .notification-list {
+      flex: 1 1 auto;
+      max-height: none;
+      overscroll-behavior: contain;  /* don't scroll the page behind it */
+    }
+
+    /* Comfortable tap targets. */
+    .notification-item { padding: 0.875rem 1rem; }
+  }
+
   /* ---- Landing page ---- */
   .hero-section {
     display: grid;
