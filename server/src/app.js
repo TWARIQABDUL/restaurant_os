@@ -20,6 +20,7 @@ const reviewsRoutes = require('./routes/reviews');
 const complaintsRoutes = require('./routes/complaints');
 const categoriesRoutes = require('./routes/categories');
 const uploadsRoutes = require('./routes/uploads');
+const platformRoutes = require('./routes/platform');
 
 const app = express();
 
@@ -66,6 +67,10 @@ app.get('/api/health', (req, res) => {
 
 // Tenant routes (super admin — no tenant scoping)
 app.use('/api/tenants', tenantsRoutes);
+
+// Platform administration (super admin). Deliberately not tenant-scoped: these
+// read and write across every store, so there is no slug to resolve.
+app.use('/api/platform', platformRoutes);
 
 // MoMo callback — no tenant scoping (identified by reference id) and no
 // auth (MTN calls this directly, not a logged-in user).

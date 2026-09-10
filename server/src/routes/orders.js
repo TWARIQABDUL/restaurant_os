@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
 const { orderLimiter, trackingLimiter } = require('../middleware/rateLimit');
+const platformSettings = require('../services/platformSettings');
 
 const {
   reserveStock, releaseStock, linesForOrder, addonLinesForOrder, InsufficientStockError,
@@ -69,6 +70,42 @@ router.post(
 
       const tenantId = req.tenant.id;
       const { items, payment_method, payment_phone, delivery_notes, guest_name, guest_phone, guest_address, guest_email } = req.body;
+
+      // Re-check the store's currency here, not just when it was configured.
+      // A currency the platform has since stopped supporting, or one MoMo
+      // cannot settle, must not be able to take money through a stale tenant
+      // setting — this is the boundary where money actually moves.
+      const allowedCurrencies = await platformSettings.allowedCurrencies();
+      const storeCurrency = String(req.tenant.settings?.currency || '').toUpperCase()
+        || platformSettings.SETTLEMENT_CURRENCY;
+
+      if (!allowedCurrencies.includes(storeCurrency)) {
+        console.error(`Order blocked: store ${tenantId} is priced in unsupported currency ${storeCurrency}`);
+        return res.status(409).json({
+          error: 'This store is not currently able to take orders. Please try again later.',
+          code: 'STORE_CURRENCY_UNSUPPORTED',
+        });
+      }
+
+      // Mobile money collects only in the settlement currency. The storefront
+      // already hides the option, but a request can be made directly.
+      if (payment_method === 'mobile_money' && !platformSettings.isSettleable(storeCurrency)) {
+        return res.status(400).json({
+          error: `Mobile money is not available for orders priced in ${storeCurrency}. `
+            + 'Please choose cash on delivery or bank transfer.',
+          code: 'MOMO_CURRENCY_MISMATCH',
+        });
+      }
+
+      // The store may also simply have that method switched off.
+      const accepted = req.tenant.settings?.payments?.acceptedPaymentMethods
+        || ['cash_on_delivery', 'mobile_money', 'bank_transfer'];
+      if (!accepted.includes(payment_method)) {
+        return res.status(400).json({
+          error: 'That payment method is not accepted by this store.',
+          code: 'PAYMENT_METHOD_NOT_ACCEPTED',
+        });
+      }
 
       // Calculate total — fetch prices from DB to prevent client-side manipulation.
       //

@@ -13,21 +13,46 @@ currency per tenant, and refunds that have to decide which rate to reverse at.
 Nothing in the product needs that: one store is one seller with one payout
 account in one country.
 
-## Why it is pinned to the settlement currency
+## Who decides which currencies exist
+
+Super admin, in **Platform → Platform settings**. The list lives in
+`platform_settings.allowed_currencies` and is the source of truth: a store picks
+from it and cannot type anything else.
+
+It is enforced at every boundary where money moves, not just on the settings
+form — a currency removed from the platform cannot keep taking money through a
+stale tenant setting:
+
+| Boundary | Check |
+| --- | --- |
+| Store settings save | Currency must be in the allowlist |
+| Storefront (`/tenants/public/:slug`) | Unsupported currency falls back; mobile money is filtered out of the advertised methods |
+| Checkout (`POST /api/orders`) | Store currency re-checked; mobile money refused unless it is the settlement currency; the method must be one the store accepts |
+| Withdrawal (`POST /api/wallet/withdraw`) | Refuses if the store or wallet is denominated in anything but the settlement currency |
+
+The settlement currency can never be removed from the allowlist, and removing a
+currency a store is actively priced in returns a `409` naming those stores
+rather than stranding them.
+
+## Why the settlement currency is not a setting
 
 Currency here is **not a display label**. `momoClient` charges in
 `momoConfig.currency` — the platform's settlement currency, from
 `MOMO_CURRENCY`. A store displaying USD while MoMo collects RWF would quote a
 customer one amount and take another.
 
-So `PATCH /api/tenants/me/payment-settings` accepts a `currency` only if it
-equals the settlement currency, and `tenantCurrency()` ignores a stored value
-that does not match. A pre-existing value cannot cause a storefront to show a
-price the platform cannot charge — the seeded `demo` store carried
-`settings.currency = 'USD'` from before MoMo existed, and it is simply not used.
+So a store may price in **any allowed currency**, but mobile money only works in
+the settlement currency. A store that switches to a non-settleable currency has
+mobile money turned off automatically, with the reason returned in the save
+response — and the save is refused outright if that would leave it with no way
+to take payment at all.
 
-Admins see the currency, the settlement currency, and a notice if their stored
-value was overridden.
+Cash on delivery and bank transfer are unaffected in any currency: no settlement
+is involved.
+
+`tenantCurrency()` ignores a stored value the platform no longer allows, so a
+pre-existing setting cannot cause a storefront to quote in an unsupported
+currency. Admins see a notice when that has happened.
 
 ## ⚠️ Changing `MOMO_CURRENCY` does not convert prices
 
@@ -75,5 +100,26 @@ transactions span more than one currency, which needs a human.
 Apply with:
 
 ```
-node server/scripts/run-currency.js
+node server/scripts/run-platform-settings.js   # allowed currencies, defaults
+node server/scripts/run-currency.js            # wallet currency labelling
 ```
+
+### After the new build is fully deployed
+
+`currency.sql` left the old 3-argument `credit_wallet_pending` in place so the
+migration could run before the server rolled out. Postgres treats it as a
+separate function, not a replacement, so it survives — still carrying the `EUR`
+default. Once every instance is on the new build:
+
+```
+node server/scripts/run-currency-cleanup.js
+```
+
+## Platform revenue is grouped by currency
+
+`GET /api/tenants/analytics` no longer sums `total_amount` across every store.
+With more than one currency in play, adding 1,000 KES to 1,000 EUR produces a
+number that is not an amount of anything. The headline total and the trend chart
+cover the settlement currency only; everything else is returned in
+`revenueByCurrency` and shown beneath the chart, so a store priced in another
+currency is not silently missing from the platform's numbers.

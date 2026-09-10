@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const supabase = require('../config/supabase');
 const { authenticate, authorize } = require('../middleware/auth');
 const walletService = require('../services/walletService');
+const platformSettings = require('../services/platformSettings');
 
 const router = express.Router();
 
@@ -57,6 +58,33 @@ router.post(
       const { data: tenant } = await supabase.from('tenants').select('settings').eq('id', req.tenant.id).single();
       const paymentSettings = tenant?.settings?.payments || {};
 
+      // A payout is a MoMo disbursement, and momoClient sends the platform's
+      // settlement currency. If this store's balance is denominated in anything
+      // else, transferring it would move a number MTN interprets in a different
+      // currency — so refuse rather than pay out the wrong amount.
+      const storeCurrency = String(tenant?.settings?.currency || '').toUpperCase()
+        || platformSettings.SETTLEMENT_CURRENCY;
+
+      if (!platformSettings.isSettleable(storeCurrency)) {
+        return res.status(400).json({
+          error: `Your balance is held in ${storeCurrency}, but payouts are sent in `
+            + `${platformSettings.SETTLEMENT_CURRENCY}. Contact support to arrange this withdrawal — `
+            + 'sending it automatically would transfer the wrong amount.',
+          code: 'PAYOUT_CURRENCY_MISMATCH',
+          storeCurrency,
+          settlementCurrency: platformSettings.SETTLEMENT_CURRENCY,
+        });
+      }
+
+      const wallet = await walletService.getWallet(req.tenant.id);
+      if (wallet.currency && !platformSettings.isSettleable(wallet.currency)) {
+        return res.status(400).json({
+          error: `This wallet is recorded in ${wallet.currency}, but payouts are sent in `
+            + `${platformSettings.SETTLEMENT_CURRENCY}. Contact support before withdrawing.`,
+          code: 'WALLET_CURRENCY_MISMATCH',
+        });
+      }
+
       const phone = req.body.phone || paymentSettings.payoutPhone;
       if (!phone) {
         return res.status(400).json({ error: 'No payout phone number provided or saved. Set one in payment settings, or include "phone" in this request.' });
@@ -64,7 +92,6 @@ router.post(
 
       let amount = req.body.amount;
       if (!amount) {
-        const wallet = await walletService.getWallet(req.tenant.id);
         amount = wallet.available_balance;
         if (!amount || Number(amount) <= 0) {
           return res.status(400).json({ error: 'No available balance to withdraw' });
