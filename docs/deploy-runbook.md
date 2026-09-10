@@ -75,6 +75,15 @@ node scripts/run-refund-hardening.js    # run at or BEFORE the API roll
 node scripts/run-lockdown-storage.js    # ONLY after step 2 is live
 ```
 
+**If `run-lockdown-storage.js` reports a statement timeout**, that is lock
+contention, not a broken migration. `DROP POLICY` needs an ACCESS EXCLUSIVE lock
+on `storage.objects`, and this database runs `lock_timeout = 0` with
+`statement_timeout = 2min`, so a single busy moment queues the DROP until it is
+cancelled — and because a multi-statement query runs in one implicit
+transaction, the whole file rolls back. The runner now sends each statement
+separately with `lock_timeout = 5s` and retries, and the file is re-runnable, so
+just run it again.
+
 `run-refund-hardening.js` is backward-compatible: the new function works with
 the old application code, so running it first is safe and closes the window
 described at the top of this file.
@@ -86,9 +95,14 @@ running it and the new client being live, image **upload** stops working. Image
 ## 4. Verify
 
 ```
-node scripts/verify-lockdown.js
+node scripts/verify-lockdown.js            # database grants
+node scripts/verify-storage-lockdown.js    # storage, driven with the real anon key
 curl -sI https://<api-host>/api/health | grep -i 'content-security-policy\|strict-transport\|ratelimit'
 ```
+
+`verify-storage-lockdown.js` reports a timeout or rate-limit as **inconclusive**
+rather than as a pass. If you see that, the Supabase project is throttling —
+wait a few minutes and re-run rather than treating it as a green light.
 
 Then check by hand:
 
@@ -97,6 +111,15 @@ Then check by hand:
 - Log in as `super_admin` from a storefront URL that is not their own tenant.
 - Track a guest order with the wrong phone — should return the same 404 as an
   unknown tracking code.
+
+## Two buckets belong to another app — read `docs/storage-findings.md`
+
+This Supabase project is shared. The `documents` and `opportunities` buckets
+belong to a different application and carry the same kind of no-role-check
+policies that SEC-01 described: anyone with that project's anon key can upload
+to either, and everything in `documents` is world-readable. They were left
+untouched on purpose — changing them would break that app's uploads. They need
+the same fix, coordinated with whoever owns it.
 
 ## Still open — product decisions, not code
 
