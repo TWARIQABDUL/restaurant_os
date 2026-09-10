@@ -1,6 +1,11 @@
 {
   "rewrites": [
     {
+      "_comment": "Proxy the Render API onto this origin so the session cookie is first-party. vercel.app and onrender.com are both on the Public Suffix List, so a cookie set directly by the API would be third-party — Safari blocks those and Chrome is retiring them. Proxied here, the browser only ever talks to this domain. NOTE: /api/* is already taken by this project's own Vercel functions (sitemap, robots, seo), hence the separate /backend prefix. This rule is first so nothing below can claim it.",
+      "source": "/backend/:path*",
+      "destination": "https://restaurant-os-qsm3.onrender.com/api/:path*"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"
     },
@@ -9,7 +14,7 @@
       "destination": "/api/robots"
     },
     {
-      "source": "/:slug((?!api|_next|static|favicon\\.ico).*)",
+      "source": "/:slug((?!api|backend|_next|static|favicon\\.ico).*)",
       "has": [
         {
           "type": "header",

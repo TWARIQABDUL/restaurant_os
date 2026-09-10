@@ -1,18 +1,24 @@
 const jwt = require('jsonwebtoken');
 const supabase = require('../config/supabase');
+const { readToken } = require('../services/session');
 
 /**
  * Verify JWT and attach user to request.
  */
 async function authenticate(req, res, next) {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = readToken(req);
+    if (!token) {
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // A socket ticket is deliberately short-lived and scoped to the handshake;
+    // it must never stand in for a session.
+    if (decoded.typ === 'socket') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
 
     // Fetch user from DB to ensure they still exist and role hasn't changed
     const { data: user, error } = await supabase
@@ -78,14 +84,17 @@ function superAdminOnly(req, res, next) {
  */
 async function optionalAuth(req, res, next) {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = readToken(req);
+    if (!token) {
       req.user = null;
       return next();
     }
 
-    const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.typ === 'socket') {
+      req.user = null;
+      return next();
+    }
 
     const { data: user } = await supabase
       .from('users')

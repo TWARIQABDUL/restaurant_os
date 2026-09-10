@@ -1,9 +1,18 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// Same-origin by default: '/backend' is proxied to the API — by the Vite dev
+// server locally, by a rewrite in vercel.json in production. That keeps the
+// session cookie first-party, so a plain SameSite=Lax cookie is sent on every
+// request and no CORS preflight is involved.
+//
+// The prefix is '/backend' rather than '/api' because this Vercel project
+// already serves its own functions under /api (sitemap, robots, seo).
+const API_URL = import.meta.env.VITE_API_URL || '/backend';
 
 const api = axios.create({
   baseURL: API_URL,
+  // Send the httpOnly session cookie.
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -45,11 +54,14 @@ function resolveTenantSlug() {
   return ownStoreSlug() || localStorage.getItem('tenantSlug') || 'demo';
 }
 
-// Attach JWT token to every request
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // The session normally travels as an httpOnly cookie, which script can't
+  // read — that's the point. This only covers users who were signed in before
+  // the cookie migration and still hold a localStorage token; it keeps them
+  // logged in until it expires. Remove once those have aged out.
+  const legacyToken = localStorage.getItem('token');
+  if (legacyToken) {
+    config.headers.Authorization = `Bearer ${legacyToken}`;
   }
 
   config.headers['X-Tenant-Slug'] = resolveTenantSlug();

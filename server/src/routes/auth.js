@@ -1,9 +1,9 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const supabase = require('../config/supabase');
 const { authenticate, authorize } = require('../middleware/auth');
+const { issueSession, clearSession, issueSocketTicket } = require('../services/session');
 
 const router = express.Router();
 
@@ -68,11 +68,9 @@ router.post(
           .is('customer_id', null);
       }
 
-      const token = jwt.sign(
-        { userId: user.id, tenantId, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
-      );
+      // Sets the httpOnly session cookie. The token is still returned in the
+      // body for pre-migration clients; new clients ignore it.
+      const token = issueSession(res, { ...user, tenant_id: tenantId });
 
       res.status(201).json({ user, token });
     } catch (err) {
@@ -149,12 +147,8 @@ router.post(
         return res.status(500).json({ error: 'Tenant created, but admin creation failed' });
       }
 
-      // 4. Generate Auth Token
-      const token = jwt.sign(
-        { userId: user.id, tenantId: tenant.id, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
-      );
+      // 4. Generate Auth Token (httpOnly cookie + body for pre-migration clients)
+      const token = issueSession(res, { ...user, tenant_id: tenant.id });
 
       res.status(201).json({ tenant, user, token });
     } catch (err) {
@@ -206,11 +200,7 @@ router.post(
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
-      const token = jwt.sign(
-        { userId: user.id, tenantId: user.tenant_id, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
-      );
+      const token = issueSession(res, user);
 
       const { password_hash, ...userWithoutPassword } = user;
       res.json({ user: userWithoutPassword, token });
@@ -224,6 +214,25 @@ router.post(
 // GET /api/auth/me — Current user profile
 router.get('/me', authenticate, async (req, res) => {
   res.json({ user: req.user });
+});
+
+// POST /api/auth/logout — Clear the session cookie.
+// Not authenticated on purpose: an expired or already-invalid session should
+// still be able to clean itself up rather than getting a 401.
+router.post('/logout', (req, res) => {
+  clearSession(res);
+  res.json({ ok: true });
+});
+
+// GET /api/auth/socket-ticket — Short-lived credential for the Socket.io handshake.
+//
+// Socket.io connects directly to this host rather than through the client's
+// same-origin rewrite (Render's static rewrites don't carry WebSockets), so the
+// session cookie isn't sent with it. The browser can't read the httpOnly cookie
+// to pass the token itself, so it asks for a ticket instead — 60s, single
+// purpose, useless as a session.
+router.get('/socket-ticket', authenticate, (req, res) => {
+  res.json({ ticket: issueSocketTicket(req.user) });
 });
 
 // GET /api/auth/staff — Admin list staff members
