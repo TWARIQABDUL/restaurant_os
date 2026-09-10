@@ -91,5 +91,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-GRANT EXECUTE ON FUNCTION reserve_stock(UUID, TEXT, JSONB) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION release_stock(UUID, TEXT, JSONB) TO anon, authenticated, service_role;
+-- service_role only — see the note in inventory.sql.
+GRANT EXECUTE ON FUNCTION reserve_stock(UUID, TEXT, JSONB) TO service_role;
+GRANT EXECUTE ON FUNCTION release_stock(UUID, TEXT, JSONB) TO service_role;
+REVOKE ALL ON FUNCTION reserve_stock(UUID, TEXT, JSONB) FROM anon, authenticated;
+REVOKE ALL ON FUNCTION release_stock(UUID, TEXT, JSONB) FROM anon, authenticated;

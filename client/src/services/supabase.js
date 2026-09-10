@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import api from './api';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -7,33 +8,41 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in client environment variables');
 }
 
+// This client is used for exactly one thing: PUTting a file to a signed upload
+// URL the API issued (see uploadImage). It has no read or write rights of its
+// own — anon holds no privileges on the database, and none on storage beyond
+// public read.
+
 export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder');
 
 /**
- * Uploads an image to the Supabase Storage bucket and returns the public URL.
- * @param {File} file - The file object from an input field
- * @param {string} bucketName - The name of the storage bucket
- * @param {string} folderPath - The folder to place the file into
- * @returns {Promise<string>} The public URL of the uploaded image
+ * Upload an image and return its public URL.
+ *
+ * The browser no longer writes to storage with the anon key — that key is
+ * public (it ships in this bundle), so anon-writable storage meant anyone could
+ * overwrite or delete every image in the bucket. Instead the API checks we are
+ * an admin/manager, picks the destination path, and hands back a signed
+ * single-use upload URL that we then PUT the file to.
+ *
+ * @param {File} file - the file from an <input type="file">
+ * @param {string} folder - 'menu-items' | 'favicons' | 'logos'
+ * @returns {Promise<string|null>} public URL of the uploaded image
  */
-export async function uploadImage(file, bucketName = 'blog-images', folderPath = 'menu-items') {
+export async function uploadImage(file, folder = 'menu-items') {
   if (!file) return null;
 
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-  const filePath = `${folderPath}/${fileName}`;
+  const { data: slot } = await api.post('/uploads/image-url', {
+    content_type: file.type,
+    folder,
+  });
 
   const { error } = await supabase.storage
-    .from(bucketName)
-    .upload(filePath, file);
+    .from(slot.bucket)
+    .uploadToSignedUrl(slot.path, slot.token, file, {
+      contentType: file.type,
+    });
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 
-  const { data } = supabase.storage
-    .from(bucketName)
-    .getPublicUrl(filePath);
-
-  return data.publicUrl;
+  return slot.public_url;
 }

@@ -3,12 +3,23 @@ const { body, validationResult } = require('express-validator');
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
+const { orderLimiter, trackingLimiter } = require('../middleware/rateLimit');
 
 const {
   reserveStock, releaseStock, linesForOrder, addonLinesForOrder, InsufficientStockError,
 } = require('../services/stock');
 
 const router = express.Router();
+
+// Ceilings on an unauthenticated request. Generous for a real basket, small
+// enough that the per-line DB work below can't be used as an amplifier.
+const MAX_ITEMS_PER_ORDER = 50;
+const MAX_QUANTITY_PER_LINE = 999;
+const MAX_ADDONS_PER_ITEM = 20;
+
+// Free-text a guest supplies. Long enough for a real address, capped so the
+// fields can't be used to bloat rows or downstream emails.
+const GUEST_TEXT_MAX = 500;
 
 /** Generate a unique tracking code like ORD-A1B2C3 */
 function generateTrackingCode() {
@@ -23,18 +34,30 @@ function generateTrackingCode() {
 // POST /api/orders — Place new order (public: customer or guest)
 router.post(
   '/',
+  orderLimiter,
   optionalAuth,
   [
-    body('items').isArray({ min: 1 }).withMessage('At least one item is required'),
-    body('items.*.menu_item_id').notEmpty().withMessage('menu_item_id is required'),
-    body('items.*.quantity').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+    // Bounded on both ends. The handler below does a DB lookup per line, so an
+    // unbounded array is an unauthenticated way to make one request cost
+    // thousands of round-trips; an unbounded quantity overflows NUMERIC(12,2).
+    body('items').isArray({ min: 1, max: MAX_ITEMS_PER_ORDER })
+      .withMessage(`An order must have between 1 and ${MAX_ITEMS_PER_ORDER} items`),
+    body('items.*.menu_item_id').isUUID().withMessage('menu_item_id must be a valid id'),
+    body('items.*.quantity').isInt({ min: 1, max: MAX_QUANTITY_PER_LINE })
+      .withMessage(`Quantity must be between 1 and ${MAX_QUANTITY_PER_LINE}`),
+    body('items.*.add_ons').optional().isArray({ max: MAX_ADDONS_PER_ITEM })
+      .withMessage(`At most ${MAX_ADDONS_PER_ITEM} options per item`),
+    body('items.*.add_ons.*.add_on_id').optional().isUUID().withMessage('add_on_id must be a valid id'),
     body('payment_method').isIn(['cash_on_delivery', 'mobile_money', 'bank_transfer']).withMessage('Invalid payment method'),
-    body('payment_phone').optional().trim(),
-    body('delivery_notes').optional().trim(),
+    body('payment_phone').optional().trim().isLength({ max: 30 }),
+    body('delivery_notes').optional().trim().isLength({ max: GUEST_TEXT_MAX }),
     // Guest fields (required if not authenticated)
-    body('guest_name').if((value, { req }) => !req.user).notEmpty().withMessage('Name is required for guest orders'),
-    body('guest_phone').if((value, { req }) => !req.user).notEmpty().withMessage('Phone is required for guest orders'),
-    body('guest_address').if((value, { req }) => !req.user).notEmpty().withMessage('Address is required for guest orders'),
+    body('guest_name').if((value, { req }) => !req.user).trim().notEmpty().isLength({ max: 120 })
+      .withMessage('Name is required for guest orders'),
+    body('guest_phone').if((value, { req }) => !req.user).trim().notEmpty().isLength({ max: 30 })
+      .withMessage('Phone is required for guest orders'),
+    body('guest_address').if((value, { req }) => !req.user).trim().notEmpty().isLength({ max: GUEST_TEXT_MAX })
+      .withMessage('Address is required for guest orders'),
     body('guest_email').optional().isEmail().withMessage('Valid email required'),
   ],
   async (req, res) => {
@@ -47,18 +70,41 @@ router.post(
       const tenantId = req.tenant.id;
       const { items, payment_method, payment_phone, delivery_notes, guest_name, guest_phone, guest_address, guest_email } = req.body;
 
-      // Calculate total — fetch prices from DB to prevent client-side manipulation
+      // Calculate total — fetch prices from DB to prevent client-side manipulation.
+      //
+      // Both lookups are batched: this used to run one awaited query per line
+      // and per option, so a large basket meant a long serial chain of DB
+      // round-trips held open by a single unauthenticated request.
+      const menuItemIds = [...new Set(items.map((i) => i.menu_item_id))];
+      const addOnIds = [...new Set(
+        items.flatMap((i) => (Array.isArray(i.add_ons) ? i.add_ons.map((a) => a.add_on_id) : []))
+      )].filter(Boolean);
+
+      const { data: menuRows } = await supabase
+        .from('menu_items')
+        .select('id, price, name')
+        .eq('tenant_id', tenantId)
+        .eq('available', true)
+        .in('id', menuItemIds);
+
+      const menuById = new Map((menuRows || []).map((m) => [m.id, m]));
+
+      let addOnById = new Map();
+      if (addOnIds.length > 0) {
+        const { data: addOnRows } = await supabase
+          .from('add_ons')
+          .select('id, price, name, single_choice')
+          .eq('tenant_id', tenantId)
+          .eq('available', true)
+          .in('id', addOnIds);
+        addOnById = new Map((addOnRows || []).map((a) => [a.id, a]));
+      }
+
       let totalAmount = 0;
       const orderItems = [];
 
       for (const item of items) {
-        const { data: menuItem } = await supabase
-          .from('menu_items')
-          .select('id, price, name')
-          .eq('id', item.menu_item_id)
-          .eq('tenant_id', tenantId)
-          .eq('available', true)
-          .single();
+        const menuItem = menuById.get(item.menu_item_id);
 
         if (!menuItem) {
           return res.status(400).json({ error: `Menu item ${item.menu_item_id} not found or unavailable` });
@@ -70,13 +116,7 @@ router.post(
         const itemAddOns = [];
         if (item.add_ons && Array.isArray(item.add_ons)) {
           for (const addOn of item.add_ons) {
-            const { data: addOnData } = await supabase
-              .from('add_ons')
-              .select('id, price, name, single_choice')
-              .eq('id', addOn.add_on_id)
-              .eq('tenant_id', tenantId)
-              .eq('available', true)
-              .single();
+            const addOnData = addOnById.get(addOn.add_on_id);
 
             if (!addOnData) {
               return res.status(400).json({ error: `Add-on ${addOn.add_on_id} not found or unavailable` });
@@ -84,7 +124,9 @@ router.post(
 
             // A single-choice option (a size) applies once per unit, so it
             // scales with the line quantity: 3 shirts in M = 3 mediums.
-            const addOnQty = addOnData.single_choice ? item.quantity : (addOn.quantity || 1);
+            const addOnQty = addOnData.single_choice
+              ? item.quantity
+              : Math.min(Math.max(parseInt(addOn.quantity, 10) || 1, 1), MAX_QUANTITY_PER_LINE);
             itemTotal += addOnData.price * addOnQty;
 
             itemAddOns.push({
@@ -214,11 +256,8 @@ router.post(
             // throws), so this is safe to leave unawaited. The client
             // polls GET /orders/track/:code (by tracking_code) to see the
             // result land, so we don't need to hand back a reference id here.
-            console.log(`[DEBUG] orders.js: Calling initiateOrderPayment in background for order ${order.id}...`);
-            walletService.initiateOrderPayment({ ...order, guest_phone: payerPhone }).then(res => {
-              console.log(`[DEBUG] orders.js: MoMo initiation for order ${order.id} resolved:`, res);
-            }).catch(err => {
-              console.error(`[DEBUG] orders.js: MoMo initiation for order ${order.id} failed:`, err);
+            walletService.initiateOrderPayment({ ...order, guest_phone: payerPhone }).catch(err => {
+              console.error(`MoMo initiation failed for order ${order.id}:`, err.message);
             });
           }
         } catch (err) {
@@ -286,7 +325,8 @@ router.get('/me', authenticate, async (req, res) => {
       `)
       .eq('customer_id', req.user.id)
       .eq('tenant_id', req.tenant.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200));
 
     if (error) {
       console.error('My orders error:', error);
@@ -300,7 +340,7 @@ router.get('/me', authenticate, async (req, res) => {
 });
 
 // GET /api/orders/track/:code — Track order by code (public but secured)
-router.get('/track/:code', optionalAuth, async (req, res) => {
+router.get('/track/:code', trackingLimiter, optionalAuth, async (req, res) => {
   try {
     const { code } = req.params;
     const { phone } = req.query;
@@ -327,26 +367,39 @@ router.get('/track/:code', optionalAuth, async (req, res) => {
       .single();
 
     if (error || !order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({
+        error: 'No order matches those details. Check the tracking code, and the phone number used to place the order.',
+      });
     }
 
-    // Security Verification
+    // Security Verification.
+    //
+    // Every failure below answers with the SAME 404 as an unknown code. The
+    // previous 401/403/404 split told an unauthenticated scanner which tracking
+    // codes were real — and, for guest orders, that the only remaining secret
+    // was a phone number. The client can still tell the customer what to do,
+    // because the hint fields say what a valid caller would need to supply;
+    // they just no longer confirm that this particular code exists.
     const isStaff = req.user && ['admin', 'manager', 'kitchen', 'delivery'].includes(req.user.role);
-    
+
+    const notFound = (hint) => res.status(404).json({
+      error: 'No order matches those details. Check the tracking code, and the phone number used to place the order.',
+      ...hint,
+    });
+
     if (!isStaff) {
       if (order.customer_id) {
         if (!req.user || req.user.id !== order.customer_id) {
-          return res.status(401).json({ 
-            error: 'This order belongs to a registered account. Please log in to track it.',
-            requireLogin: true 
-          });
+          return notFound({ requireLogin: true });
         }
       } else {
-        if (!phone || phone !== order.guest_phone) {
-          return res.status(403).json({ 
-            error: 'Please provide the correct phone number used for this guest order.',
-            requirePhone: true 
-          });
+        // Constant-time compare so response timing doesn't narrow the number
+        // down digit by digit.
+        const given = Buffer.from(String(phone || ''));
+        const actual = Buffer.from(String(order.guest_phone || ''));
+        const matches = given.length === actual.length && crypto.timingSafeEqual(given, actual);
+        if (!matches) {
+          return notFound({ requirePhone: true });
         }
       }
     }
@@ -367,6 +420,12 @@ router.get(
       const tenantId = req.tenant.id;
       const { status, payment_status, from, to } = req.query;
 
+      // Paged. This used to return every order for the tenant with all items,
+      // options, customer and driver joined — fine at launch, an outage at a
+      // few thousand orders.
+      const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+      const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
       let query = supabase
         .from('orders')
         .select(`
@@ -381,23 +440,27 @@ router.get(
               add_on:add_ons ( id, name )
             )
           )
-        `)
+        `, { count: 'exact' })
         .eq('tenant_id', tenantId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       if (status) query = query.eq('status', status);
       if (payment_status) query = query.eq('payment_status', payment_status);
       if (from) query = query.gte('created_at', from);
       if (to) query = query.lte('created_at', to);
 
-      const { data: orders, error } = await query;
+      const { data: orders, error, count } = await query;
 
       if (error) {
         console.error('Orders fetch error:', error);
         return res.status(500).json({ error: 'Failed to fetch orders' });
       }
 
-      res.json({ orders: orders || [] });
+      res.json({
+        orders: orders || [],
+        pagination: { limit, offset, total: count ?? null },
+      });
     } catch (err) {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -668,13 +731,28 @@ router.patch(
         updatePayload.delivery_type = 'internal';
         driverDetails = { id: driver.id, name: driver.name, phone: driver.phone, plateNumber: driver.plate_number };
       } else {
-        if (!external_rider_info) {
+        if (!external_rider_info || typeof external_rider_info !== 'object') {
           return res.status(400).json({ error: 'External rider info is required' });
         }
+
+        // Whitelisted and length-capped rather than stored as given: this object
+        // is echoed back on the public tracking endpoint, so it should never
+        // carry arbitrary caller-supplied keys.
+        const text = (value, max) => String(value ?? '').trim().slice(0, max);
+        const rider = {
+          name: text(external_rider_info.name, 120),
+          phone: text(external_rider_info.phone, 30),
+          plateNumber: text(external_rider_info.plateNumber, 20),
+        };
+
+        if (!rider.name || !rider.phone) {
+          return res.status(400).json({ error: 'External rider needs at least a name and a phone number' });
+        }
+
         updatePayload.delivery_person_id = null;
         updatePayload.delivery_type = 'external';
-        updatePayload.external_rider_info = external_rider_info;
-        driverDetails = { name: external_rider_info.name, phone: external_rider_info.phone, plateNumber: external_rider_info.plateNumber || 'N/A' };
+        updatePayload.external_rider_info = rider;
+        driverDetails = { name: rider.name, phone: rider.phone, plateNumber: rider.plateNumber || 'N/A' };
       }
 
       const { data: order, error } = await supabase

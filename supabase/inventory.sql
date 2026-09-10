@@ -116,5 +116,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-GRANT EXECUTE ON FUNCTION reserve_stock(UUID, JSONB) TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION release_stock(UUID, JSONB) TO anon, authenticated, service_role;
+-- service_role only. These were granted to anon/authenticated too, which
+-- fights lockdown-anon.sql: whichever ran last won, and release_stock in
+-- anon's hands lets anyone inflate any store's inventory. Only the backend
+-- calls these, and the backend is service_role.
+GRANT EXECUTE ON FUNCTION reserve_stock(UUID, JSONB) TO service_role;
+GRANT EXECUTE ON FUNCTION release_stock(UUID, JSONB) TO service_role;
+REVOKE ALL ON FUNCTION reserve_stock(UUID, JSONB) FROM anon, authenticated;
+REVOKE ALL ON FUNCTION release_stock(UUID, JSONB) FROM anon, authenticated;

@@ -184,10 +184,15 @@ DROP POLICY IF EXISTS "Allow Uploads" ON storage.objects;
 DROP POLICY IF EXISTS "Allow Updates" ON storage.objects;
 DROP POLICY IF EXISTS "Allow Deletes" ON storage.objects;
 
+-- Read is public: the bucket backs <img> tags on every storefront.
 CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING ( bucket_id = 'blog-images' );
-CREATE POLICY "Allow Uploads" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'blog-images' );
-CREATE POLICY "Allow Updates" ON storage.objects FOR UPDATE USING ( bucket_id = 'blog-images' );
-CREATE POLICY "Allow Deletes" ON storage.objects FOR DELETE USING ( bucket_id = 'blog-images' );
+
+-- There are deliberately NO write policies here. A policy with only a
+-- bucket_id check grants to `public`, which includes `anon` — and the anon key
+-- ships in the client bundle, so that would let any visitor overwrite or delete
+-- every image in the bucket. Uploads go through the API instead, which checks
+-- the caller is an admin/manager and hands back a signed, single-use upload URL
+-- (server/src/routes/uploads.js). See supabase/lockdown-storage.sql.
 
 -- ============================================
 -- REVIEWS

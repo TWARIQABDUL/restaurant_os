@@ -29,8 +29,12 @@ router.get('/', async (req, res) => {
     }
 
     if (search) {
-      query = query.ilike('name', `%${search}%`);
+      // Cap the pattern: a leading-wildcard ILIKE can't use an index, so an
+      // unbounded one is a cheap way to make the database work hard.
+      query = query.ilike('name', `%${String(search).slice(0, 100)}%`);
     }
+
+    query = query.limit(Math.min(Math.max(parseInt(req.query.limit, 10) || 200, 1), 500));
 
     const { data: items, error } = await query;
 
@@ -284,7 +288,15 @@ router.put(
       for (const field of allowedFields) {
         if (req.body[field] === undefined) continue;
         if (field === 'price') {
-          updates[field] = parseFloat(req.body[field]);
+          // POST validates this with isFloat({ min: 0 }); this route had no
+          // validator chain at all, so a negative price got straight through —
+          // and order totals are computed from the stored price, so a negative
+          // line subtracts from the basket.
+          const price = parseFloat(req.body[field]);
+          if (!Number.isFinite(price) || price < 0) {
+            return res.status(400).json({ error: 'Price must be a positive number' });
+          }
+          updates[field] = price;
         } else if (field === 'stock_quantity' || field === 'low_stock_threshold') {
           updates[field] = Math.max(0, parseInt(req.body[field], 10) || 0);
         } else if (field === 'sku') {

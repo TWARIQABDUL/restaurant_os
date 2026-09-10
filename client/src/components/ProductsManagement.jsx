@@ -96,7 +96,7 @@ export default function ProductsManagement() {
     try {
       let finalImageUrl = draft.image_url;
       if (imageFile) {
-        finalImageUrl = await uploadImage(imageFile, 'blog-images');
+        finalImageUrl = await uploadImage(imageFile);
       }
       const cleanVariants = (draft.variants || [])
         .filter((v) => v.name.trim())

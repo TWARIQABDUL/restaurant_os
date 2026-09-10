@@ -22,10 +22,9 @@ async function recordMomoTransaction({ referenceId, type, purpose, tenantId, ord
     .single();
 
   if (error) {
-    console.error(`[DEBUG] Failed to record momo_transaction:`, error.message);
+    console.error('Failed to record momo_transaction:', error.message);
     throw new Error(`Failed to record momo_transaction: ${error.message}`);
   }
-  console.log(`[DEBUG] Recorded MoMo transaction ${data.id} for order ${orderId} (Ref: ${referenceId})`);
   return data;
 }
 
@@ -61,9 +60,7 @@ async function handleCollectionResult(txn, result) {
       p_order_id: txn.order_id,
       p_amount: txn.amount,
     });
-    console.log(`[DEBUG] Order ${txn.order_id} marked as PAID and wallet credited`);
   } else if (result.status === 'FAILED') {
-    console.log(`[DEBUG] handleCollectionResult: FAILED for order ${txn.order_id}`, result);
     await updateMomoTransactionResult(txn.id, {
       status: 'failed',
       momoStatusRaw: result.status,
@@ -122,8 +119,6 @@ async function initiateOrderPayment(order) {
     amount: order.total_amount,
   });
 
-  console.log(`[DEBUG] initiateOrderPayment: Attempting requestToPay for order ${order.id} with phone ${phone} and amount ${order.total_amount}`);
-
   try {
     await momoClient.requestToPay({
       amount: order.total_amount,
@@ -133,17 +128,13 @@ async function initiateOrderPayment(order) {
       payeeNote: `Payment for order ${order.tracking_code}`,
       callbackUrl: momoConfig.callbackUrlBase ? `${momoConfig.callbackUrlBase}/api/momo/callback/collection/${referenceId}` : undefined,
     });
-    console.log(`[DEBUG] initiateOrderPayment: requestToPay accepted by MTN for order ${order.id}`);
   } catch (err) {
-    console.error(`[DEBUG] initiateOrderPayment: requestToPay threw error:`, err.message);
+    console.error(`MoMo requestToPay failed for order ${order.id}:`, err.message);
     await updateMomoTransactionResult(txn.id, { status: 'failed', failureReason: err.message });
     return { status: 'FAILED', reason: err.message, momoTransactionId: txn.id };
   }
 
-  console.log(`[DEBUG] initiateOrderPayment: Polling for result...`);
   const result = await momoClient.pollUntilResolved(() => momoClient.getRequestToPayStatus(referenceId));
-  console.log(`[DEBUG] initiateOrderPayment: Polling finished with status: ${result.status}`);
-  
   await handleCollectionResult(txn, result);
   return { status: result.status, momoTransactionId: txn.id, referenceId };
 }
@@ -348,6 +339,25 @@ async function processRefundDisbursement({ refundRequestId, tenantId, orderId, p
 
 /** Approve a pending refund request: deduct the tenant wallet (atomic), then pay the customer. */
 async function approveRefund({ refundRequestId, reviewerUserId }) {
+  // The RPC is the gate, not this function. It claims the request with
+  // UPDATE ... WHERE status = 'pending' as its first statement, so two
+  // concurrent approvals cannot both deduct the wallet — the loser raises
+  // 'already been reviewed'. Checking the status here first would just be a
+  // read in a different transaction from the write, which is exactly the race
+  // this replaced.
+  const { data: amount, error: deductErr } = await supabase.rpc('approve_refund_deduct_wallet', {
+    p_refund_request_id: refundRequestId,
+  });
+  if (deductErr) throw new Error(deductErr.message);
+
+  // Reviewer attribution only — the status was already set by the RPC.
+  await supabase
+    .from('refund_requests')
+    .update({ reviewed_by: reviewerUserId, reviewed_at: new Date().toISOString() })
+    .eq('id', refundRequestId);
+
+  // Read the order back only now that the deduction has committed, so we are
+  // reading state we know we own.
   const { data: refundRequest, error: fetchErr } = await supabase
     .from('refund_requests')
     .select('*, order:orders(id, tenant_id, guest_phone, customer_id, total_amount)')
@@ -355,18 +365,6 @@ async function approveRefund({ refundRequestId, reviewerUserId }) {
     .single();
 
   if (fetchErr || !refundRequest) throw new Error('Refund request not found');
-  if (refundRequest.status !== 'pending') throw new Error(`Refund request is already ${refundRequest.status}`);
-
-  // Atomic, raises on insufficient tenant balance (e.g. already withdrawn).
-  const { data: amount, error: deductErr } = await supabase.rpc('approve_refund_deduct_wallet', {
-    p_refund_request_id: refundRequestId,
-  });
-  if (deductErr) throw new Error(deductErr.message);
-
-  await supabase
-    .from('refund_requests')
-    .update({ status: 'approved', reviewed_by: reviewerUserId, reviewed_at: new Date().toISOString() })
-    .eq('id', refundRequestId);
 
   let phone = refundRequest.order.guest_phone;
   if (!phone && refundRequest.order.customer_id) {

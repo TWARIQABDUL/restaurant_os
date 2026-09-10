@@ -5,6 +5,45 @@ const { authenticate, authorize, superAdminOnly } = require('../middleware/auth'
 
 const router = express.Router();
 
+// ── Validation for tenant-authored presentation fields ─────────────────────
+// These end up interpolated into HTML we serve (client/api/seo.js) and into CSS
+// custom properties (TenantThemeInjector). The renderer escapes them, but a
+// value that cannot be malformed in the first place is one fewer thing
+// depending on that escaping staying correct.
+
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const TWITTER_HANDLE = /^@?[A-Za-z0-9_]{1,15}$/;
+const OG_LOCALE = /^[a-z]{2}(?:_[A-Z]{2})?$/;
+
+const TEXT_LIMITS = {
+  seoTitle: 70,
+  seoDescription: 200,
+  seoKeywords: 250,
+  author: 100,
+};
+
+/** An https URL, or null. Rules out javascript:/data: before they are stored. */
+function cleanUrl(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:') return undefined; // signals "invalid"
+    return url.href;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Trimmed, length-capped plain text with control characters removed. */
+function cleanText(value, max) {
+  return String(value ?? '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001F\u007F]/g, '')
+    .trim()
+    .slice(0, max);
+}
+
 // POST /api/tenants — Create tenant (Super Admin)
 router.post(
   '/',
@@ -271,11 +310,15 @@ router.patch('/:id/toggle', authenticate, superAdminOnly, async (req, res) => {
 // GET /api/tenants/public — List all active tenants (for sitemap)
 router.get('/public', async (req, res) => {
   try {
+    // Slug and name only: this feeds the public sitemap. created_at was also
+    // being returned, which published the full customer list *and* the signup
+    // timeline to anyone who curled it.
     const { data: tenants, error } = await supabase
       .from('tenants')
-      .select('slug, name, created_at')
+      .select('slug, name')
       .eq('active', true)
-      .order('name', { ascending: true });
+      .order('name', { ascending: true })
+      .limit(5000);
 
     if (error) throw error;
 
@@ -344,6 +387,35 @@ router.patch('/me/seo-settings', authenticate, authorize('admin'), async (req, r
       faviconUrl, themeColor, twitterHandle, ogLocale, author 
     } = req.body;
 
+    const clean = {};
+
+    for (const [field, value] of Object.entries({ seoTitle, seoDescription, seoKeywords, author })) {
+      if (value !== undefined) clean[field] = cleanText(value, TEXT_LIMITS[field]);
+    }
+
+    if (faviconUrl !== undefined) {
+      const url = cleanUrl(faviconUrl);
+      if (url === undefined) {
+        return res.status(400).json({ error: 'faviconUrl must be an https URL' });
+      }
+      clean.faviconUrl = url;
+    }
+
+    if (themeColor !== undefined && !HEX_COLOR.test(String(themeColor))) {
+      return res.status(400).json({ error: 'themeColor must be a hex colour like #DC2626' });
+    }
+    if (themeColor !== undefined) clean.themeColor = String(themeColor);
+
+    if (twitterHandle !== undefined && twitterHandle !== '' && !TWITTER_HANDLE.test(String(twitterHandle))) {
+      return res.status(400).json({ error: 'twitterHandle must be a Twitter/X handle, e.g. @yourshop' });
+    }
+    if (twitterHandle !== undefined) clean.twitterHandle = String(twitterHandle);
+
+    if (ogLocale !== undefined && !OG_LOCALE.test(String(ogLocale))) {
+      return res.status(400).json({ error: 'ogLocale must look like "en" or "en_US"' });
+    }
+    if (ogLocale !== undefined) clean.ogLocale = String(ogLocale);
+
     const { data: current, error: fetchErr } = await supabase
       .from('tenants')
       .select('settings')
@@ -358,14 +430,7 @@ router.patch('/me/seo-settings', authenticate, authorize('admin'), async (req, r
       ...current.settings,
       seo: {
         ...(current.settings?.seo || {}),
-        ...(seoTitle !== undefined ? { seoTitle } : {}),
-        ...(seoDescription !== undefined ? { seoDescription } : {}),
-        ...(seoKeywords !== undefined ? { seoKeywords } : {}),
-        ...(faviconUrl !== undefined ? { faviconUrl } : {}),
-        ...(themeColor !== undefined ? { themeColor } : {}),
-        ...(twitterHandle !== undefined ? { twitterHandle } : {}),
-        ...(ogLocale !== undefined ? { ogLocale } : {}),
-        ...(author !== undefined ? { author } : {}),
+        ...clean,
       },
     };
 
@@ -410,7 +475,19 @@ router.get('/me/theme', authenticate, authorize('admin', 'manager'), async (req,
 // PATCH /api/tenants/me/theme — update current theme settings
 router.patch('/me/theme', authenticate, authorize('admin', 'manager'), async (req, res) => {
   try {
-    const { primaryColor, accentColor, secondaryColor, backgroundColor, textColor } = req.body;
+    // Theme values are written into CSS custom properties on the client, so
+    // restrict them to hex — that keeps url(), var() and stray punctuation out
+    // of the stylesheet rather than relying on the browser to reject them.
+    const theme = {};
+    for (const key of ['primaryColor', 'accentColor', 'secondaryColor', 'backgroundColor', 'textColor']) {
+      const value = req.body[key];
+      if (value === undefined) continue;
+      if (value === null || value === '') { theme[key] = null; continue; }
+      if (!HEX_COLOR.test(String(value))) {
+        return res.status(400).json({ error: `${key} must be a hex colour like #DC2626` });
+      }
+      theme[key] = String(value);
+    }
 
     const { data: current, error: fetchErr } = await supabase
       .from('tenants')
@@ -426,11 +503,7 @@ router.patch('/me/theme', authenticate, authorize('admin', 'manager'), async (re
       ...current.settings,
       theme: {
         ...(current.settings?.theme || {}),
-        ...(primaryColor !== undefined ? { primaryColor } : {}),
-        ...(accentColor !== undefined ? { accentColor } : {}),
-        ...(secondaryColor !== undefined ? { secondaryColor } : {}),
-        ...(backgroundColor !== undefined ? { backgroundColor } : {}),
-        ...(textColor !== undefined ? { textColor } : {}),
+        ...theme,
       },
     };
 

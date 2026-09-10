@@ -1,15 +1,33 @@
+const crypto = require('crypto');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
 const supabase = require('../config/supabase');
 const { authenticate, authorize } = require('../middleware/auth');
 const { issueSession, clearSession, issueSocketTicket } = require('../services/session');
+const { authLimiter, signupLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
+
+// A real bcrypt hash of a value nobody can supply. Compared against when the
+// email doesn't exist, so a miss costs the same work as a wrong password —
+// otherwise the response time alone tells an attacker which emails are real.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 12);
+
+// Slugs that must not become storefronts: they collide with the client's own
+// routes (see GLOBAL_ROUTES in client/src/services/api.js), with the Vercel
+// rewrites, or would let someone impersonate the platform itself.
+const RESERVED_SLUGS = new Set([
+  'admin', 'manager', 'delivery', 'super-admin', 'login', 'register', 'logout',
+  'api', 'backend', 'www', 'app', 'static', 'assets', 'public', 'track',
+  'checkout', 'cart', 'account', 'settings', 'support', 'help', 'billing',
+  'sitemap', 'robots', 'favicon', 'restaurant-os', 'security', 'status',
+]);
 
 // POST /api/auth/register — Customer self-registration
 router.post(
   '/register',
+  authLimiter,
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('email').isEmail().withMessage('Valid email is required'),
@@ -83,6 +101,7 @@ router.post(
 // POST /api/auth/register-tenant — Public self-serve onboarding or Super Admin provisioning
 router.post(
   '/register-tenant',
+  signupLimiter,
   [
     body('restaurantName').trim().notEmpty().withMessage('Restaurant name is required'),
     body('slug').trim().notEmpty().withMessage('Slug is required')
@@ -99,6 +118,10 @@ router.post(
       }
 
       const { restaurantName, slug, adminName, adminEmail, adminPassword } = req.body;
+
+      if (RESERVED_SLUGS.has(slug)) {
+        return res.status(409).json({ error: 'That URL handle is reserved. Please choose another.' });
+      }
 
       // 1. Check if slug already exists
       const { data: existingTenant } = await supabase
@@ -161,6 +184,7 @@ router.post(
 // POST /api/auth/login
 router.post(
   '/login',
+  authLimiter,
   [
     body('email').isEmail().withMessage('Valid email is required'),
     body('password').notEmpty().withMessage('Password is required'),
@@ -175,26 +199,50 @@ router.post(
       const { email, password } = req.body;
       const tenantId = req.tenant.id;
 
-      const { data: users, error } = await supabase
+      // Scoped to the store this login was made against. Without the tenant
+      // filter this fetched every account on the platform sharing the address
+      // and bcrypt-compared against each in turn — which turned any storefront
+      // into a credential-testing oracle for every other store, and made one
+      // login attempt cost N hashes. UNIQUE(email, tenant_id) makes this at
+      // most one row.
+      const SELECT = `
+        id, name, email, password_hash, role, phone, plate_number, tenant_id,
+        tenants ( slug )
+      `;
+
+      const { data: scopedUser, error } = await supabase
         .from('users')
-        .select(`
-          id, name, email, password_hash, role, phone, plate_number, tenant_id,
-          tenants ( slug )
-        `)
-        .eq('email', email);
+        .select(SELECT)
+        .eq('email', email)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
 
-      if (error || !users || users.length === 0) {
-        return res.status(401).json({ error: 'Invalid email or password' });
+      let candidate = error ? null : scopedUser;
+
+      // super_admin is the one role that legitimately signs in from anywhere:
+      // it acts across tenants, and the dashboard it lands on has no slug in
+      // the URL, so the store this request resolved to is arbitrary. Restricted
+      // to that single role, so it cannot be used to probe ordinary accounts on
+      // other stores — which is what the unscoped query above used to allow.
+      if (!candidate) {
+        const { data: superAdmin } = await supabase
+          .from('users')
+          .select(SELECT)
+          .eq('email', email)
+          .eq('role', 'super_admin')
+          .maybeSingle();
+        candidate = superAdmin || null;
       }
 
-      let user = null;
-      for (const u of users) {
-        const validPassword = await bcrypt.compare(password, u.password_hash);
-        if (validPassword) {
-          user = u;
-          break;
-        }
-      }
+      // Compare against a dummy hash when there's no such user, so a miss costs
+      // the same time as a wrong password and the response can't be used to
+      // enumerate which addresses are registered.
+      const validPassword = await bcrypt.compare(
+        password,
+        candidate?.password_hash || DUMMY_PASSWORD_HASH
+      );
+
+      const user = candidate && validPassword ? candidate : null;
 
       if (!user) {
         return res.status(401).json({ error: 'Invalid email or password' });

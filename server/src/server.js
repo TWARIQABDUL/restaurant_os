@@ -1,5 +1,8 @@
 require('dotenv').config();
 
+// Before anything else: refuse to boot on a config that would fail silently.
+require('./config/env').assertEnv();
+
 const http = require('http');
 const { Server } = require('socket.io');
 const app = require('./app');

@@ -1,3 +1,58 @@
+// Everything below is interpolated into HTML that we serve from our own
+// domain, and every value in it is tenant-controlled — a tenant admin sets the
+// SEO fields, and tenant signup is self-serve. So none of it can be trusted as
+// markup.
+
+/** Text position: <title>, <h1>, <p>. */
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Attribute position: content="...", href="...".
+ *
+ * Same escaping — the quote is what matters here — but kept as its own function
+ * so the call site says which context it is in, and so tightening one context
+ * later doesn't silently change the other.
+ */
+const escapeAttr = escapeHtml;
+
+/**
+ * A URL safe to put in href/src. Anything that isn't plainly http(s) becomes
+ * empty rather than being rendered, which rules out javascript: and data:.
+ */
+function safeUrl(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+    return escapeAttr(url.href);
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * JSON-LD sits inside a <script> block, where the HTML parser looks for the
+ * literal string "</script" before the JS parser ever runs. JSON.stringify does
+ * not escape '/', so an unescaped tenant name containing </script> closes the
+ * block and everything after it becomes markup. Escaping '<' as \u003c is
+ * valid JSON, parses back to the same string, and cannot close the block.
+ */
+function safeJsonLd(value) {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
 export default async function handler(req, res) {
   // Extract slug from URL. The Vercel rewrite passes the original URL path
   const pathParts = req.url.split('?')[0].split('/').filter(Boolean);
@@ -13,7 +68,7 @@ export default async function handler(req, res) {
     // Determine backend URL from Vercel Environment Variables
     const apiUrl = process.env.VITE_API_URL || 'http://localhost:5000/api';
     
-    const fetchRes = await fetch(`${apiUrl}/tenants/public/${slug}`);
+    const fetchRes = await fetch(`${apiUrl}/tenants/public/${encodeURIComponent(slug)}`);
     
     if (!fetchRes.ok) {
       throw new Error('Tenant not found');
@@ -23,28 +78,39 @@ export default async function handler(req, res) {
     const tenant = data.tenant;
     const seo = tenant.seo || {};
 
-    const title = seo.seoTitle || tenant.name || 'Restaurant OS';
-    const description = seo.seoDescription || `Order online from ${tenant.name}`;
-    const keywords = seo.seoKeywords || '';
-    const faviconUrl = seo.faviconUrl || '';
-    const themeColor = seo.themeColor || '#ffffff';
-    const twitterHandle = seo.twitterHandle || '';
-    const ogLocale = seo.ogLocale || 'en_US';
-    const author = seo.author || '';
+    // Raw values, for the JSON-LD payload (escaped by safeJsonLd on the way out).
+    const rawTitle = seo.seoTitle || tenant.name || 'Restaurant OS';
+    const rawDescription = seo.seoDescription || `Order online from ${tenant.name}`;
+    const rawKeywords = seo.seoKeywords || '';
+    const rawAuthor = seo.author || '';
 
-    const imageUrl = tenant.logo_url || faviconUrl || '';
-    const currentUrl = `https://${req.headers.host || 'restaurant-os-liart-rho.vercel.app'}/${slug}`;
+    // Escaped values, for the HTML.
+    const title = escapeHtml(rawTitle);
+    const description = escapeHtml(rawDescription);
+    const keywords = escapeAttr(rawKeywords);
+    const faviconUrl = safeUrl(seo.faviconUrl);
+    const themeColor = escapeAttr(seo.themeColor || '#ffffff');
+    const twitterHandle = escapeAttr(seo.twitterHandle || '');
+    const ogLocale = escapeAttr(seo.ogLocale || 'en_US');
+    const author = escapeAttr(rawAuthor);
+
+    const imageUrl = safeUrl(tenant.logo_url) || faviconUrl || '';
+    // The host header is attacker-controllable on some proxies, so escape it
+    // rather than trusting it into an attribute.
+    const currentUrl = escapeAttr(
+      `https://${req.headers.host || 'restaurant-os-liart-rho.vercel.app'}/${encodeURIComponent(slug)}`
+    );
 
     // JSON-LD structured data for Google Rich Results
-    const jsonLd = JSON.stringify({
+    const jsonLd = safeJsonLd({
       "@context": "https://schema.org",
       "@type": "Restaurant",
       "name": tenant.name,
-      "description": description,
+      "description": rawDescription,
       "url": currentUrl,
       ...(imageUrl && { "image": imageUrl }),
-      ...(author && { "author": { "@type": "Organization", "name": author } }),
-      "servesCuisine": keywords || "Food",
+      ...(rawAuthor && { "author": { "@type": "Organization", "name": rawAuthor } }),
+      "servesCuisine": rawKeywords || "Food",
       "hasMenu": `${currentUrl}#menu`,
       "potentialAction": {
         "@type": "OrderAction",

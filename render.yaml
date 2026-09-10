@@ -39,16 +39,34 @@ services:
         sync: false
 
       # MoMo Variables
+      #
+      # These are per-environment, NOT constants — they were hardcoded to
+      # sandbox, which meant a production deploy would send real customers
+      # sandbox prompts, collect nothing, and still look like it worked (the
+      # sandbox answers SUCCESSFUL regardless). src/config/env.js now refuses
+      # to boot on NODE_ENV=production with a sandbox MoMo config.
+      #
+      # Live (Rwanda) values for reference:
+      #   MOMO_ENVIRONMENT        production
+      #   MOMO_BASE_URL           https://proxy.momoapi.mtn.com
+      #   MOMO_TARGET_ENVIRONMENT mtnrwanda
+      #   MOMO_CURRENCY           RWF
       - key: MOMO_ENVIRONMENT
-        value: sandbox
+        sync: false
       - key: MOMO_BASE_URL
-        value: https://sandbox.momodeveloper.mtn.com
+        sync: false
       - key: MOMO_TARGET_ENVIRONMENT
-        value: sandbox
+        sync: false
       - key: MOMO_CURRENCY
-        value: EUR
+        sync: false
       - key: MOMO_DEFAULT_COUNTRY_CODE
         value: 250
+      # Set to "true" ONLY for a staging/soak deployment that is meant to run
+      # against the MoMo sandbox. Leave unset for a real deployment — the boot
+      # check then refuses to start on a sandbox config, which is the whole
+      # point of it.
+      - key: MOMO_ALLOW_SANDBOX
+        sync: false
       - key: MOMO_COLLECTION_SUBSCRIPTION_KEY
         sync: false
       - key: MOMO_COLLECTION_API_USER

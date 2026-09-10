@@ -274,7 +274,7 @@ export default function AdminDashboard() {
     try {
       let finalFaviconUrl = seoSettings.faviconUrl;
       if (faviconFile) {
-        finalFaviconUrl = await uploadImage(faviconFile, 'blog-images', 'favicons');
+        finalFaviconUrl = await uploadImage(faviconFile, 'favicons');
       }
       await api.patch('/tenants/me/seo-settings', { ...seoSettings, faviconUrl: finalFaviconUrl });
       setFaviconFile(null);

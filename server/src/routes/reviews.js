@@ -19,8 +19,13 @@ router.get('/menu/:menuItemId', async (req, res) => {
         created_at,
         users ( name )
       `)
+      // Scoped to this store. Without the tenant filter, any storefront could
+      // read the reviews — and reviewer names — for any product id on the
+      // platform. The write path below already checks tenant ownership.
       .eq('menu_item_id', menuItemId)
-      .order('created_at', { ascending: false });
+      .eq('tenant_id', req.tenant.id)
+      .order('created_at', { ascending: false })
+      .limit(Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200));
 
     if (error) {
       console.error('Fetch reviews error:', error);

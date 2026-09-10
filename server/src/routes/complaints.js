@@ -344,15 +344,25 @@ router.patch(
       const { id } = req.params;
       const tenantId = req.tenant.id;
 
+      // Join through to the order so we can check who owns this complaint.
+      // Without it, any authenticated customer could iterate complaint ids and
+      // reopen other people's resolved disputes, wiping resolution_notes and
+      // resetting escalation — this route had authenticate() but no ownership
+      // check at all.
       const { data: complaint, error: fetchErr } = await supabase
         .from('complaints')
-        .select('*')
+        .select('*, order:orders!inner(id, customer_id)')
         .eq('id', id)
         .eq('tenant_id', tenantId)
         .single();
 
       if (fetchErr || !complaint) return res.status(404).json({ error: 'Complaint not found' });
-      
+
+      const isStaff = ['admin', 'manager'].includes(req.user.role);
+      if (!isStaff && complaint.order?.customer_id !== req.user.id) {
+        return res.status(404).json({ error: 'Complaint not found' });
+      }
+
       // Can't reopen if it was refunded
       if (complaint.refunded_amount > 0) {
         return res.status(400).json({ error: 'Cannot reopen a complaint that was resolved with a refund' });
@@ -367,6 +377,7 @@ router.patch(
           updated_at: new Date().toISOString()
         })
         .eq('id', id)
+        .eq('tenant_id', tenantId)
         .select()
         .single();
 
