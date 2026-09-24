@@ -194,6 +194,31 @@ the new database is greenfield, so nothing pre-exists. See §4.3.)
 and sorts by filename so `V###_` works. **No checksums**, so requirement 5 is lost. That is the
 whole trade.
 
+**Built at milestone 2**, in-house, all seven requirements plus `status`, `--dry-run`, `new` and an
+acceptance suite of 46 checks (`npm run db:test`). Four things the section did not anticipate:
+
+- **The ledger carries an eighth column, `transactional`**, because requirement 7 says a
+  non-transactional run must be *recorded* as one. The opt-out is `-- migrate:no-transaction` on its
+  own line in the file header.
+- **The runner creates `schema_migrations`, not `V000`** — nothing could record `V000` as applied
+  otherwise. It is excluded from the app role's privileges; the application has no business reading
+  it.
+- **Statements are split by a real scanner, not on `;`** — handling line and nested block comments,
+  `''` doubling, backslash escapes inside `E'…'` literals, quoted identifiers, and dollar-quoted
+  bodies — which every plpgsql function in §5 depends on. Splitting matters because a non-transactional migration must send its
+  statements one at a time: Postgres wraps a multi-statement simple query in an implicit
+  transaction, which is exactly what `CREATE INDEX CONCURRENTLY` cannot tolerate. It also buys an
+  error that names the file, the line and the statement number.
+- **`status` and `--dry-run` are strictly read-only** — they do not create the ledger on a database
+  they were only asked to inspect.
+
+Two guards worth naming: the runner **rejects `BEGIN`/`COMMIT` inside a migration** (it owns the
+transaction, and writes the ledger row inside it), and it **refuses a non-loopback target from an
+interactive terminal** without `--yes`, while a deploy — which has no TTY — is never asked.
+
+Checksums are sha256 over CRLF-normalised content, so a checkout with different line endings does
+not read as tampering, and what was hashed is what ran.
+
 ---
 
 ### 2.5 No browser storage as a source of truth
@@ -708,7 +733,7 @@ in 28–30, where it can be rehearsed.
 | # | Milestone | Done when |
 |---|---|---|
 | **1** ✅ | **Postgres container.** Done 2026-09-24. PG 17 pinned, `127.0.0.1:55432`, named volume, TCP healthcheck, bootstrap limited to roles + diagnostics (§4.4) | **Met.** `db:reset` rebuilt from nothing in 2m17s and `db:verify --expect-empty` passed: reachable from the host, both roles authenticating over TCP, version matching the pin, UTC, checksums on, app role unprivileged, zero tables |
-| **2** | **Migration runner + ledger.** The seven requirements of §2.4, `schema_migrations`, `V000_init` | The runner rejects a duplicate version, an out-of-order version, and an edited checksum — each demonstrated. `V000` applies once and is recorded |
+| **2** ✅ | **Migration runner + ledger.** Done 2026-09-24. `db/scripts/migrate.ts` (TypeScript, run directly by Node — no build step), `schema_migrations`, `V000_init`, and `db:test` | **Met.** `npm run db:test` — **46 checks, all passing**, in a throwaway database: duplicate version, out-of-order version and edited checksum each rejected with the offending filenames, plus a missing file, an off-convention name, an empty file, self-managed transactions, `V2` applying before `V10`, rollback leaving nothing behind, the `no-transaction` opt-out, a dollar-quoted body surviving the splitter, and a blocked second run. `V000` applied once, recorded, and re-running is a no-op |
 | **3** | **TypeScript + ESM.** `tsconfig` strict for client, server and `packages/core`; `tsc --noEmit` in CI; server CommonJS → ESM | A deliberate type error fails CI. The server boots on ESM with every existing route still answering |
 | **4** | **Tailwind reset.** Delete the old `@theme`, the `@layer components` semantic classes and the `:root` bridge. New `@theme` with the fixed tokens. Runtime CSS-variable plumbing for the nine per-store tokens | One page renders in Bricolage/Figtree on `#F6F5F1` with no legacy CSS reachable. CI rejects `@apply` |
 

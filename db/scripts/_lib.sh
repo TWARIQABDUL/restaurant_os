@@ -71,3 +71,11 @@ psql_as() {
         psql -h 127.0.0.1 -U "$role" -d "$DB_NAME" -v ON_ERROR_STOP=1 "$@"
 }
 scalar_as() { local role="$1" password="$2" sql="$3"; psql_as "$role" "$password" -tAc "$sql"; }
+
+# Same, against an arbitrary database on the container — used by the test suite,
+# which works in a throwaway database rather than the development one.
+psql_db() {
+    local role="$1" password="$2" database="$3"; shift 3
+    compose exec -T -e "PGPASSWORD=${password}" "$SERVICE" \
+        psql -h 127.0.0.1 -U "$role" -d "$database" -v ON_ERROR_STOP=1 "$@"
+}

@@ -36,9 +36,12 @@ Run from the repository root.
 | `npm run db:reset` | **Destroy the volume** and rebuild from nothing. Asks for confirmation; `-- -y` skips it. |
 | `npm run db:psql` | Interactive `psql`, as the owner role, using the container's client. Nothing to install. |
 | `npm run db:logs` | Follow the log. Statements over 200 ms and every lock wait land here. |
+| `npm run db:migrate` | Apply every pending migration. `-- --dry-run` shows what would apply and touches nothing. |
+| `npm run db:migrate:status` | What is applied, what is pending, what has drifted. Read-only. |
+| `npm run db:migrate:new -- "add product variants"` | Create the next migration file from a template. |
+| `npm run db:test` | The runner's acceptance tests, in a throwaway database. 46 checks. |
 
-Arriving later, in their own milestones: `db:migrate`, `db:migrate:new`, `db:migrate:status`
-(milestone 2), `db:seed` (milestone 10), `db:types` (milestone 5).
+Arriving later: `db:seed` (milestone 10), `db:types` (milestone 5).
 
 ### First run
 
@@ -56,12 +59,19 @@ A minute or two the first time, a few seconds after that.
 ```
 db/
   bootstrap/local.sql   LOCAL ONLY. Runs once, on an empty data directory.
-  migrations/           V000_init.sql onward.            milestone 2
+  migrations/           V000_init.sql onward.
   seeds/                dev.ts + fixtures.               milestone 10
-  scripts/              the db:* commands
+  scripts/
+    migrate.ts          the runner
+    test-migrate.sh     its acceptance tests
+    _lib.sh             shared shell helpers; parses docker-compose.yml
+    up/down/reset/verify/psql/logs/migrate .sh
   README.md
 ../docker-compose.yml   the container
 ```
+
+The runner is TypeScript run directly by Node — no build step, no `tsx`. Node 22.6+ strips types
+natively, which is why `engines.node` says `>=22.6`.
 
 ---
 
@@ -84,6 +94,70 @@ identically. That is milestone 2.
 
 One consequence catches everybody once: **editing `bootstrap/local.sql` has no effect on a volume
 that already exists.** Run `npm run db:reset` after changing it.
+
+---
+
+## Migrations
+
+**Convention: `V<number>_<snake_case>.sql`**, applied in **numeric** order — `V2` before `V10`, which
+is not what sorting filenames would give you. Gaps are fine; an abandoned branch leaves one.
+Version numbers are claimed **at merge**, not when the work starts, or two branches both take `V042`.
+
+Forward-only. A correction is a new migration, never an edit to an applied one — the runner enforces
+that with checksums.
+
+### What the runner refuses to do
+
+Each of these is an acceptance test in `db/scripts/test-migrate.sh`, not an intention:
+
+| It refuses | Because |
+|---|---|
+| Two files claiming one version | That is how two merged branches corrupt a schema. The message names both files. |
+| A pending version below the highest applied | It would build a schema in an order no other environment will reproduce. |
+| A file that changed after it was applied | The database no longer matches what the file says. Checksums are sha256, CRLF-normalised so line endings are not mistaken for tampering. |
+| An applied migration whose file has gone | The ledger and the repository disagree. |
+| A filename off-convention, or an empty file | An empty migration would be recorded as applied and do nothing. |
+| `BEGIN` / `COMMIT` inside a migration | The runner owns the transaction — see below. |
+| `CREATE INDEX CONCURRENTLY` without the opt-out | Postgres cannot run it inside a transaction block. The error tells you the exact line to add. |
+| A second concurrent run | An advisory lock, held for the whole run. |
+
+### The transaction, and opting out of it
+
+Each migration runs in **its own transaction, with its ledger row written inside it**, so a failure
+leaves nothing half-applied and nothing falsely recorded. The error names the file, the line, the
+statement number and what Postgres said.
+
+For `CREATE INDEX CONCURRENTLY`, which Postgres refuses to run in a transaction, put this on its own
+line in the file header:
+
+```sql
+-- migrate:no-transaction
+```
+
+The ledger records `transactional = false` for it. **Know the trade:** such a migration that fails
+part-way leaves the database changed with nothing recorded. The runner says so when it happens.
+
+### The ledger
+
+`schema_migrations` — `version` (**PRIMARY KEY**, and *this* is what enforces run-once, not the
+filename) · `filename` · `checksum` · `applied_at` · `duration_ms` · `applied_by` · `transactional`.
+
+It is created by the **runner**, not by `V000`: nothing could record `V000` as applied otherwise.
+It is deliberately left out of the app role's privileges — the application has no business reading
+it.
+
+### `V000_init.sql`
+
+Not a dump of production. The database is greenfield, so there is no baseline: `V000` establishes
+the privilege model and the shared `set_updated_at()` trigger function, and the schema is built
+forward from `V001`.
+
+Two decisions it records, so they are not re-litigated: **no uuid extension** (`gen_random_uuid()`
+has been in core since PG13) and **no citext** (case-insensitive email uniqueness is a unique index
+on `lower(email)`, at milestone 5).
+
+`V000` asserts the `vendlyfy_app` role exists and fails loudly if it does not, rather than letting
+every `GRANT` in it silently apply to nothing.
 
 ---
 
