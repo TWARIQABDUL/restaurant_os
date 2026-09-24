@@ -9,6 +9,57 @@
 //   * bigint   -> string   it exceeds Number.MAX_SAFE_INTEGER.
 
 /**
+ * The "pick several" choices on one line — Cheese and Extra sauce. The single-select choices are already the variant, so they are not repeated here.
+ */
+export interface CartItemOptionValuesRow {
+  cart_item_id: string;
+  option_value_id: string;
+  cart_id: string;
+}
+
+/**
+ * One line. A variant, a quantity, and any "pick several" option values chosen for this line — two lines of the same burger with different extras are two lines.
+ */
+export interface CartItemsRow {
+  id: string;
+  cart_id: string;
+  variant_id: string;
+  store_id: string;
+  quantity: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * A cart, server-side. One per customer per store, or one per anonymous session per store. Survives a browser with storage disabled, which is the point.
+ */
+export interface CartsRow {
+  id: string;
+  store_id: string;
+  user_id: string | null;
+  anonymous_session_id: string | null;
+  /** Seven days, as States.dc.html promises. A sweep deletes past this; nothing reads an expired cart. */
+  expires_at: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * A grouping on the storefront. The word for it comes from the industry template: Sections, Collections, Aisles, Rooms.
+ */
+export interface CategoriesRow {
+  id: string;
+  store_id: string;
+  name: string;
+  description: string;
+  image_url: string | null;
+  is_visible: boolean;
+  position: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
  * Modules a version turns on by default. Absence means off. Merchants can still change these in Settings, which is what stores.config_overrides carries.
  */
 export interface IndustryTemplateVersionModulesRow {
@@ -69,6 +120,40 @@ export interface ModulesRow {
   created_at: Date;
 }
 
+/** `option_groups.select_mode`, from its CHECK constraint. */
+export type OptionGroupsSelectMode =
+  | 'one'
+  | 'several';
+
+/**
+ * A choice offered on a product: Size, Colour, Spice level, Extras. select_mode = one makes it a variant dimension; several makes it priced add-ons on the line.
+ */
+export interface OptionGroupsRow {
+  id: string;
+  store_id: string;
+  name: string;
+  select_mode: OptionGroupsSelectMode;
+  is_required: boolean;
+  position: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * One choice within a group: M, Black, Hot, Cheese. price_delta is what choosing it adds.
+ */
+export interface OptionValuesRow {
+  id: string;
+  option_group_id: string;
+  store_id: string;
+  label: string;
+  price_delta: string;
+  is_available: boolean;
+  position: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
 /** `platform_members.role`, from its CHECK constraint. */
 export type PlatformMembersRole =
   | 'super_admin';
@@ -90,6 +175,16 @@ export interface PlatformMembersRow {
 }
 
 /**
+ * Which sections a product appears in. Deleting a section removes these rows and keeps the products — Categories.dc.html: "Its 6 products stay in your catalog."
+ */
+export interface ProductCategoriesRow {
+  product_id: string;
+  category_id: string;
+  store_id: string;
+  position: number;
+}
+
+/**
  * Flags a product can carry that components already know how to render — a badge on the card, an extra step at checkout, a note on the order.
  */
 export interface ProductFlagsRow {
@@ -97,6 +192,76 @@ export interface ProductFlagsRow {
   label: string;
   description: string;
   created_at: Date;
+}
+
+/**
+ * Which option groups a product offers. A store-wide group attached here to two products is what "shared option group" means — there is no copy.
+ */
+export interface ProductOptionGroupsRow {
+  product_id: string;
+  option_group_id: string;
+  store_id: string;
+  position: number;
+}
+
+/**
+ * Flags on one product. Constrained to the flags the store's pinned industry template offers — see product_flag_offered_by_template.
+ */
+export interface ProductProductFlagsRow {
+  product_id: string;
+  store_id: string;
+  flag_key: string;
+}
+
+/**
+ * The combination a variant is: one option value per single-select group. Integrity of the whole matrix is checked at commit by product_variant_matrix_check.
+ */
+export interface ProductVariantValuesRow {
+  variant_id: string;
+  option_group_id: string;
+  option_value_id: string;
+  product_id: string;
+}
+
+/**
+ * One purchasable combination. Every product has at least one — a product with no single-select options has exactly one default variant, so stock and SKU always live here and reserve_stock has one code path.
+ */
+export interface ProductVariantsRow {
+  id: string;
+  product_id: string;
+  store_id: string;
+  sku: string | null;
+  /** NULL when the product does not track stock. Never both NULL and tracked: see product_variants_stock_matches_tracking. */
+  stock_quantity: number | null;
+  is_available: boolean;
+  is_default: boolean;
+  position: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** `products.status`, from its CHECK constraint. */
+export type ProductsStatus =
+  | 'draft'
+  | 'active';
+
+/**
+ * What a store sells. Called menu items, products, medicines or services depending on the store's industry template — one table, read differently.
+ */
+export interface ProductsRow {
+  id: string;
+  store_id: string;
+  name: string;
+  description: string;
+  /** The price a variant starts from. A variant price is this plus its option value deltas, computed at read time. */
+  base_price: string;
+  compare_at_price: string | null;
+  cover_image_url: string | null;
+  track_stock: boolean;
+  status: ProductsStatus;
+  position: number;
+  created_at: Date;
+  updated_at: Date;
 }
 
 /** `role_permissions.scope`, from its CHECK constraint. */
@@ -189,13 +354,25 @@ export interface UsersRow {
 
 /** Every table, for a repository layer that is generic over one. */
 export interface Database {
+  cart_item_option_values: CartItemOptionValuesRow;
+  cart_items: CartItemsRow;
+  carts: CartsRow;
+  categories: CategoriesRow;
   industry_template_version_modules: IndustryTemplateVersionModulesRow;
   industry_template_version_product_flags: IndustryTemplateVersionProductFlagsRow;
   industry_template_versions: IndustryTemplateVersionsRow;
   industry_templates: IndustryTemplatesRow;
   modules: ModulesRow;
+  option_groups: OptionGroupsRow;
+  option_values: OptionValuesRow;
   platform_members: PlatformMembersRow;
+  product_categories: ProductCategoriesRow;
   product_flags: ProductFlagsRow;
+  product_option_groups: ProductOptionGroupsRow;
+  product_product_flags: ProductProductFlagsRow;
+  product_variant_values: ProductVariantValuesRow;
+  product_variants: ProductVariantsRow;
+  products: ProductsRow;
   role_permissions: RolePermissionsRow;
   store_members: StoreMembersRow;
   stores: StoresRow;
@@ -204,13 +381,25 @@ export interface Database {
 
 /** Table names as a value, so a runtime check can be exhaustive. */
 export const TABLE_NAMES = [
+  'cart_item_option_values',
+  'cart_items',
+  'carts',
+  'categories',
   'industry_template_version_modules',
   'industry_template_version_product_flags',
   'industry_template_versions',
   'industry_templates',
   'modules',
+  'option_groups',
+  'option_values',
   'platform_members',
+  'product_categories',
   'product_flags',
+  'product_option_groups',
+  'product_product_flags',
+  'product_variant_values',
+  'product_variants',
+  'products',
   'role_permissions',
   'store_members',
   'stores',

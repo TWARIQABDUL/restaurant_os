@@ -695,6 +695,40 @@ not summable. Recomputing a running balance from them would bake both errors in 
 | `add_ons` | `option_groups` + `option_values` |
 | — | **`product_variants`** — new and unavoidable |
 
+> **Built at milestone 7** (`V003`). Four decisions, the first of which was not what it looked like:
+>
+> **Variants are the cartesian product of the "pick one" groups, and only those.** A "pick several"
+> group is not a dimension: Extras on a burger (Cheese +500, Fries +1,000) are chosen per line at
+> checkout and priced per selection. `AddProduct.dc.html` computes it that way — `attrs.filter(a =>
+> a.mode === 'one')` — and guessing otherwise would have multiplied every burger's matrix by its
+> add-ons and split their stock across the copies. A constraint refuses a variant built over a
+> multi-select group, naming that specific mistake.
+>
+> **Every product has at least one variant**, including one with no options at all, which gets a
+> single `is_default` row. The UI draws "one stock number" or "stock for each", but underneath it is
+> one shape — because milestone 8's `reserve_stock` has to decrement exactly one row atomically, and
+> stock living in two places would mean two code paths through the riskiest function in the rewrite.
+>
+> **Matrix integrity is checked at COMMIT**, by a `DEFERRABLE INITIALLY DEFERRED` constraint trigger,
+> because a variant is inserted before its values and a per-statement check would see every matrix
+> half-built. Five rules: no group the product does not offer; no multi-select group; exactly one
+> value per single-select group; no duplicate combination; and stock tracking all-or-nothing across a
+> product's variants.
+>
+> **Tenancy is declarative, not remembered.** Every table carries `store_id`, and every join between
+> two of them carries it and composite-foreign-keys it — the `UNIQUE (id, scope)` pattern from V001
+> applied to `store_id`. §2.3 warns that one missing tenant predicate is "a cross-tenant leak that
+> will not announce itself"; this makes attaching one store's option group to another store's product
+> unrepresentable rather than merely unlikely.
+>
+> **No `scope` column on `option_groups`.** A shared group is one attached to several products; how a
+> group is managed is a UI question and the Options panel in `AddProduct` is still undesigned, so a
+> column encoding that distinction now would be a guess.
+>
+> **The cart stores no prices.** `States.dc.html`: "Prices are re-checked at checkout; any change is
+> shown before paying." A price copied into the cart is a second source of truth that goes stale in
+> silence.
+
 **The variant gap.** Today a size is an `add_ons` row with its own stock: that expresses "M has 4
 left" but **not** "Black/M has 4 left", because size and colour stock are separate rows. The design
 requires per-combination stock and SKU. This changes the atomic path — `reserve_stock` currently
@@ -1020,7 +1054,7 @@ snapshot, and it aborts unless the server first refuses a write.
 |---|---|---|
 | **5** ✅ | **Identity, stores & memberships (§5.4).** Done 2026-09-24. `V001`, five tables, `db/scripts/gen-types.ts`, `db/scripts/test-schema.sh` | **Met.** *The store-picker case:* one person holds `owner@nyama-and-co` **and** `manager@inzu-threads`, and the picker's own query returns both. *Row types:* `packages/core/src/generated/database.ts`, committed, with CHECK constraints emitted as union types and `numeric`/`bigint` as `string` — `npm run db:types -- --check` regenerates in CI and fails on any drift, so a column rename cannot merge beside stale types. **105 checks pass** across two suites (59 schema, 46 runner), including every scope rule, both uniqueness rules, one person's two roles in two stores, and the escalations the schema itself refuses |
 | **6** ✅ | **Config.** Done 2026-09-24. `V002`, six tables + `stores` columns, two validator functions, four triggers, and the templates shipped as data | **Met.** *The templates are rows* — **eight, not six** (see §3): every word map, attribute preset, module set and order flow from `AdminIndustries`, asserted against the board rather than against fixtures. *Pharmacy:* `new → pharmacist_check → preparing → ready → delivered`, the `rx` module, and the `prescription_required` flag — and it ships as a **draft**, as the board draws it, so no store can pin it. **55 config checks** pass, plus 105 from the earlier suites |
-| **7** | **Catalogue.** `products`, `categories` + join, `option_groups`, `option_values`, `product_variants`, **`carts`** (§2.5 — server-side, anonymous-session-keyed, 7-day expiry) | A fashion product with 12 size×colour variants, each carrying its own stock and SKU. A shared store-wide option group attached to two products. A cart survives a browser with storage disabled |
+| **7** ✅ | **Catalogue.** Done 2026-09-24. `V003`, ten tables, a deferred matrix-integrity constraint, and the server-side cart | **Met, all three.** *Twelve variants:* 4 sizes × 3 colours, each its own row with its own stock and SKU, built the way the app will — variant and values in one transaction, checked at commit. Black/M reads back as one row with stock of its own. *Shared group:* one `option_groups` row attached to two products through the join — **no copy**, so editing Cheese reaches both. *Cart:* keyed only by a server-issued session cookie, reads back whole from that id with nothing client-side, kept 7 days, and carries **no price columns at all** (asserted against `information_schema`). **50 catalogue checks** pass, 210 across four suites |
 | **8** | **Orders & money.** `orders` (12 statuses), `order_items`, `wallets`, `wallet_ledger` with running balance, withdrawals, refunds, momo transactions — plus the seven plpgsql functions, with **`reserve_stock` rewritten against variants** | Two concurrent reservations of the last unit: exactly one wins. This is a test, not an inspection |
 | **9** | **Supporting domains.** complaints, reviews + replies, notifications, audit log, payment methods, currencies, KYC, delivery zones, promotions, plans & fees, rider shifts & cash | Every table the 53 boards need exists. No board has nowhere to store its data |
 
