@@ -399,6 +399,40 @@ Duplicating any of them is the likeliest source of "the preview doesn't match th
 - **`config`** — resolves `published template version + store overrides → effective config`,
   server-side, once, served as one versioned payload with an ETag. Exposes `t(key)` and
   `has(module)`.
+
+  > **The schema behind it landed at milestone 6** (`V002`). Five things to know before writing the
+  > resolver:
+  >
+  > **There are eight templates, not six.** This plan said six; `AdminIndustries.dc.html` has food,
+  > fashion, beauty, electronics, grocery, pharmacy, furniture and services.
+  >
+  > **A published version is immutable, and that is what makes pinning mean anything.** A store pins
+  > `(template_id, version)` — if v4 could change, a store pinned to v4 is pinned to nothing. Triggers
+  > refuse any update or delete of a published version, refuse changes to its module and flag sets, and
+  > refuse a publish that also rewrites the payload: publishing records a decision, it does not make
+  > one. A store may only pin a published version.
+  >
+  > **Modules and product flags are tables, not strings in jsonb.** A template naming module `stok`
+  > would make `has('stock')` false for every store on it, silently and for good; a foreign key makes
+  > that unrepresentable. Words, attributes and order steps stay jsonb, validated by `IMMUTABLE`
+  > functions called from `CHECK` constraints — which is how a nested shape is validated at the column
+  > rather than in whichever writer remembers to.
+  >
+  > **An order step carries both a key and a label.** Services' first step is `booked` labelled
+  > "Booked" where food's is `new` labelled "New", and they are the same state. Milestone 8 decides how
+  > these keys relate to `orders.status`; pharmacy's `pharmacist_check` is the case proving the status
+  > vocabulary cannot simply be fixed.
+  >
+  > **The templates ship in the migration, not in a seed**, because a database with no industry
+  > templates cannot onboard a merchant — Onboarding's first question is the business type. Reference
+  > data the product does not work without belongs with the schema; dev fixtures belong in `db/seeds`.
+  >
+  > **Two boards disagree, and it is recorded rather than resolved.** `Industries.dc.html`'s
+  > illustrative JSON and cards mention modules the editor does not offer — `expiry_dates`,
+  > `table_ordering` (the editor calls it `table`), `variants`, `stock_per_variant`, `reviews`,
+  > `brands`, `specs_table`, `warranty`, `serial_numbers`. Seeding a module with no code behind it
+  > would make `has()` true for a feature that does not exist, which is worse than the gap, so the
+  > registry holds the editor's eight and the rest is a designer question, noted at the foot of `V002`.
 - **`money`** — one formatter driven by the currency table: symbol, position, decimals, separator,
   and **cash rounding that applies only to cash-on-delivery totals**. Property tests, not examples.
 
@@ -985,7 +1019,7 @@ snapshot, and it aborts unless the server first refuses a write.
 | # | Milestone | Done when |
 |---|---|---|
 | **5** ✅ | **Identity, stores & memberships (§5.4).** Done 2026-09-24. `V001`, five tables, `db/scripts/gen-types.ts`, `db/scripts/test-schema.sh` | **Met.** *The store-picker case:* one person holds `owner@nyama-and-co` **and** `manager@inzu-threads`, and the picker's own query returns both. *Row types:* `packages/core/src/generated/database.ts`, committed, with CHECK constraints emitted as union types and `numeric`/`bigint` as `string` — `npm run db:types -- --check` regenerates in CI and fails on any drift, so a column rename cannot merge beside stale types. **105 checks pass** across two suites (59 schema, 46 runner), including every scope rule, both uniqueness rules, one person's two roles in two stores, and the escalations the schema itself refuses |
-| **6** | **Config.** `industry_templates` (versioned, draft/published), store config overrides | The six templates from `AdminIndustries` are expressible as rows, including Pharmacy's `order_steps` and product flag |
+| **6** ✅ | **Config.** Done 2026-09-24. `V002`, six tables + `stores` columns, two validator functions, four triggers, and the templates shipped as data | **Met.** *The templates are rows* — **eight, not six** (see §3): every word map, attribute preset, module set and order flow from `AdminIndustries`, asserted against the board rather than against fixtures. *Pharmacy:* `new → pharmacist_check → preparing → ready → delivered`, the `rx` module, and the `prescription_required` flag — and it ships as a **draft**, as the board draws it, so no store can pin it. **55 config checks** pass, plus 105 from the earlier suites |
 | **7** | **Catalogue.** `products`, `categories` + join, `option_groups`, `option_values`, `product_variants`, **`carts`** (§2.5 — server-side, anonymous-session-keyed, 7-day expiry) | A fashion product with 12 size×colour variants, each carrying its own stock and SKU. A shared store-wide option group attached to two products. A cart survives a browser with storage disabled |
 | **8** | **Orders & money.** `orders` (12 statuses), `order_items`, `wallets`, `wallet_ledger` with running balance, withdrawals, refunds, momo transactions — plus the seven plpgsql functions, with **`reserve_stock` rewritten against variants** | Two concurrent reservations of the last unit: exactly one wins. This is a test, not an inspection |
 | **9** | **Supporting domains.** complaints, reviews + replies, notifications, audit log, payment methods, currencies, KYC, delivery zones, promotions, plans & fees, rider shifts & cash | Every table the 53 boards need exists. No board has nowhere to store its data |

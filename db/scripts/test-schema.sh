@@ -237,10 +237,19 @@ step "updated_at maintains itself"
 accepts "touching a store" "UPDATE stores SET name='Nyama and Company' WHERE slug='nyama-and-co'"
 equals  "its updated_at moved past created_at" "t" \
     "SELECT updated_at > created_at FROM stores WHERE slug='nyama-and-co'"
-equals  "and the trigger exists on every table that carries the column" "4" \
-    "SELECT count(DISTINCT c.relname) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
-       JOIN pg_namespace n ON n.oid=c.relnamespace
-      WHERE n.nspname='public' AND NOT t.tgisinternal AND t.tgfoid = 'set_updated_at'::regproc"
+# The invariant, not a count: every table carrying updated_at must have the
+# trigger that maintains it. A hardcoded number here would break at each new
+# milestone AND would not catch the thing worth catching — a new table that has
+# the column and forgets the trigger, whose updated_at then silently never moves.
+equals  "no table has an updated_at column without the trigger that maintains it" "0" \
+    "SELECT count(*) FROM information_schema.columns c
+      WHERE c.table_schema='public' AND c.column_name='updated_at'
+        AND NOT EXISTS (
+            SELECT 1 FROM pg_trigger tg
+              JOIN pg_class k ON k.oid = tg.tgrelid
+              JOIN pg_namespace n ON n.oid = k.relnamespace
+             WHERE n.nspname='public' AND k.relname = c.table_name
+               AND NOT tg.tgisinternal AND tg.tgfoid = 'set_updated_at'::regproc)"
 
 # =============================================================================
 printf '\n%s\n' "$PASSED passed, $FAILED failed."

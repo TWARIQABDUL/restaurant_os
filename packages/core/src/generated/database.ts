@@ -8,6 +8,67 @@
 //                          `number` here would invite arithmetic that loses cents.
 //   * bigint   -> string   it exceeds Number.MAX_SAFE_INTEGER.
 
+/**
+ * Modules a version turns on by default. Absence means off. Merchants can still change these in Settings, which is what stores.config_overrides carries.
+ */
+export interface IndustryTemplateVersionModulesRow {
+  template_id: string;
+  version: number;
+  module_key: string;
+}
+
+/**
+ * Product flags available to stores on this version. Pharmacy carries prescription_required.
+ */
+export interface IndustryTemplateVersionProductFlagsRow {
+  template_id: string;
+  version: number;
+  flag_key: string;
+}
+
+/** `industry_template_versions.status`, from its CHECK constraint. */
+export type IndustryTemplateVersionsStatus =
+  | 'draft'
+  | 'published';
+
+/**
+ * One version of a template. A published version is IMMUTABLE, because stores pin to it — changing it would silently reconfigure every store on it.
+ */
+export interface IndustryTemplateVersionsRow {
+  template_id: string;
+  version: number;
+  /** draft | published. Publishing is one-way: a new change is a new version, which is what makes a pinned version trustworthy. */
+  status: IndustryTemplateVersionsStatus;
+  words: unknown;
+  attributes: unknown;
+  order_steps: unknown;
+  created_by: string | null;
+  created_at: Date;
+  published_at: Date | null;
+}
+
+/**
+ * A business type a merchant can pick at sign-up. The configuration itself lives on its versions.
+ */
+export interface IndustryTemplatesRow {
+  id: string;
+  key: string;
+  name: string;
+  accent_color: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Feature gates a template can switch on. has(module) reads these. Adding one is a migration because a module without code behind it does nothing.
+ */
+export interface ModulesRow {
+  key: string;
+  label: string;
+  description: string;
+  created_at: Date;
+}
+
 /** `platform_members.role`, from its CHECK constraint. */
 export type PlatformMembersRole =
   | 'super_admin';
@@ -26,6 +87,16 @@ export interface PlatformMembersRow {
   created_by: string | null;
   created_at: Date;
   updated_at: Date;
+}
+
+/**
+ * Flags a product can carry that components already know how to render — a badge on the card, an extra step at checkout, a note on the order.
+ */
+export interface ProductFlagsRow {
+  key: string;
+  label: string;
+  description: string;
+  created_at: Date;
 }
 
 /** `role_permissions.scope`, from its CHECK constraint. */
@@ -88,6 +159,11 @@ export interface StoresRow {
   status: StoresStatus;
   created_at: Date;
   updated_at: Date;
+  industry_template_id: string | null;
+  /** Pinned, not floating. Publishing a new template version does not move a store to it — AdminIndustries makes that an explicit rollout choice. */
+  industry_template_version: number | null;
+  /** What this merchant changed in Settings. Merged over the pinned version by the config resolver; the template is never edited per store. */
+  config_overrides: unknown;
 }
 
 /** `users.scope`, from its CHECK constraint. */
@@ -113,7 +189,13 @@ export interface UsersRow {
 
 /** Every table, for a repository layer that is generic over one. */
 export interface Database {
+  industry_template_version_modules: IndustryTemplateVersionModulesRow;
+  industry_template_version_product_flags: IndustryTemplateVersionProductFlagsRow;
+  industry_template_versions: IndustryTemplateVersionsRow;
+  industry_templates: IndustryTemplatesRow;
+  modules: ModulesRow;
   platform_members: PlatformMembersRow;
+  product_flags: ProductFlagsRow;
   role_permissions: RolePermissionsRow;
   store_members: StoreMembersRow;
   stores: StoresRow;
@@ -122,7 +204,13 @@ export interface Database {
 
 /** Table names as a value, so a runtime check can be exhaustive. */
 export const TABLE_NAMES = [
+  'industry_template_version_modules',
+  'industry_template_version_product_flags',
+  'industry_template_versions',
+  'industry_templates',
+  'modules',
   'platform_members',
+  'product_flags',
   'role_permissions',
   'store_members',
   'stores',
