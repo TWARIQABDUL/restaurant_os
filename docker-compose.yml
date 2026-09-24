@@ -1,0 +1,116 @@
+# Vendlyfy — local development database
+#
+# Milestone 1 of docs/migration/04-implementation-plan.md.
+#
+# This is PLAIN POSTGRES, not a Supabase stack (§4.2): same engine, same
+# extensions, same role split as the deployed instance, so "works locally,
+# fails in production" stops being a category of bug.
+#
+# It does NOT run the application yet. server/src still talks to PostgREST
+# through supabase-js — there is no `pg` usage in it (§4.1). What this container
+# serves today: migrations (milestone 2), seeds (milestone 10) and tests. The
+# app points at it from milestone 11.
+#
+#   npm run db:up       start it and verify it
+#   npm run db:verify   prove it is reachable and healthy
+#   npm run db:reset    destroy the volume and rebuild from nothing
+#   npm run db:psql     a shell on it
+#
+# Credentials here are deliberately local and worthless. Nothing in this file
+# is a secret, and nothing in this file is used in deployment.
+
+# Fixed project name: the named volume stays vendlyfy_pgdata even when the
+# checkout directory is renamed (this repo is still called restaurant_os).
+name: vendlyfy
+
+services:
+  postgres:
+    # PINNED MAJOR VERSION. This must move in lockstep with the deployed
+    # instance — change it in one commit, both places, never just here.
+    # See db/README.md § "The Postgres version".
+    #
+    # Debian-based on purpose, not Alpine: musl and glibc collate text
+    # differently, which changes ORDER BY results and index behaviour against
+    # a glibc-based managed instance.
+    image: postgres:17
+    container_name: vendlyfy-postgres
+    shm_size: 256mb
+
+    environment:
+      # The owner / migration role. Migrations run as this one.
+      POSTGRES_USER: vendlyfy_owner
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: vendlyfy
+      # Page checksums: on by default at most managed providers, so on here too.
+      # initdb-time only — it takes effect on a fresh volume (db:reset).
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+
+    # Bound to loopback on a NON-DEFAULT host port. Two reasons:
+    #   - 5432 on this machine is already taken by another Postgres, and a
+    #     mistyped DATABASE_URL must fail loudly instead of hitting something real.
+    #   - "55432:5432" alone would publish on 0.0.0.0, and Docker's own rules
+    #     sit in front of firewalld — that puts the database on the LAN.
+    ports:
+      - "127.0.0.1:55432:5432"
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Runs ONCE, only on an empty data directory. Deployment never runs it,
+      # so nothing the schema depends on may live here alone — see the header
+      # of that file.
+      - ./db/bootstrap:/docker-entrypoint-initdb.d:ro
+
+    command:
+      - postgres
+      # Determinism for money and timestamps.
+      - "-c"
+      - "timezone=UTC"
+      - "-c"
+      - "log_timezone=UTC"
+      # Query-cost visibility. §2.3 requires EXPLAIN (ANALYZE, BUFFERS) against
+      # seeded volumes before a request-path query merges; these make that work
+      # possible without reconfiguring the container each time.
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "track_io_timing=on"
+      - "-c"
+      - "log_min_duration_statement=200"
+      - "-c"
+      - "log_lock_waits=on"
+      - "-c"
+      - "log_line_prefix=%m [%p] %u@%d "
+
+    # -h 127.0.0.1 on purpose: this checks the TCP listener, not just the unix
+    # socket, so `db:up --wait` cannot return on a server clients can't reach.
+    #
+    # start_period is long because the FIRST run is slow: initdb, the bootstrap
+    # script, then a shutdown and restart — measured at ~110s on a Docker
+    # Desktop VM. Health failures inside the start period don't count, so this
+    # costs nothing on later starts, and a genuinely broken container still
+    # fails fast because it exits rather than lingering unhealthy.
+    #
+    # start_interval polls every 2s during that window, so the container flips
+    # to healthy within ~2s of actually being ready. After the start period,
+    # interval x retries = 60s to declare a running server unhealthy.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U vendlyfy_owner -d vendlyfy"]
+      start_period: 180s
+      start_interval: 2s
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+    # log_min_duration_statement is on; cap the log so a long-running dev box
+    # cannot fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  pgdata:
+    name: vendlyfy_pgdata

@@ -1,0 +1,17 @@
+{
+  "name": "vendlyfy",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Vendlyfy — repository root. Carries the db:* scripts for the local Postgres container. Workspaces (client, server, packages/core) arrive at milestone 3; until then this package has no dependencies and needs no install.",
+  "scripts": {
+    "db:up": "bash db/scripts/up.sh",
+    "db:down": "bash db/scripts/down.sh",
+    "db:reset": "bash db/scripts/reset.sh",
+    "db:verify": "bash db/scripts/verify.sh",
+    "db:psql": "bash db/scripts/psql.sh",
+    "db:logs": "bash db/scripts/logs.sh"
+  },
+  "engines": {
+    "node": ">=18.17"
+  }
+}
