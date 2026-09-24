@@ -1,7 +1,34 @@
 @import 'tailwindcss';
 
 /* ================================================================
-   DESIGN SYSTEM — Restaurant OS
+   LEGACY — do not add to this file.
+   ================================================================
+   Superseded at milestone 4 by src/styles/tokens.css, which carries the design
+   canvas's token layer. This file is the "Clean light SaaS" direction the canvas
+   replaced: Inter/Outfit, a slate neutral ramp, and one fixed brand red.
+
+   It cannot simply be deleted. 31 of the old pages use 55 of the semantic classes
+   below, 542 times, and index.html loads them through src/main.jsx. Deleting it
+   would strip the styling from the live client months before cutover, so it stays
+   until Stage D has rewritten the pages that depend on it, and goes with the last
+   of them.
+
+   What that means in practice:
+
+     * New work imports src/styles/tokens.css and lives in its own Vite entry
+       (gallery.html today; the storefront, merchant and admin trees in Stage D).
+       `npm run check:styles` fails if anything new imports this file.
+     * Nothing new should be added here, including bug fixes that could instead be
+       made in the replacement screen.
+     * The per-store theming this design cannot express — nine runtime tokens, a
+       contrast-enforcing compiler — is the reason for the replacement, not a
+       preference between two palettes.
+
+   See docs/migration/04-implementation-plan.md §2.2 and §4.6.
+   ================================================================ */
+
+/* ================================================================
+   DESIGN SYSTEM — Restaurant OS (legacy)
    Tailwind v4 · "Clean light SaaS" — flat surfaces, single accent.
    ================================================================ */
 

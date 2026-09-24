@@ -40,6 +40,7 @@ Run from the repository root.
 | `npm run db:migrate:status` | What is applied, what is pending, what has drifted. Read-only. |
 | `npm run db:migrate:new -- "add product variants"` | Create the next migration file from a template. |
 | `npm run db:test` | The runner's acceptance tests, in a throwaway database. 46 checks. |
+| `npm run db:profile` | **Reads the OLD Supabase database** and writes `docs/migration/05-old-database-profile.md`. Read-only: it aborts unless the server first refuses a write, and every figure comes from one REPEATABLE READ snapshot. |
 
 Arriving later: `db:seed` (milestone 10), `db:types` (milestone 5).
 

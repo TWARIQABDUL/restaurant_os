@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Built and deployed so CI verifies it, but it is an internal reference
+         page, not a product surface. -->
+    <meta name="robots" content="noindex" />
+
+    <!-- The canvas's own font request, copied exactly from project/Main.dc.html.
+         Bricolage Grotesque for display, Figtree for reading, JetBrains Mono for
+         codes and SKUs. TODO before launch: self-host these. A third-party
+         render-blocking request on every page is a dependency the storefront
+         does not need, and Google Fonts is one more origin to trust. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+    <title>Vendlyfy — token sheet</title>
+  </head>
+  <body>
+    <!-- A SEPARATE ENTRY from index.html on purpose. index.html loads
+         src/main.jsx, which imports src/index.css — the legacy stylesheet with
+         84 semantic classes that 31 of the old pages still depend on. Keeping the
+         new token layer in its own document is what makes "no legacy CSS
+         reachable" a fact about this page rather than a hope, and it is where the
+         UI kit gallery lands at milestone 14. -->
+    <div id="root"></div>
+    <script type="module" src="/src/gallery/main.tsx"></script>
+  </body>
+</html>

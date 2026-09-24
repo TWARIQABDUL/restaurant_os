@@ -93,13 +93,17 @@ info "runner      : db/scripts/migrate.ts"
 # =============================================================================
 step "Requirement 6 — apply, record, and never re-apply"
 # =============================================================================
+# Counted from the directory rather than hardcoded: this suite has to keep working
+# as Stage B adds migrations, and "every file was recorded" is a stronger claim
+# than "there is one row".
+REAL_MIGRATIONS="$(find "$SELF_DIR/../migrations" -name 'V*.sql' | wc -l | tr -d ' ')"
 fresh_db
-expect_ok   "V000_init applies against an empty database" --dir "$SELF_DIR/../migrations"
-expect_sql  "it is recorded in the ledger" "1" "SELECT count(*) FROM schema_migrations"
+expect_ok   "all $REAL_MIGRATIONS real migrations apply to an empty database" --dir "$SELF_DIR/../migrations"
+expect_sql  "every one is recorded in the ledger" "$REAL_MIGRATIONS" "SELECT count(*) FROM schema_migrations"
 expect_sql  "recorded as transactional" "t" "SELECT transactional FROM schema_migrations WHERE version = 0"
 expect_sql  "V000 created set_updated_at()" "1" "SELECT count(*) FROM pg_proc WHERE proname = 'set_updated_at'"
 expect_ok   "a second run applies nothing" --dir "$SELF_DIR/../migrations"
-expect_sql  "still exactly one ledger row" "1" "SELECT count(*) FROM schema_migrations"
+expect_sql  "still exactly $REAL_MIGRATIONS ledger rows" "$REAL_MIGRATIONS" "SELECT count(*) FROM schema_migrations"
 
 # =============================================================================
 step "Requirement 2 — duplicate versions"

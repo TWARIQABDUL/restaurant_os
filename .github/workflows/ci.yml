@@ -62,7 +62,13 @@ jobs:
       - name: Apply migrations
         run: npm run db:migrate
 
-      - name: Migration runner acceptance tests
+      # §2.1: a column rename must fail `tsc`, not fail at runtime in a repository
+      # method. That only holds if the committed row types match the schema, so
+      # regenerate and fail on any difference.
+      - name: Row types match the schema
+        run: npm run db:types -- --check
+
+      - name: Database test suites
         run: npm run db:test
 
       # Proves the migrations can be applied to an empty database from nothing —
@@ -133,3 +139,9 @@ jobs:
         working-directory: client
       - run: npm run build
         working-directory: client
+
+      # §2.2 is "Tailwind utilities only", and the boundary between the new token
+      # layer and the legacy stylesheet that cannot be deleted yet. Runs after the
+      # build so it can assert on the emitted CSS, not just the source.
+      - name: Style rules
+        run: npm run check:styles -- --require-dist

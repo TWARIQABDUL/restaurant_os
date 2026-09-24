@@ -14,8 +14,11 @@
     "db:migrate": "bash db/scripts/migrate.sh",
     "db:migrate:status": "bash db/scripts/migrate.sh status",
     "db:migrate:new": "bash db/scripts/migrate.sh new",
-    "db:test": "bash db/scripts/test-migrate.sh",
-    "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p server && tsc -p client"
+    "db:types": "bash db/scripts/gen-types.sh",
+    "db:test": "bash db/scripts/test.sh",
+    "db:profile": "bash db/scripts/profile-old-db.sh",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p server && tsc -p client",
+    "check:styles": "node scripts/check-styles.ts"
   },
   "engines": {
     "node": ">=22.18"

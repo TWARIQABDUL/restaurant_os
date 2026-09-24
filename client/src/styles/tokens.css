@@ -1,0 +1,233 @@
+/* ============================================================================
+   L0 — the token layer
+   ============================================================================
+   Milestone 4 of docs/migration/04-implementation-plan.md. Every value here is
+   taken from the design canvas's own token spec (project/Main.dc.html), and the
+   status palette from project/States.dc.html. Nothing is invented; where a value
+   is computed, the arithmetic is written out so milestone 13's theme compiler can
+   be checked against it.
+
+   TWO CLASSES OF TOKEN, and the split is the whole point (§2.2):
+
+     FIXED      neutrals, status colours, type, spacing, radius, elevation.
+                The same in every store. Compiled into this stylesheet at build
+                time, because there is one bundle.
+
+     PER-STORE  the nine the theme engine derives. These CANNOT be build-time
+                values — there is one bundle and thousands of stores — so they are
+                runtime CSS custom properties, set by
+                client/src/styles/store-theme.ts.
+
+   This file has NO @layer components and NO @apply. Utilities only, per §2.2.
+   The legacy stylesheet at ../index.css is a separate entry and is not imported
+   here — see its header.
+   ========================================================================= */
+
+@import 'tailwindcss';
+
+@theme {
+  /* --------------------------------------------------------------------------
+     Clear Tailwind's defaults first.
+     --------------------------------------------------------------------------
+     This makes the token set CLOSED: `bg-red-500`, `rounded-md` and `text-sm`
+     stop existing, so an off-design value cannot be written by accident. The
+     design has one palette, five radii and six type sizes; anything else is a
+     mistake, and this is what turns that from a convention into a build error.
+     -------------------------------------------------------------------------- */
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+
+  /* --- Type ---------------------------------------------------------------
+     Bricolage Grotesque for display, Figtree for everything you read, JetBrains
+     Mono for codes, SKUs and order ids. */
+  --font-display: 'Bricolage Grotesque', 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* The canvas states these in px at a 16px root: display 40/44, heading 24/30,
+     title 17/24, body 15/22, caption 13/18, mono 13. They are expressed in rem
+     so that a reader who raises their browser's font size gets a larger UI
+     rather than a broken one. */
+  --text-display: 2.5rem;              /* 40px */
+  --text-display--line-height: 2.75rem;/* 44px */
+  --text-display--font-weight: 700;
+  --text-display--letter-spacing: -0.02em;
+
+  --text-heading: 1.5rem;              /* 24px */
+  --text-heading--line-height: 1.875rem; /* 30px */
+  --text-heading--font-weight: 700;
+  --text-heading--letter-spacing: -0.02em;
+
+  --text-title: 1.0625rem;             /* 17px */
+  --text-title--line-height: 1.5rem;   /* 24px */
+  --text-title--font-weight: 600;
+
+  --text-body: 0.9375rem;              /* 15px */
+  --text-body--line-height: 1.375rem;  /* 22px */
+  --text-body--font-weight: 400;
+
+  --text-caption: 0.8125rem;           /* 13px */
+  --text-caption--line-height: 1.125rem; /* 18px */
+  --text-caption--font-weight: 500;
+
+  --text-mono: 0.8125rem;              /* 13px */
+  --text-mono--line-height: 1.125rem;
+  --text-mono--font-weight: 500;
+
+  /* --- Fixed neutrals ------------------------------------------------------
+     "Neutrals carry the interface. Only the brand color changes per store."
+     These are the platform's, and they are NOT the per-store tokens below — a
+     store's theme may override its page and text colours, but these names stay
+     available for chrome that must not shift. */
+  --color-ink: #17160F;
+  --color-ink-2: #3B3A33;
+  --color-muted: #5F5C53;
+  --color-disabled: #A8A499;
+  --color-line: #E5E2DA;
+  --color-line-subtle: #EFEDE7;
+  --color-control-line: #CFCBC1;
+  --color-ground: #F6F5F1;
+  --color-surface: #FFFFFF;
+
+  /* --- Status ------------------------------------------------------------
+     DELIBERATELY NOT THEMEABLE. "Paid" must mean the same thing in every store,
+     so these are kept out of the theme engine's inputs entirely — the engine
+     cannot reach them, which is a structural guarantee rather than a rule
+     someone has to remember. Pairs are background + foreground, from States. */
+  --color-status-neutral: #EFEDE7;
+  --color-status-neutral-fg: #3B3A33;
+  --color-status-warn: #FBF0DD;
+  --color-status-warn-fg: #7A4600;
+  --color-status-danger: #FCE9E7;
+  --color-status-danger-fg: #B42318;
+  --color-status-success: #E4F2E9;
+  --color-status-success-fg: #1A7443;
+  --color-status-info: #E7EEF9;
+  --color-status-info-fg: #1F437F;
+
+  /* Kept because utilities reference them and the design uses both literally. */
+  --color-white: #FFFFFF;
+  --color-black: #000000;
+
+  /* --- Spacing · 4-point --------------------------------------------------
+     The canvas's eight steps are 4, 8, 12, 16, 24, 32, 48, 64. Tailwind derives
+     its whole spacing scale from one multiplier, so those are exactly
+     p-1 p-2 p-3 p-4 p-6 p-8 p-12 p-16. Declared rather than defaulted so the
+     4-point decision is visible here. */
+  --spacing: 0.25rem;
+
+  /* --- Radius ------------------------------------------------------------- */
+  --radius-chip: 8px;
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-sheet: 20px;
+  --radius-pill: 999px;
+
+  /* --- Elevation ----------------------------------------------------------
+     Three levels and no more: flat on borders, shadow only for things that
+     float. Level 0 is a border, so it is not a shadow token. */
+  --shadow-menu: 0 1px 2px rgb(23 22 15 / 0.06), 0 4px 12px rgb(23 22 15 / 0.08);
+  --shadow-sheet: 0 12px 32px rgb(23 22 15 / 0.18);
+}
+
+/* ============================================================================
+   The nine per-store tokens
+   ============================================================================
+   @theme inline, not @theme, and the distinction is load-bearing.
+
+   With plain @theme, Tailwind emits `--color-store-surface: var(--store-surface)`
+   as a custom property on :root. A custom property's value is substituted at
+   computed-value time ON THE ELEMENT WHERE IT IS DECLARED — so it would resolve
+   against :root's --store-surface once, and descendants would inherit that
+   resolved colour. Overriding --store-surface on a subtree would then do nothing.
+
+   That would break two things the design requires: StorePreview, which shows one
+   store's theme inside the merchant console, and ThemeStudio's live preview.
+   Both are subtrees with a different theme from the page around them.
+
+   `inline` makes the utility compile to `background-color: var(--store-surface)`
+   directly, with no intermediate property, so the variable resolves at the point
+   of use and subtree overrides work.
+   ========================================================================= */
+@theme inline {
+  --color-store-bg: var(--store-bg);                  /* Page       */
+  --color-store-surface: var(--store-surface);        /* Cards      */
+  --color-store-text: var(--store-text);              /* Text       */
+  --color-store-muted: var(--store-muted);            /* Muted text */
+  --color-store-border: var(--store-border);          /* Lines      */
+  --color-store-primary: var(--store-primary);        /* Buttons    */
+  --color-store-on-primary: var(--store-on-primary);  /* Button text */
+  --color-store-accent: var(--store-accent);          /* Highlights */
+  --color-store-tint: var(--store-tint);              /* Selected   */
+}
+
+/* ----------------------------------------------------------------------------
+   The platform default theme.
+   ----------------------------------------------------------------------------
+   A FALLBACK, not a source of truth. Every published store theme is compiled by
+   the theme engine and applied at runtime (store-theme.ts). These values are
+   what renders where there is no store: the platform admin console, the sign-in
+   pages, the component gallery — and for the instant before a store's theme
+   arrives, so that a slow response shows the design's own default rather than
+   unstyled text.
+
+   Sourced from the canvas's default store, brand #1D6B47:
+     primary / on-primary   `PRIMARY = 'background:#1D6B47;color:#FFFFFF;'` (States)
+     bg surface text muted border   the fixed neutrals above, unchanged — in the
+                                    light mood the engine keeps the neutral ground
+     tint    tint('#1D6B47') = #E4EDE9, by the canvas's published mix:
+             round(channel * 0.12 + 255 * 0.88) per channel — 12% brand, 88% white
+     accent  the platform default has no separate highlight hue, so it is the
+             brand. The engine derives one from brand + harmony (milestone 13).
+   -------------------------------------------------------------------------- */
+:root {
+  --store-bg: #F6F5F1;
+  --store-surface: #FFFFFF;
+  --store-text: #17160F;
+  --store-muted: #5F5C53;
+  --store-border: #E5E2DA;
+  --store-primary: #1D6B47;
+  --store-on-primary: #FFFFFF;
+  --store-accent: #1D6B47;
+  --store-tint: #E4EDE9;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--store-bg);
+    color: var(--store-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* One focus treatment everywhere, from the canvas: a 2px ink outline, offset.
+     Ink rather than the brand colour, so focus stays visible whatever a store
+     themes its buttons to. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
