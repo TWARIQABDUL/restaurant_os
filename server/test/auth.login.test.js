@@ -14,9 +14,12 @@
  * point this at a scratch project rather than production if you have one.
  */
 
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const http = require('node:http');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import path from 'node:path';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'node:url';
 
 process.env.NODE_ENV = 'test';
 // These tests deliberately drive many failed logins from one address.
@@ -24,11 +27,15 @@ process.env.RATE_LIMIT_DISABLED = 'true';
 process.env.JWT_SECRET = process.env.JWT_SECRET
   || 'test-only-secret-not-used-anywhere-real-0123456789';
 
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+// dotenv does not overwrite a variable that is already set, so the JWT_SECRET
+// above still wins over the one in .env — exactly as it did under CommonJS.
+dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env') });
 
-const bcrypt = require('bcryptjs');
-const supabase = require('../src/config/supabase');
-const app = require('../src/app');
+// Dynamic, because ESM hoists static imports above everything above: these three
+// read process.env as they load, and must see it fully assembled.
+const { default: bcrypt } = await import('bcryptjs');
+const { default: supabase } = await import('../src/config/supabase.js');
+const { default: app } = await import('../src/app.js');
 
 const EMAIL = `login_test_${Date.now()}@example.invalid`;
 const PW_ADMIN = 'admin-password-A1!';

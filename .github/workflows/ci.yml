@@ -1,0 +1,135 @@
+# CI — milestone 3 of docs/migration/04-implementation-plan.md.
+#
+# §2.1: "tsc --noEmit is its own CI gate. oxlint does not typecheck, and vite
+# build does not either — esbuild strips types without checking them. A green
+# build proves nothing about types."
+#
+# Four independent jobs, so one failure names one thing.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Native TypeScript execution (the db:* scripts are .ts run directly by Node)
+  # is unflagged from Node 22.18. Keep this in step with engines.node in
+  # package.json.
+  NODE_VERSION: "22"
+
+jobs:
+  typecheck:
+    name: Types (all four projects)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      # tsc -p client needs @types/react, which lives in client/node_modules.
+      - run: npm ci
+        working-directory: client
+      - run: npm run typecheck
+
+  database:
+    name: Migrations and runner tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      # The same docker-compose.yml developers use, not a service container:
+      # then CI is testing the thing that ships, including its bootstrap and its
+      # settings. Runners have Docker and Compose v2 preinstalled.
+      - name: Start Postgres
+        run: npm run db:up
+
+      - name: Apply migrations
+        run: npm run db:migrate
+
+      - name: Migration runner acceptance tests
+        run: npm run db:test
+
+      # Proves the migrations can be applied to an empty database from nothing —
+      # which is what a new environment does, and what milestone 29's ETL
+      # rehearsal will do repeatedly.
+      - name: Rebuild from nothing and migrate again
+        run: |
+          npm run db:reset -- -y
+          npm run db:migrate
+
+      - name: Postgres log on failure
+        if: failure()
+        run: npm run db:logs -- --tail 200
+
+  server:
+    name: Server wiring (ESM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+        working-directory: server
+
+      # Parses every file as ESM. Cheap, and it catches a conversion slip before
+      # anything is executed.
+      - name: Syntax-check every module
+        working-directory: server
+        run: |
+          set -e
+          for f in $(find src test -name '*.js') smoketest.js; do node --check "$f"; done
+          echo "$(find src test -name '*.js' | wc -l) files + smoketest parsed as ESM"
+
+      # server/scripts is a CommonJS island (its own package.json) holding the
+      # retired Supabase-era runners. Check it stays parseable as CommonJS.
+      - name: Syntax-check the retired CommonJS scripts
+        working-directory: server
+        run: |
+          set -e
+          for f in scripts/*.js; do node --check "$f"; done
+
+      # Loads every service and route module, asserts the exports, boots the app
+      # and makes real HTTP requests. Needs no database: it points Supabase at a
+      # dead port on purpose.
+      - name: Wiring smoketest
+        working-directory: server
+        run: npm run smoketest
+
+      # NOT run here: `npm test` (test/auth.login.test.js). Those are integration
+      # tests that create and delete rows in whatever database the env points at,
+      # which in this repo is production. They need a scratch database before they
+      # can be automated — see milestone 29.
+
+  client:
+    name: Client lint and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+        working-directory: client
+      - run: npm run lint
+        working-directory: client
+      - run: npm run build
+        working-directory: client

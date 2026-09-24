@@ -70,8 +70,9 @@ db/
 ../docker-compose.yml   the container
 ```
 
-The runner is TypeScript run directly by Node — no build step, no `tsx`. Node 22.6+ strips types
-natively, which is why `engines.node` says `>=22.6`.
+The runner is TypeScript run directly by Node — no build step, no `tsx`. Node strips types natively
+and unflagged from **22.18**, which is what `engines.node` requires. On an older 22.x it needs
+`--experimental-strip-types`; below 22.6 it does not run at all.
 
 ---
 

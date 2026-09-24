@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+import supabase from '../config/supabase.js';
 
 /**
  * Per-product variants (sizes, colours) are `add_ons` rows with `menu_item_id`
@@ -56,4 +56,4 @@ async function syncVariants(tenantId, menuItemId, dimension, variants) {
   }
 }
 
-module.exports = { syncVariants };
+export { syncVariants };

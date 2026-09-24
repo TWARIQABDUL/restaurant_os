@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
-const supabase = require('../config/supabase');
-const { readToken } = require('../services/session');
+import jwt from 'jsonwebtoken';
+import supabase from '../config/supabase.js';
+import { readToken } from '../services/session.js';
 
 /**
  * Verify JWT and attach user to request.
@@ -120,4 +120,4 @@ async function optionalAuth(req, res, next) {
   }
 }
 
-module.exports = { authenticate, authorize, superAdminOnly, optionalAuth };
+export { authenticate, authorize, superAdminOnly, optionalAuth };

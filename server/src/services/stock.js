@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+import supabase from '../config/supabase.js';
 
 /**
  * Stock reservation helpers.
@@ -131,12 +131,4 @@ function withStockFlags(item) {
   };
 }
 
-module.exports = {
-  reserveStock,
-  releaseStock,
-  linesForOrder,
-  addonLinesForOrder,
-  isPurchasable,
-  withStockFlags,
-  InsufficientStockError,
-};
+export { reserveStock, releaseStock, linesForOrder, addonLinesForOrder, isPurchasable, withStockFlags, InsufficientStockError };

@@ -84,6 +84,63 @@ the theme compiler live in or across the backend. Typing them later means writin
 - **Row types are generated from the database schema** and committed. A column rename then fails
   `tsc` instead of failing at runtime inside a repository method.
 
+**Built at milestone 3.** `tsconfig.base.json` plus four projects that extend it — the root
+(`db/scripts`), `packages/core`, `server`, `client` — and `npm run typecheck` running all four.
+Beyond `strict`: `noUncheckedIndexedAccess` (because `rows[0]` is usually a database result, where
+"no rows" is a real case), `noUnusedLocals`, `noUnusedParameters`, and two that keep the source
+inside what Node's type stripping can execute — `verbatimModuleSyntax` and `erasableSyntaxOnly`,
+which reject enums, namespaces and parameter properties outright.
+
+`allowJs: true` with **`checkJs: false`**: a new `.ts` file can import an old `.js` one during the
+rewrite, without turning on hundreds of errors in code §2.1 deletes rather than converts. A file
+graduates by being rewritten.
+
+**Two guards are structural rather than conventional.** `packages/core` is compiled with
+`"lib": ["ES2023"]` and `"types": []` — no DOM, no Node — so a module there that reaches for
+`document` *or* for `process` fails to compile. That is §3's isomorphism requirement enforced by the
+compiler. The client gets `"types": []` for the same reason in the other direction.
+
+> **A trap worth recording.** `"types": []` alone did not hold. `vite.config.js` was in the client
+> project's `include`, and Vite's own type definitions carry a reference to `@types/node` — which
+> put `process` back in scope for every file in `src/`. Eight deliberate errors were probed against
+> the four projects; seven failed immediately and this one passed silently until the Vite config was
+> dropped from the project. It is JavaScript with `checkJs` off, so it was never being checked.
+
+**Node 22.18+ at the root** (`engines`), because the `db:*` scripts are TypeScript executed
+directly — unflagged type stripping starts there. `server` stays at 18.17: it needs only ESM and
+top-level await, and its `__dirname` replacement is the portable `fileURLToPath(import.meta.url)`
+rather than `import.meta.dirname`, which needs Node 20.11 and would have failed silently on an older
+one, since `render.yaml` pins no Node version.
+
+### The server's CommonJS → ESM conversion
+
+36 files and 142 `require` calls, done with a codemod and six hand-written exceptions. Three things
+worth knowing before the next one:
+
+- **Import hoisting breaks load-order-dependent boot code.** `server.js` was `dotenv`, then
+  `assertEnv()`, then `require('./app')` — and CommonJS ran them in that order. ESM evaluates every
+  static import first, so `import app from './app.js'` would have loaded `config/supabase.js`, which
+  reads `process.env` and calls `process.exit(1)` on a bad key, *before* `.env` was read. Only
+  `dotenv/config` and `config/env.js` are static imports now; everything else is `await import()`.
+  The same applied to `smoketest.js` and `test/auth.login.test.js`, both of which assign
+  `process.env` before loading anything.
+- **`const x = require('./m')` and `module.exports = { a, b }` convert to incompatible halves.** The
+  first becomes a *default* import, the second becomes *named* exports — so `x` is `undefined` at
+  runtime, silently. There were **16** of these. They were found by a script that read each module's
+  actual exports and checked every relative import against them, not by reading the diff; the fix is
+  `import * as x from './m.js'`, which is what `require` of an exports object always meant.
+- **`server/scripts` is a CommonJS island** — its own `package.json` with `"type": "commonjs"`, one
+  file instead of converting or deleting 19 retired Supabase-era runners. §4.3 retires them, but
+  `run-sql.js` is still the only way to apply a hotfix to the live database before cutover, so they
+  stay until milestone 30. See `server/scripts/README.md`.
+
+**`smoketest.js` was repaired and then extended, because it is the acceptance instrument.** It had
+been exiting 1 since the service_role hardening landed — it only ever set the anon key — so it was
+proving nothing. It now checks **all 16 route modules** (not the 3 it sampled), then boots the app on
+an ephemeral port and makes real requests. A mounted router is distinguished from an unmounted one by
+the app's 404 *body*, not by status code: `/api/momo`'s only route is a POST on a subpath, so a bare
+GET there legitimately falls through, and a mounted route may answer 404 for its own reasons.
+
 ### 2.2 Tailwind only
 
 Three things leave `client/src/index.css`: the old `@theme` block (Inter/Outfit, slate,
@@ -459,10 +516,22 @@ db/
                         never anything the schema depends on
   migrations/       V000_init.sql, V001_…                    milestone 2
   seeds/            dev.ts + fixtures/                       milestone 10
-packages/core/      theme-engine · config · money · types     milestone 3 (TS, ESM)
+packages/core/      theme-engine · config · money · types     skeleton done, milestone 3
+  src/index.ts      empty; names what lands and when          fills at 12 and 13
+tsconfig.base.json  shared strictness, four projects extend it done, milestone 3
+.github/workflows/  ci.yml — types · database · server · client done, milestone 3
 client/src/         shared/ui · storefront/ · merchant/ · admin/
-server/src/         routes/ services/ repositories/ db/
+server/src/         routes/ services/ repositories/ db/       ESM as of milestone 3
+server/scripts/     retired CommonJS runners, own package.json until milestone 30
 ```
+
+**`npm` workspaces are deferred to milestone 12, not milestone 3.** They would make
+`@vendlyfy/core` resolvable by name from `client/` and `server/` — and nothing imports it until
+milestone 12, so there is nothing to resolve yet. Against that: the old client and server deploy
+from their own directories, each with its own lockfile (`client/vercel.json`, `render.yaml` with
+`rootDir: server`), and both must keep running untouched until cutover. Restructuring `node_modules`
+underneath a live money system months before anything needs it buys nothing. `packages/core`'s
+`tsconfig` exists now, which is the part milestone 3 was actually for.
 
 **Built:** `db:up` · `db:down` · `db:reset` · `db:verify` · `db:psql` · `db:logs`.
 **Later:** `db:migrate` · `db:migrate:new` · `db:migrate:status` (milestone 2) · `db:seed` (10) ·
@@ -734,7 +803,7 @@ in 28–30, where it can be rehearsed.
 |---|---|---|
 | **1** ✅ | **Postgres container.** Done 2026-09-24. PG 17 pinned, `127.0.0.1:55432`, named volume, TCP healthcheck, bootstrap limited to roles + diagnostics (§4.4) | **Met.** `db:reset` rebuilt from nothing in 2m17s and `db:verify --expect-empty` passed: reachable from the host, both roles authenticating over TCP, version matching the pin, UTC, checksums on, app role unprivileged, zero tables |
 | **2** ✅ | **Migration runner + ledger.** Done 2026-09-24. `db/scripts/migrate.ts` (TypeScript, run directly by Node — no build step), `schema_migrations`, `V000_init`, and `db:test` | **Met.** `npm run db:test` — **46 checks, all passing**, in a throwaway database: duplicate version, out-of-order version and edited checksum each rejected with the offending filenames, plus a missing file, an off-convention name, an empty file, self-managed transactions, `V2` applying before `V10`, rollback leaving nothing behind, the `no-transaction` opt-out, a dollar-quoted body surviving the splitter, and a blocked second run. `V000` applied once, recorded, and re-running is a no-op |
-| **3** | **TypeScript + ESM.** `tsconfig` strict for client, server and `packages/core`; `tsc --noEmit` in CI; server CommonJS → ESM | A deliberate type error fails CI. The server boots on ESM with every existing route still answering |
+| **3** ✅ | **TypeScript + ESM.** Done 2026-09-24. `tsconfig.base.json` + four projects, `npm run typecheck`, `.github/workflows/ci.yml` (4 jobs), server CJS → ESM (36 files, 142 requires), `packages/core` skeleton | **Met, both halves.** *Type error:* eight deliberate errors probed across the four projects — plain mismatches, an enum under `erasableSyntaxOnly`, an unused local, `document` and `process` in `packages/core`, `process` in the client — all now fail their project's typecheck. *Server on ESM:* `node src/server.js` boots and `GET /api/health` answers 200; all 16 route modules load with **86 routes registered**; 14 routers answer on their own GET routes and the 2 with no GET route are verified at module level; the retired CommonJS scripts still parse and four of them were run against the live database unchanged. Every CI job was run locally and passes. **The integration suite was then run against the real database by hand: 10 tests, 10 pass** — so the conversion is verified against production data, not only wiring |
 | **4** | **Tailwind reset.** Delete the old `@theme`, the `@layer components` semantic classes and the `:root` bridge. New `@theme` with the fixed tokens. Runtime CSS-variable plumbing for the nine per-store tokens | One page renders in Bricolage/Figtree on `#F6F5F1` with no legacy CSS reachable. CI rejects `@apply` |
 
 ### Stage B — Schema

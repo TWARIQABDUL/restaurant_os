@@ -1,0 +1,53 @@
+// Shared compiler settings — milestone 3 of docs/migration/04-implementation-plan.md.
+//
+// Four projects extend this: the root (db/scripts), packages/core, server and
+// client. Each adds only what differs — module system, libs, JSX — so that the
+// strictness below cannot drift apart between them.
+//
+// §2.1: "strict: true from the first file. No `any` in domain types."
+{
+  "compilerOptions": {
+    "target": "ES2023",
+
+    // Every file is a module. Nothing declares globals by accident.
+    "moduleDetection": "force",
+
+    // --- strictness ---------------------------------------------------------
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // rows[0] is possibly undefined — and in this codebase rows[0] is usually a
+    // database result, where "no rows" is a real case that used to read as a
+    // crash in production.
+    "noUncheckedIndexedAccess": true,
+
+    "forceConsistentCasingInFileNames": true,
+
+    // --- what Node can actually run -----------------------------------------
+    // The db:* scripts are TypeScript executed directly by Node, which strips
+    // types without understanding them. These two keep the source inside what
+    // stripping can handle: type-only imports must say `import type`, and
+    // enums, namespaces and parameter properties are rejected outright.
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true,
+
+    // --- the existing JavaScript --------------------------------------------
+    // allowJs so a new .ts file can import an old .js one during the rewrite.
+    // checkJs off because §2.1 replaces that JavaScript rather than converting
+    // it — turning this on would produce hundreds of errors in code scheduled
+    // for deletion. A file graduates by being rewritten, not by being annotated.
+    "allowJs": true,
+    "checkJs": false,
+
+    "skipLibCheck": true,
+
+    // tsc is a checker here, never a build step: Vite builds the client and Node
+    // runs the TypeScript directly. allowImportingTsExtensions requires noEmit.
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  }
+}

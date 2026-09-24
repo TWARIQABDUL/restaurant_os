@@ -1,8 +1,8 @@
-const express = require('express');
-const supabase = require('../config/supabase');
-const momoConfig = require('../config/momo');
-const platformSettings = require('../services/platformSettings');
-const { authenticate, superAdminOnly } = require('../middleware/auth');
+import express from 'express';
+import supabase from '../config/supabase.js';
+import momoConfig from '../config/momo.js';
+import * as platformSettings from '../services/platformSettings.js';
+import { authenticate, superAdminOnly } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -174,4 +174,4 @@ router.get('/health', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

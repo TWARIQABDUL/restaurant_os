@@ -1,0 +1,11 @@
+// The root project: the database tooling in db/scripts, run directly by Node.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    "types": ["node"]
+  },
+  "include": ["db/scripts/**/*.ts"]
+}

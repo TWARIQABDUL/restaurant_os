@@ -1,5 +1,5 @@
-const express = require('express');
-const walletService = require('../services/walletService');
+import express from 'express';
+import * as walletService from '../services/walletService.js';
 
 const router = express.Router();
 
@@ -26,4 +26,4 @@ router.post('/callback/:type/:referenceId', (req, res) => {
   });
 });
 
-module.exports = router;
+export default router;

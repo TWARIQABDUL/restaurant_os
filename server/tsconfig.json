@@ -1,0 +1,17 @@
+// The API server. ESM as of milestone 3; TypeScript arrives feature by feature
+// alongside the repository layer (§2.1), so today this mostly guards the .js
+// files' syntax and gives the first .ts file somewhere strict to land.
+//
+// server/scripts is excluded: those are the retired one-off Supabase runners
+// (§4.3), still CommonJS, scoped by their own package.json.
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "test/**/*", "smoketest.js"],
+  "exclude": ["scripts/**", "node_modules"]
+}

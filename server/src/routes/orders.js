@@ -1,14 +1,15 @@
-const express = require('express');
-const { body, validationResult } = require('express-validator');
-const crypto = require('crypto');
-const supabase = require('../config/supabase');
-const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
-const { orderLimiter, trackingLimiter } = require('../middleware/rateLimit');
-const platformSettings = require('../services/platformSettings');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import crypto from 'crypto';
+import supabase from '../config/supabase.js';
+import { authenticate, authorize, optionalAuth } from '../middleware/auth.js';
+import { orderLimiter, trackingLimiter } from '../middleware/rateLimit.js';
+import * as platformSettings from '../services/platformSettings.js';
 
-const {
-  reserveStock, releaseStock, linesForOrder, addonLinesForOrder, InsufficientStockError,
-} = require('../services/stock');
+import { reserveStock, releaseStock, linesForOrder, addonLinesForOrder, InsufficientStockError } from '../services/stock.js';
+import * as walletService from '../services/walletService.js';
+import momoConfigCheck from '../config/momo.js';
+import * as notificationService from '../services/notificationService.js';
 
 const router = express.Router();
 
@@ -275,8 +276,6 @@ router.post(
       // the settlement scheduler's reconciliation sweep still catches it.
       let paymentInfo = { status: 'not_applicable' };
       if (payment_method === 'mobile_money') {
-        const walletService = require('../services/walletService');
-        const momoConfigCheck = require('../config/momo');
 
         try {
           momoConfigCheck.assertConfigured('collection');
@@ -307,7 +306,6 @@ router.post(
       }
 
       // Send confirmation email and write to DB
-      const notificationService = require('../services/notificationService');
       await notificationService.notifyOrderPlaced(order, req.user, { guest_name, guest_email, guest_phone });
 
       // Emit socket notification to trigger frontend fetch
@@ -524,7 +522,6 @@ router.patch(
         return res.status(400).json({ error: 'Order not found or cannot be approved' });
       }
 
-      const notificationService = require('../services/notificationService');
       await notificationService.notifyOrderApproved(order);
 
       const io = req.app.get('io');
@@ -579,7 +576,6 @@ router.patch(
       // means the customer needs their money back — automatically, not
       // via a separate refund request they'd have to know to submit.
       if (order.payment_method === 'mobile_money' && order.payment_status === 'paid' && order.settlement_status === 'pending') {
-        const walletService = require('../services/walletService');
         supabase
           .from('refund_requests')
           .insert({
@@ -601,7 +597,6 @@ router.patch(
           });
       }
 
-      const notificationService = require('../services/notificationService');
       await notificationService.notifyOrderRejected(order, reason);
 
       const io = req.app.get('io');
@@ -709,7 +704,6 @@ router.patch(
         return res.status(400).json({ error: 'Order not found or cannot be marked as ready' });
       }
 
-      const notificationService = require('../services/notificationService');
       await notificationService.notifyOrderReady(order, req.tenant.id);
 
       // Notify admins and managers
@@ -806,7 +800,6 @@ router.patch(
       }
 
       // We only have the notification service set up for full User models, so we simulate it for external
-      const notificationService = require('../services/notificationService');
       if (assign_type === 'internal') {
         const fullDriver = { id: driverDetails.id, name: driverDetails.name, phone: driverDetails.phone, plate_number: driverDetails.plateNumber };
         await notificationService.notifyDeliveryAssigned(order, fullDriver);
@@ -861,7 +854,6 @@ router.patch(
         return res.status(400).json({ error: 'Order not found or cannot be marked as delivered' });
       }
 
-      const notificationService = require('../services/notificationService');
       await notificationService.notifyOrderDelivered(order);
 
       const io = req.app.get('io');
@@ -952,4 +944,4 @@ router.post(
   }
 );
 
-module.exports = router;
+export default router;

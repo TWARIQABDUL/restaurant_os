@@ -1,7 +1,8 @@
-const express = require('express');
-const { body, validationResult } = require('express-validator');
-const supabase = require('../config/supabase');
-const { authenticate, authorize } = require('../middleware/auth');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import supabase from '../config/supabase.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import * as walletService from '../services/walletService.js';
 
 const router = express.Router();
 
@@ -261,7 +262,6 @@ router.patch(
       }
 
       // 3. Trigger wallet deduction and MoMo payout
-      const walletService = require('../services/walletService');
       try {
         await walletService.approveRefund({ 
           refundRequestId: refundRequest.id, 
@@ -391,4 +391,4 @@ router.patch(
   }
 );
 
-module.exports = router;
+export default router;

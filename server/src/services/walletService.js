@@ -1,6 +1,6 @@
-const supabase = require('../config/supabase');
-const momoClient = require('./momoClient');
-const momoConfig = require('../config/momo');
+import supabase from '../config/supabase.js';
+import * as momoClient from './momoClient.js';
+import momoConfig from '../config/momo.js';
 
 async function recordMomoTransaction({ referenceId, type, purpose, tenantId, orderId, withdrawalRequestId, refundRequestId, phoneNumber, amount }) {
   const { data, error } = await supabase
@@ -450,18 +450,4 @@ async function getWithdrawals(tenantId, limit = 50) {
   return data || [];
 }
 
-module.exports = {
-  initiateOrderPayment,
-  reconcilePendingCollections,
-  reconcilePendingDisbursements,
-  releaseEligibleOrders,
-  requestWithdrawal,
-  maybeAutoPayout,
-  approveRefund,
-  rejectRefund,
-  recheckCollection,
-  recheckDisbursement,
-  getWallet,
-  getLedger,
-  getWithdrawals,
-};
+export { initiateOrderPayment, reconcilePendingCollections, reconcilePendingDisbursements, releaseEligibleOrders, requestWithdrawal, maybeAutoPayout, approveRefund, rejectRefund, recheckCollection, recheckDisbursement, getWallet, getLedger, getWithdrawals };

@@ -1,4 +1,4 @@
-const sgMail = require('@sendgrid/mail');
+import sgMail from '@sendgrid/mail';
 
 const apiKey = process.env.SENDGRID_API_KEY;
 const emailFrom = process.env.EMAIL_FROM || 'noreply@restaurantos.com';
@@ -34,4 +34,4 @@ async function sendEmail({ to, subject, html, text }) {
   }
 }
 
-module.exports = { sendEmail, emailFrom };
+export { sendEmail, emailFrom };

@@ -1,11 +1,11 @@
-const crypto = require('crypto');
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const { body, validationResult } = require('express-validator');
-const supabase = require('../config/supabase');
-const { authenticate, authorize } = require('../middleware/auth');
-const { issueSession, clearSession, issueSocketTicket } = require('../services/session');
-const { authLimiter, signupLimiter } = require('../middleware/rateLimit');
+import crypto from 'crypto';
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import { body, validationResult } from 'express-validator';
+import supabase from '../config/supabase.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import { issueSession, clearSession, issueSocketTicket } from '../services/session.js';
+import { authLimiter, signupLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -394,4 +394,4 @@ router.post(
   }
 );
 
-module.exports = router;
+export default router;

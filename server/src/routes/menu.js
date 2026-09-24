@@ -1,9 +1,9 @@
-const express = require('express');
-const { body, validationResult } = require('express-validator');
-const supabase = require('../config/supabase');
-const { authenticate, authorize } = require('../middleware/auth');
-const { withStockFlags } = require('../services/stock');
-const { syncVariants } = require('../services/variants');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import supabase from '../config/supabase.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import { withStockFlags } from '../services/stock.js';
+import { syncVariants } from '../services/variants.js';
 
 // Stock fields sellers can set on a product.
 const STOCK_FIELDS = ['track_inventory', 'stock_quantity', 'low_stock_threshold', 'sku'];
@@ -371,4 +371,4 @@ router.delete(
   }
 );
 
-module.exports = router;
+export default router;

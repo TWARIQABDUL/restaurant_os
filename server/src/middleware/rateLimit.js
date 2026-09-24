@@ -1,4 +1,4 @@
-const rateLimit = require('express-rate-limit');
+import rateLimit from 'express-rate-limit';
 
 // Render terminates TLS upstream, so req.ip is the proxy's address unless
 // `trust proxy` is set (see app.js). These limiters key on req.ip, so that
@@ -78,11 +78,4 @@ const globalLimiter = rateLimit({
   message: message('a moment'),
 });
 
-module.exports = {
-  authLimiter,
-  signupLimiter,
-  orderLimiter,
-  trackingLimiter,
-  webhookLimiter,
-  globalLimiter,
-};
+export { authLimiter, signupLimiter, orderLimiter, trackingLimiter, webhookLimiter, globalLimiter };

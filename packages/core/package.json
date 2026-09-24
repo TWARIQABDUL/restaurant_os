@@ -1,0 +1,11 @@
+{
+  "name": "@vendlyfy/core",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Isomorphic domain logic the browser and the Express server both import: theme-engine, config resolver, money. L3 of the layer model.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  }
+}

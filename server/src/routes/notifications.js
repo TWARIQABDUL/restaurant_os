@@ -1,7 +1,7 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const supabase = require('../config/supabase');
-const { authenticate } = require('../middleware/auth');
+import supabase from '../config/supabase.js';
+import { authenticate } from '../middleware/auth.js';
 
 /**
  * GET /api/notifications
@@ -44,4 +44,4 @@ router.patch('/read-all', authenticate, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

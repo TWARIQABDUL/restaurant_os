@@ -1,26 +1,26 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const cookieParser = require('cookie-parser');
-const { resolveTenant } = require('./middleware/tenant');
-const { globalLimiter, webhookLimiter } = require('./middleware/rateLimit');
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
+import { resolveTenant } from './middleware/tenant.js';
+import { globalLimiter, webhookLimiter } from './middleware/rateLimit.js';
 
-const authRoutes = require('./routes/auth');
-const menuRoutes = require('./routes/menu');
-const addonsRoutes = require('./routes/addons');
-const ordersRoutes = require('./routes/orders');
-const deliveryRoutes = require('./routes/delivery');
-const analyticsRoutes = require('./routes/analytics');
-const tenantsRoutes = require('./routes/tenants');
-const notificationsRoutes = require('./routes/notifications');
-const walletRoutes = require('./routes/wallet');
-const refundsRoutes = require('./routes/refunds');
-const momoWebhookRoutes = require('./routes/momoWebhook');
-const reviewsRoutes = require('./routes/reviews');
-const complaintsRoutes = require('./routes/complaints');
-const categoriesRoutes = require('./routes/categories');
-const uploadsRoutes = require('./routes/uploads');
-const platformRoutes = require('./routes/platform');
+import authRoutes from './routes/auth.js';
+import menuRoutes from './routes/menu.js';
+import addonsRoutes from './routes/addons.js';
+import ordersRoutes from './routes/orders.js';
+import deliveryRoutes from './routes/delivery.js';
+import analyticsRoutes from './routes/analytics.js';
+import tenantsRoutes from './routes/tenants.js';
+import notificationsRoutes from './routes/notifications.js';
+import walletRoutes from './routes/wallet.js';
+import refundsRoutes from './routes/refunds.js';
+import momoWebhookRoutes from './routes/momoWebhook.js';
+import reviewsRoutes from './routes/reviews.js';
+import complaintsRoutes from './routes/complaints.js';
+import categoriesRoutes from './routes/categories.js';
+import uploadsRoutes from './routes/uploads.js';
+import platformRoutes from './routes/platform.js';
 
 const app = express();
 
@@ -114,4 +114,4 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-module.exports = app;
+export default app;

@@ -1,5 +1,4 @@
-const supabase = require('../config/supabase');
-const { isUpstreamTimeout } = require('../config/supabase');
+import supabase, { isUpstreamTimeout } from '../config/supabase.js';
 
 /**
  * Resolve tenant from request.
@@ -71,4 +70,4 @@ async function resolveTenant(req, res, next) {
   }
 }
 
-module.exports = { resolveTenant };
+export { resolveTenant };

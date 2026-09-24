@@ -1,7 +1,7 @@
-const express = require('express');
-const { body, validationResult } = require('express-validator');
-const supabase = require('../config/supabase');
-const { authenticate } = require('../middleware/auth');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import supabase from '../config/supabase.js';
+import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -115,4 +115,4 @@ router.post(
   }
 );
 
-module.exports = router;
+export default router;

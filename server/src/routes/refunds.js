@@ -1,7 +1,7 @@
-const express = require('express');
-const supabase = require('../config/supabase');
-const { authenticate, authorize } = require('../middleware/auth');
-const walletService = require('../services/walletService');
+import express from 'express';
+import supabase from '../config/supabase.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import * as walletService from '../services/walletService.js';
 
 const router = express.Router();
 
@@ -80,4 +80,4 @@ router.patch('/:id/reject', authenticate, authorize('admin'), async (req, res) =
   }
 });
 
-module.exports = router;
+export default router;

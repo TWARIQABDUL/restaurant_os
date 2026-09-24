@@ -74,4 +74,4 @@ function assertConfigured(product) {
   }
 }
 
-module.exports = { ...config, assertConfigured };
+export default { ...config, assertConfigured };

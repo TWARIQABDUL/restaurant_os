@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const supabase = require('../config/supabase');
+import jwt from 'jsonwebtoken';
+import supabase from '../config/supabase.js';
 
 /**
  * Set up Socket.io event handlers.
@@ -85,4 +85,4 @@ function setupSocketHandlers(io) {
   });
 }
 
-module.exports = { setupSocketHandlers };
+export { setupSocketHandlers };

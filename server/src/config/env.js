@@ -83,4 +83,4 @@ function assertEnv() {
   }
 }
 
-module.exports = { assertEnv };
+export { assertEnv };

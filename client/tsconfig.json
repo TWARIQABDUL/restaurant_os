@@ -1,0 +1,24 @@
+// The browser app. Vite resolves modules, so moduleResolution is "bundler" and
+// tsc never emits. The existing .jsx is included for resolution only — checkJs
+// is off, because it is being replaced against the new design, not converted.
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+
+    // No ambient Node types in browser code: a file that reaches for `process`
+    // or `Buffer` must not typecheck here.
+    //
+    // "types": [] alone is not enough for that. vite.config.js used to be in the
+    // include list below, and Vite's own type definitions carry a reference to
+    // @types/node — which put `process` back in scope for every file in src.
+    // Leaving the Vite config out costs nothing, since it is JavaScript and
+    // checkJs is off, so it was never being checked anyway.
+    "types": []
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

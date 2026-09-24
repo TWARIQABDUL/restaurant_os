@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
 // The session token lives in an httpOnly cookie, so a stolen-by-XSS token is no
 // longer possible — script on the page cannot read it. During the migration the
@@ -82,11 +82,4 @@ function issueSocketTicket(user) {
   );
 }
 
-module.exports = {
-  COOKIE_NAME,
-  issueSession,
-  clearSession,
-  readToken,
-  issueSocketTicket,
-  SOCKET_TICKET_TTL_SECONDS,
-};
+export { COOKIE_NAME, issueSession, clearSession, readToken, issueSocketTicket, SOCKET_TICKET_TTL_SECONDS };

@@ -9,8 +9,8 @@
 // can still find it and check its real status with MoMo, instead of the
 // transaction being silently lost.
 
-const crypto = require('crypto');
-const momo = require('../config/momo');
+import crypto from 'crypto';
+import momo from '../config/momo.js';
 
 const tokenCache = { collection: null, disbursement: null };
 
@@ -202,12 +202,4 @@ async function pollUntilResolved(checkFn, { timeoutMs = 20000, intervalMs = 2000
   return last;
 }
 
-module.exports = {
-  normalizePhone,
-  generateReferenceId,
-  requestToPay,
-  getRequestToPayStatus,
-  transfer,
-  getTransferStatus,
-  pollUntilResolved,
-};
+export { normalizePhone, generateReferenceId, requestToPay, getRequestToPayStatus, transfer, getTransferStatus, pollUntilResolved };

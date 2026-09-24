@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+import { createClient } from '@supabase/supabase-js';
 
 // The backend authenticates with the SERVICE-ROLE key, never the anon key.
 //
@@ -110,6 +110,5 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   global: { fetch: timeoutFetch },
 });
 
-module.exports = supabase;
-module.exports.isUpstreamTimeout = isUpstreamTimeout;
-module.exports.UPSTREAM_TIMEOUT_MARKER = UPSTREAM_TIMEOUT_MARKER;
+export default supabase;
+export { isUpstreamTimeout, UPSTREAM_TIMEOUT_MARKER };

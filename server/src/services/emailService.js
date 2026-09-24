@@ -1,6 +1,12 @@
-const { sendEmail } = require('../config/email');
-const fs = require('fs');
-const path = require('path');
+import { sendEmail } from '../config/email.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'node:url';
+
+// The ESM equivalent of __dirname. import.meta.dirname would read better but
+// needs Node 20.11+, and render.yaml pins no Node version — on an older one it
+// is undefined and this path silently becomes a TypeError at first send.
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * HTML-escape a template value.
@@ -23,7 +29,7 @@ function escapeHtml(value) {
  * Load an HTML template and replace placeholders.
  */
 function renderTemplate(templateName, data) {
-  const templatePath = path.join(__dirname, '..', 'templates', `${templateName}.html`);
+  const templatePath = path.join(moduleDir, '..', 'templates', `${templateName}.html`);
   const safe = Object.fromEntries(
     Object.entries(data || {}).map(([key, value]) => [key, escapeHtml(value)])
   );
@@ -59,4 +65,4 @@ async function sendTemplatedEmail({ to, subject, template, data }) {
   await sendEmail({ to, subject, html });
 }
 
-module.exports = { sendTemplatedEmail, renderTemplate, escapeHtml };
+export { sendTemplatedEmail, renderTemplate, escapeHtml };

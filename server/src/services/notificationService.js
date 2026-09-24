@@ -1,5 +1,5 @@
-const supabase = require('../config/supabase');
-const { sendTemplatedEmail } = require('./emailService');
+import supabase from '../config/supabase.js';
+import { sendTemplatedEmail } from './emailService.js';
 
 async function insertDbNotification(tenantId, userIds, message, icon, actionUrl = null) {
   if (!userIds || userIds.length === 0) return;
@@ -279,11 +279,4 @@ async function notifyOrderDelivered(order) {
   }
 }
 
-module.exports = {
-  notifyOrderPlaced,
-  notifyOrderApproved,
-  notifyOrderRejected,
-  notifyOrderReady,
-  notifyDeliveryAssigned,
-  notifyOrderDelivered,
-};
+export { notifyOrderPlaced, notifyOrderApproved, notifyOrderRejected, notifyOrderReady, notifyDeliveryAssigned, notifyOrderDelivered };

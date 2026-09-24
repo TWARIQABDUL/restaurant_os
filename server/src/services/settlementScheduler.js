@@ -1,5 +1,5 @@
-const momoConfig = require('../config/momo');
-const walletService = require('./walletService');
+import momoConfig from '../config/momo.js';
+import * as walletService from './walletService.js';
 
 let intervalHandle = null;
 let running = false;
@@ -44,4 +44,4 @@ function stop() {
   }
 }
 
-module.exports = { start, stop, tick };
+export { start, stop, tick };

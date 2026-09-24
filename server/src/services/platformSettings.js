@@ -1,5 +1,5 @@
-const supabase = require('../config/supabase');
-const momoConfig = require('../config/momo');
+import supabase from '../config/supabase.js';
+import momoConfig from '../config/momo.js';
 
 /**
  * Platform-wide settings, owned by super admin.
@@ -105,12 +105,4 @@ async function update(patch, userId) {
   return data;
 }
 
-module.exports = {
-  get,
-  update,
-  invalidate,
-  allowedCurrencies,
-  isAllowedCurrency,
-  isSettleable,
-  SETTLEMENT_CURRENCY,
-};
+export { get, update, invalidate, allowedCurrencies, isAllowedCurrency, isSettleable, SETTLEMENT_CURRENCY };

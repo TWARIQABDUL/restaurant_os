@@ -84,9 +84,13 @@ type LedgerRow = {
 };
 
 class MigrateError extends Error {}
-const fail = (message: string): never => {
+
+// A declaration, not `const fail = () => …`: TypeScript only treats a call as
+// never-returning — and so only narrows the code after it — for a function
+// declaration or a const with an explicit type annotation.
+function fail(message: string): never {
   throw new MigrateError(message);
-};
+}
 
 // ---------------------------------------------------------------------------
 // Output
@@ -362,7 +366,7 @@ async function readLedger(client: Client, { create }: { create: boolean }): Prom
     const { rows } = await client.query<{ exists: string | null }>(
       'SELECT to_regclass($1)::text AS exists', [LEDGER],
     );
-    if (rows[0].exists === null) return [];
+    if ((rows[0]?.exists ?? null) === null) return [];
   }
   const { rows } = await client.query<LedgerRow>(
     `SELECT version, filename, checksum, applied_at, duration_ms, applied_by, transactional
@@ -440,7 +444,7 @@ async function runStatements(client: Client, m: Migration): Promise<void> {
       throw new MigrateError(
         `${m.filename}:${st.line} failed (statement ${index + 1} of ${m.statements.length})\n` +
         `        ${pgErrorDetail(error)}\n` +
-        `      ${st.raw.split('\n')[0].slice(0, 100)}`,
+        `      ${(st.raw.split('\n')[0] ?? st.raw).slice(0, 100)}`,
       );
     }
   }
@@ -513,10 +517,12 @@ async function connect(url: string): Promise<Target> {
     return fail(`cannot connect to ${host}:${parsed.port || 5432}/${database}\n        ${pgErrorDetail(error)}`);
   }
   const { rows } = await client.query<{ user: string }>('SELECT current_user AS user');
+  const user = rows[0]?.user;
+  if (user === undefined) fail('SELECT current_user returned no rows — the connection is not usable');
   return {
     client,
     label: `${host}:${parsed.port || 5432}/${database}`,
-    user: rows[0].user,
+    user,
     loopback: host === '127.0.0.1' || host === 'localhost' || host === '::1',
   };
 }
@@ -533,7 +539,7 @@ async function takeLock(client: Client): Promise<void> {
       'SELECT pg_try_advisory_lock($1) AS locked',
       [ADVISORY_LOCK_KEY.toString()],
     );
-    if (rows[0].locked) return;
+    if (rows[0]?.locked === true) return;
     if (Date.now() >= deadline) {
       fail(
         `another migration run holds the advisory lock (waited ${LOCK_WAIT_SECONDS}s).\n` +
@@ -707,18 +713,22 @@ async function main(): Promise<void> {
   let assumeYes = process.env.MIGRATE_ASSUME_YES === '1';
   const positional: string[] = [];
 
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
+  const rest = [...argv];
+  for (;;) {
+    const arg = rest.shift();
+    if (arg === undefined) break;
     if (arg === '--dry-run') dryRun = true;
     else if (arg === '--yes' || arg === '-y') assumeYes = true;
-    else if (arg === '--dir') dir = path.resolve(argv[++i] ?? fail('--dir needs a path'));
-    else if (arg === '--url') url = argv[++i] ?? fail('--url needs a connection string');
+    else if (arg === '--dir') dir = path.resolve(rest.shift() ?? fail('--dir needs a path'));
+    else if (arg === '--url') url = rest.shift() ?? fail('--url needs a connection string');
     else if (arg.startsWith('-')) fail(`unknown option: ${arg}`);
     else positional.push(arg);
   }
 
-  if (positional.length > 0 && ['up', 'status', 'new'].includes(positional[0])) {
-    command = positional.shift()!;
+  const first = positional[0];
+  if (first !== undefined && ['up', 'status', 'new'].includes(first)) {
+    command = first;
+    positional.shift();
   }
 
   if (command === 'new') {

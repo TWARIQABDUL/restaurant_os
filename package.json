@@ -14,15 +14,18 @@
     "db:migrate": "bash db/scripts/migrate.sh",
     "db:migrate:status": "bash db/scripts/migrate.sh status",
     "db:migrate:new": "bash db/scripts/migrate.sh new",
-    "db:test": "bash db/scripts/test-migrate.sh"
+    "db:test": "bash db/scripts/test-migrate.sh",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p server && tsc -p client"
   },
   "engines": {
-    "node": ">=22.6"
+    "node": ">=22.18"
   },
   "dependencies": {
     "pg": "^8.23.0"
   },
   "devDependencies": {
-    "@types/pg": "^8.23.1"
+    "@types/node": "^26.6.2",
+    "@types/pg": "^8.23.1",
+    "typescript": "^7.0.2"
   }
 }

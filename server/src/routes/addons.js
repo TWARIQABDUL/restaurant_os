@@ -1,8 +1,8 @@
-const express = require('express');
-const { body, validationResult } = require('express-validator');
-const supabase = require('../config/supabase');
-const { authenticate, authorize } = require('../middleware/auth');
-const { withStockFlags } = require('../services/stock');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import supabase from '../config/supabase.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import { withStockFlags } from '../services/stock.js';
 
 const router = express.Router();
 
@@ -227,4 +227,4 @@ router.delete(
   }
 );
 
-module.exports = router;
+export default router;

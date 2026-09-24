@@ -1,10 +1,10 @@
-const express = require('express');
-const { body, validationResult } = require('express-validator');
-const supabase = require('../config/supabase');
-const { authenticate, authorize, superAdminOnly } = require('../middleware/auth');
-const momoConfig = require('../config/momo');
-const bcrypt = require('bcryptjs');
-const platformSettings = require('../services/platformSettings');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import supabase from '../config/supabase.js';
+import { authenticate, authorize, superAdminOnly } from '../middleware/auth.js';
+import momoConfig from '../config/momo.js';
+import bcrypt from 'bcryptjs';
+import * as platformSettings from '../services/platformSettings.js';
 
 const router = express.Router();
 
@@ -819,4 +819,4 @@ router.post(
   }
 );
 
-module.exports = router;
+export default router;

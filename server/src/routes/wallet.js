@@ -1,9 +1,9 @@
-const express = require('express');
-const { body, validationResult } = require('express-validator');
-const supabase = require('../config/supabase');
-const { authenticate, authorize } = require('../middleware/auth');
-const walletService = require('../services/walletService');
-const platformSettings = require('../services/platformSettings');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import supabase from '../config/supabase.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import * as walletService from '../services/walletService.js';
+import * as platformSettings from '../services/platformSettings.js';
 
 const router = express.Router();
 
@@ -116,4 +116,4 @@ router.post(
   }
 );
 
-module.exports = router;
+export default router;

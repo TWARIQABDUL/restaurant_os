@@ -1,0 +1,17 @@
+// L3 of the layer model: code the browser AND the Express server both import.
+//
+// The lib and types below are the point of this file. No "DOM", so a module that
+// reaches for `document` or `window` fails to compile; no "node", so one that
+// reaches for `process` or `Buffer` fails too. Isomorphism is enforced by the
+// compiler rather than by remembering — because §3 names duplicating any of this
+// as the likeliest source of "the preview doesn't match the live store".
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

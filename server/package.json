@@ -1,12 +1,14 @@
 {
   "name": "restaurant-os-server",
   "version": "1.0.0",
-  "description": "Restaurant OS \u2014 Backend API",
+  "description": "Restaurant OS — Backend API",
   "main": "src/server.js",
+  "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\"",
+    "smoketest": "node smoketest.js"
   },
   "dependencies": {
     "@sendgrid/mail": "^8.1.0",
