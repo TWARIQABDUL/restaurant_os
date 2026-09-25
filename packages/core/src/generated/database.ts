@@ -60,6 +60,55 @@ export interface CategoriesRow {
 }
 
 /**
+ * Where the platform operates. A country's default currency is what a store signing up there sells in.
+ */
+export interface CountriesRow {
+  code: string;
+  name: string;
+  default_currency_code: string;
+  is_enabled: boolean;
+  created_at: Date;
+}
+
+/** `currencies.rate_source`, from its CHECK constraint. */
+export type CurrenciesRateSource =
+  | 'feed'
+  | 'manual';
+
+/** `currencies.symbol_position`, from its CHECK constraint. */
+export type CurrenciesSymbolPosition =
+  | 'before'
+  | 'after';
+
+/** `currencies.thousands_separator`, from its CHECK constraint. */
+export type CurrenciesThousandsSeparator =
+  | ','
+  | ' '
+  | '.';
+
+/**
+ * How money is written, rounded and converted. The formatter in packages/core reads only these columns, so there is one implementation of "what does 3500 look like".
+ */
+export interface CurrenciesRow {
+  code: string;
+  name: string;
+  symbol: string;
+  symbol_position: CurrenciesSymbolPosition;
+  decimals: number;
+  thousands_separator: CurrenciesThousandsSeparator;
+  /** Applied only to cash-on-delivery totals. A card or momo total is never rounded — that difference is exactly the kind that goes unnoticed for a month. */
+  cash_rounding: string;
+  is_enabled: boolean;
+  is_default: boolean;
+  rate_source: CurrenciesRateSource;
+  /** Display conversion only: "≈ $2.40" beside the real price. The charge is always in the store's own currency. */
+  usd_rate: string | null;
+  rate_updated_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
  * Modules a version turns on by default. Absence means off. Merchants can still change these in Settings, which is what stores.config_overrides carries.
  */
 export interface IndustryTemplateVersionModulesRow {
@@ -149,6 +198,8 @@ export interface MomoTransactionsRow {
   created_at: Date;
   resolved_at: Date | null;
   withdrawal_id: string | null;
+  /** Which provider this attempt went through. The old schema assumed MTN; with Airtel and M-Pesa in the same table, reconciliation needs to know. */
+  payment_method_key: string | null;
 }
 
 /** `option_groups.select_mode`, from its CHECK constraint. */
@@ -245,11 +296,6 @@ export type OrdersFulfilmentType =
   | 'delivery'
   | 'pickup';
 
-/** `orders.payment_method`, from its CHECK constraint. */
-export type OrdersPaymentMethod =
-  | 'cash'
-  | 'momo';
-
 /** `orders.payment_status`, from its CHECK constraint. */
 export type OrdersPaymentStatus =
   | 'unpaid'
@@ -295,7 +341,7 @@ export interface OrdersRow {
   delivery_address: string | null;
   fulfilment_type: OrdersFulfilmentType;
   status: OrdersStatus;
-  payment_method: OrdersPaymentMethod;
+  payment_method: string;
   payment_status: OrdersPaymentStatus;
   settlement_status: OrdersSettlementStatus;
   currency: string;
@@ -311,6 +357,92 @@ export interface OrdersRow {
   placed_at: Date;
   paid_at: Date | null;
   delivered_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Where an online method can be offered. MTN covers Rwanda and Uganda; M-Pesa is Kenya only.
+ */
+export interface PaymentMethodCountriesRow {
+  payment_method_key: string;
+  country_code: string;
+}
+
+/**
+ * Which currencies a method can charge in, and the provider's limits in each.
+ */
+export interface PaymentMethodCurrenciesRow {
+  payment_method_key: string;
+  currency_code: string;
+  min_amount: string;
+  max_amount: string;
+}
+
+/** `payment_methods.kind`, from its CHECK constraint. */
+export type PaymentMethodsKind =
+  | 'online'
+  | 'offline';
+
+/** `payment_methods.status`, from its CHECK constraint. */
+export type PaymentMethodsStatus =
+  | 'draft'
+  | 'live'
+  | 'paused';
+
+/**
+ * How a customer can pay. Online methods carry a provider and a webhook; cash is offline and needs neither, which is why AdminPayments does not list it.
+ */
+export interface PaymentMethodsRow {
+  key: string;
+  name: string;
+  short_name: string;
+  kind: PaymentMethodsKind;
+  customer_label: string;
+  customer_hint: string;
+  provider: string | null;
+  webhook_url: string | null;
+  /** draft | live | paused. Only a live method may be named on a new order — enforced by orders_payment_method_usable. */
+  status: PaymentMethodsStatus;
+  incident_note: string | null;
+  position: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Which features a plan includes. Absence is exclusion, so a new feature is off everywhere until granted deliberately.
+ */
+export interface PlanFeatureGrantsRow {
+  plan_key: string;
+  feature_key: string;
+}
+
+/**
+ * Commercial entitlements, which are NOT the same axis as industry modules. A module is what a business type does; a feature is what a plan permits. See the note at the foot of this file.
+ */
+export interface PlanFeaturesRow {
+  key: string;
+  label: string;
+  description: string;
+  position: number;
+  created_at: Date;
+}
+
+/**
+ * What a store pays and what it gets. Prices are NULL until finance confirms them — see Part 9.
+ */
+export interface PlansRow {
+  key: string;
+  name: string;
+  monthly_price: string | null;
+  payment_fee_percent: string | null;
+  withdrawal_fee: string | null;
+  currency_code: string | null;
+  /** NULL is unlimited. Enforced when a store admin creates a member, at milestone 11. */
+  staff_account_limit: number | null;
+  is_default: boolean;
+  position: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -530,6 +662,8 @@ export interface StoresRow {
   industry_template_version: number | null;
   /** What this merchant changed in Settings. Merged over the pinned version by the config resolver; the template is never edited per store. */
   config_overrides: unknown;
+  /** Every store is on a plan. Defaults to the Starter plan rather than being nullable, because "no plan" is not a state the billing or entitlement code can read. */
+  plan_key: string;
 }
 
 /** `users.scope`, from its CHECK constraint. */
@@ -640,6 +774,8 @@ export interface Database {
   cart_items: CartItemsRow;
   carts: CartsRow;
   categories: CategoriesRow;
+  countries: CountriesRow;
+  currencies: CurrenciesRow;
   industry_template_version_modules: IndustryTemplateVersionModulesRow;
   industry_template_version_product_flags: IndustryTemplateVersionProductFlagsRow;
   industry_template_versions: IndustryTemplateVersionsRow;
@@ -653,6 +789,12 @@ export interface Database {
   order_items: OrderItemsRow;
   order_status_transitions: OrderStatusTransitionsRow;
   orders: OrdersRow;
+  payment_method_countries: PaymentMethodCountriesRow;
+  payment_method_currencies: PaymentMethodCurrenciesRow;
+  payment_methods: PaymentMethodsRow;
+  plan_feature_grants: PlanFeatureGrantsRow;
+  plan_features: PlanFeaturesRow;
+  plans: PlansRow;
   platform_members: PlatformMembersRow;
   product_categories: ProductCategoriesRow;
   product_flags: ProductFlagsRow;
@@ -678,6 +820,8 @@ export const TABLE_NAMES = [
   'cart_items',
   'carts',
   'categories',
+  'countries',
+  'currencies',
   'industry_template_version_modules',
   'industry_template_version_product_flags',
   'industry_template_versions',
@@ -691,6 +835,12 @@ export const TABLE_NAMES = [
   'order_items',
   'order_status_transitions',
   'orders',
+  'payment_method_countries',
+  'payment_method_currencies',
+  'payment_methods',
+  'plan_feature_grants',
+  'plan_features',
+  'plans',
   'platform_members',
   'product_categories',
   'product_flags',

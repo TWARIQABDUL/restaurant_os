@@ -105,7 +105,7 @@ accepts "an order for 15,000, and a MoMo collection in flight" \
     "INSERT INTO orders (id,store_id,order_number,tracking_code,idempotency_key,guest_name,guest_phone,
         delivery_address,fulfilment_type,payment_method,currency,subtotal_amount)
       VALUES ('${O}','${ST}',next_order_number('${ST}'),'trk_money_order_001','idem_money_order_0001',
-              'Aimable Kayitare','078 330 1180','KG 11 Ave','delivery','momo','RWF',15000);
+              'Aimable Kayitare','078 330 1180','KG 11 Ave','delivery','mtn_momo','RWF',15000);
      INSERT INTO order_items (order_id,store_id,variant_id,product_name,unit_price_amount,quantity)
       VALUES ('${O}','${ST}','${V1}','Linen tee',15000,1);
      INSERT INTO momo_transactions (id,store_id,order_id,direction,reference_id,phone,amount,currency)
@@ -232,7 +232,7 @@ accepts "a second order, paid and still in escrow" \
     "INSERT INTO orders (id,store_id,order_number,tracking_code,idempotency_key,guest_name,guest_phone,
         delivery_address,fulfilment_type,payment_method,currency,subtotal_amount)
       VALUES ('${O2}','${ST}',next_order_number('${ST}'),'trk_escrow_refund01','idem_escrow_refund001',
-              'Yvonne Mutesi','078 200 7781','KN 3 Rd','delivery','momo','RWF',8000);
+              'Yvonne Mutesi','078 200 7781','KN 3 Rd','delivery','mtn_momo','RWF',8000);
      INSERT INTO order_items (order_id,store_id,variant_id,product_name,unit_price_amount,quantity)
       VALUES ('${O2}','${ST}','${V1}','Linen tee',8000,1);
      INSERT INTO momo_transactions (id,store_id,order_id,direction,reference_id,phone,amount,currency)
@@ -268,7 +268,7 @@ accepts "a third order with a collection in flight" \
     "INSERT INTO orders (id,store_id,order_number,tracking_code,idempotency_key,guest_name,guest_phone,
         delivery_address,fulfilment_type,payment_method,currency,subtotal_amount)
       VALUES ('${O3}','${ST}',next_order_number('${ST}'),'trk_race_webhook001','idem_race_webhook0001',
-              'Kevin Mugabo','078 990 2231','KG 9 Ave','delivery','momo','RWF',4000);
+              'Kevin Mugabo','078 990 2231','KG 9 Ave','delivery','mtn_momo','RWF',4000);
      INSERT INTO order_items (order_id,store_id,variant_id,product_name,unit_price_amount,quantity)
       VALUES ('${O3}','${ST}','${V1}','Linen tee',4000,1);
      INSERT INTO momo_transactions (id,store_id,order_id,direction,reference_id,phone,amount,currency)

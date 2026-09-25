@@ -65,7 +65,7 @@ INSERT INTO orders (id,store_id,order_number,tracking_code,idempotency_key,
                     payment_method,currency,subtotal_amount,delivery_fee_amount ${3:+,$3})
   VALUES ('$1','${ST}',next_order_number('${ST}'),'trk_$(printf '%s' "$2" | tr -dc 'a-z0-9' | head -c 16)','$2',
           'Aimable Kayitare','078 330 1180','KG 11 Ave, Kimihurura','delivery',
-          'momo','RWF',9000,1000 ${4:+,$4});
+          'mtn_momo','RWF',9000,1000 ${4:+,$4});
 INSERT INTO order_items (id,order_id,store_id,variant_id,product_name,unit_price_amount,options_amount,quantity)
   VALUES ('$1'::uuid + 0,'$1','${ST}','dddd0000-0000-0000-0000-000000000001','Chicken burger',3500,1000,2);
 SQL
@@ -80,7 +80,7 @@ accepts "the first attempt — order, line and captured options in one transacti
     "INSERT INTO orders (id,store_id,order_number,tracking_code,idempotency_key,guest_name,guest_phone,
         delivery_address,fulfilment_type,payment_method,currency,subtotal_amount)
       VALUES ('eeee0000-0000-0000-0000-000000000001','${ST}',next_order_number('${ST}'),'trk_first_attempt01','${KEY}',
-              'Aimable Kayitare','078 330 1180','KG 11 Ave','delivery','momo','RWF',10000);
+              'Aimable Kayitare','078 330 1180','KG 11 Ave','delivery','mtn_momo','RWF',10000);
      INSERT INTO order_items (id,order_id,store_id,variant_id,product_name,unit_price_amount,options_amount,quantity)
       VALUES ('${ITEM}','eeee0000-0000-0000-0000-000000000001','${ST}','dddd0000-0000-0000-0000-000000000001',
               'Chicken burger',3500,1500,2);
@@ -91,7 +91,7 @@ refuses "the retry, carrying the same idempotency key" "orders_store_idempotency
     "INSERT INTO orders (id,store_id,order_number,tracking_code,idempotency_key,guest_name,guest_phone,
         delivery_address,fulfilment_type,payment_method,currency,subtotal_amount)
       VALUES ('eeee0000-0000-0000-0000-000000000002','${ST}',next_order_number('${ST}'),'trk_second_attempt1','${KEY}',
-              'Aimable Kayitare','078 330 1180','KG 11 Ave','delivery','momo','RWF',10000);
+              'Aimable Kayitare','078 330 1180','KG 11 Ave','delivery','mtn_momo','RWF',10000);
      INSERT INTO order_items (order_id,store_id,variant_id,product_name,unit_price_amount,options_amount,quantity)
       VALUES ('eeee0000-0000-0000-0000-000000000002','${ST}','dddd0000-0000-0000-0000-000000000001','Chicken burger',3500,0,2)"
 equals  "so exactly one order exists" "1" "SELECT count(*) FROM orders"
@@ -117,11 +117,14 @@ refuses "writing a line total directly" "can only be updated to DEFAULT" \
     "UPDATE order_items SET line_total_amount=1 WHERE order_id='eeee0000-0000-0000-0000-000000000001'"
 
 step "An order with no lines cannot exist"
+# A subtotal above the provider's minimum, because V006's payment-method check runs
+# before the deferred one and an order of 0 cannot be charged at all. What is under
+# test here is that it has no lines.
 refuses "an order on its own" "has no lines" \
     "INSERT INTO orders (store_id,order_number,tracking_code,idempotency_key,guest_name,guest_phone,
         delivery_address,fulfilment_type,payment_method,currency,subtotal_amount)
       VALUES ('${ST}',next_order_number('${ST}'),'trk_no_lines_at_all','idem_no_lines_at_all_x',
-              'X','078 000 0000','KG 1 Ave','delivery','momo','RWF',0)"
+              'X','078 000 0000','KG 1 Ave','delivery','mtn_momo','RWF',1000)"
 refuses "removing the last line from an order" "has no lines" \
     "DELETE FROM order_items WHERE order_id='eeee0000-0000-0000-0000-000000000001'"
 
@@ -196,17 +199,17 @@ refuses "an order belonging to nobody" "orders_has_a_customer" \
     "INSERT INTO orders (store_id,order_number,tracking_code,idempotency_key,delivery_address,
         fulfilment_type,payment_method,currency,subtotal_amount)
       VALUES ('${ST}',next_order_number('${ST}'),'trk_nobody_at_all1','idem_nobody_at_all_xx',
-              'KG 1 Ave','delivery','momo','RWF',1000)"
+              'KG 1 Ave','delivery','mtn_momo','RWF',1000)"
 refuses "a delivery with nowhere to go" "orders_delivery_has_address" \
     "INSERT INTO orders (store_id,order_number,tracking_code,idempotency_key,guest_name,guest_phone,
         fulfilment_type,payment_method,currency,subtotal_amount)
       VALUES ('${ST}',next_order_number('${ST}'),'trk_no_address_here','idem_no_address_here_x',
-              'X','078 000 0000','delivery','momo','RWF',1000)"
+              'X','078 000 0000','delivery','mtn_momo','RWF',1000)"
 refuses "a pickup carrying a stale address" "orders_delivery_has_address" \
     "INSERT INTO orders (store_id,order_number,tracking_code,idempotency_key,guest_name,guest_phone,
         delivery_address,fulfilment_type,payment_method,currency,subtotal_amount)
       VALUES ('${ST}',next_order_number('${ST}'),'trk_pickup_address1','idem_pickup_address_xx',
-              'X','078 000 0000','KG 1 Ave','pickup','momo','RWF',1000)"
+              'X','078 000 0000','KG 1 Ave','pickup','mtn_momo','RWF',1000)"
 
 step "What was charged is captured, not looked up later"
 accepts "renaming the product afterwards" \

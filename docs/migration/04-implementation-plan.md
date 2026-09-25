@@ -1132,7 +1132,7 @@ snapshot, and it aborts unless the server first refuses a write.
 | **6** ✅ | **Config.** Done 2026-09-24. `V002`, six tables + `stores` columns, two validator functions, four triggers, and the templates shipped as data | **Met.** *The templates are rows* — **eight, not six** (see §3): every word map, attribute preset, module set and order flow from `AdminIndustries`, asserted against the board rather than against fixtures. *Pharmacy:* `new → pharmacist_check → preparing → ready → delivered`, the `rx` module, and the `prescription_required` flag — and it ships as a **draft**, as the board draws it, so no store can pin it. **55 config checks** pass, plus 105 from the earlier suites |
 | **7** ✅ | **Catalogue.** Done 2026-09-24. `V003`, ten tables, a deferred matrix-integrity constraint, and the server-side cart | **Met, all three.** *Twelve variants:* 4 sizes × 3 colours, each its own row with its own stock and SKU, built the way the app will — variant and values in one transaction, checked at commit. Black/M reads back as one row with stock of its own. *Shared group:* one `option_groups` row attached to two products through the join — **no copy**, so editing Cheese reaches both. *Cart:* keyed only by a server-issued session cookie, reads back whole from that id with nothing client-side, kept 7 days, and carries **no price columns at all** (asserted against `information_schema`). **50 catalogue checks** pass, 210 across four suites |
 | **8** ✅ | **Orders & money.** Done 2026-09-25, in two migrations because one file of this would not be reviewable and §2.4 asks for one concern each. `V004` orders (46 checks), `V005` money and the money functions (94 checks) | **Met, and then some.** The done-when asked for two concurrent reservations of the last unit; it was run with **ten** — one won, nine were told it was gone, stock landed on exactly zero and never went negative. Two more real races: the **same webhook delivered ten times at once** produced exactly one credit, and **ten reviewers approving one refund** produced exactly one debit. Every internal transfer writes both sides; the ledger's sequence is an unbroken run and every `balance_after` follows its predecessor; a wallet balance cannot be set by hand; and after a full lifecycle — paid, released, withdrawn, reversed, partially then fully refunded, plus a short cash payment — **the ledger still sums to the balances** |
-| **9** | **Supporting domains.** complaints, reviews + replies, notifications, audit log, payment methods, currencies, KYC, delivery zones, promotions, plans & fees, rider shifts & cash | Every table the 53 boards need exists. No board has nowhere to store its data |
+| **9** ◐ | **Supporting domains.** Eleven of them, so delivered in parts. **`V006` — done 2026-09-25** (59 checks): currencies, countries, payment methods, plans & fees. **Remaining:** delivery zones · rider shifts & cash · complaints · reviews + replies · notifications · audit log · KYC · promotions | *V006 met:* the six currencies with their exact formatting from `AdminCurrencies`, five countries, four payment methods from `AdminPayments`, and Starter/Growth from `AdminPlans` — all seeded, so a fresh database can onboard a merchant. It also **closes loose ends left open on purpose**: `stores.country`, `stores.selling_currency`, `stores.plan_key`, `wallets.currency`, `orders.currency` and `orders.payment_method` are now references rather than bare text. A store cannot open in a country the platform has not launched, and an order cannot name a provider that is not live, not available in its country, or outside the provider's limits |
 
 ### Stage C — Platform
 
@@ -1230,6 +1230,23 @@ milestone 2 writes anything; a change after that is a `db:reset`, not an upgrade
 *"Sound is off for this device"*, and with no browser storage that is either a per-user-per-device
 row keyed by a cookie, or per-user with the wording changed (§2.5). Second, image storage. Keep the existing Supabase bucket behind signed URLs,
 or move to S3/R2. Stub the endpoint locally. Does not block `V000`.
+
+**Newly open, from milestone 9's first part:**
+
+- **Plan prices and fees.** `AdminPlans` says "Prices and fees are placeholders until finance confirms
+  them", so `plans.monthly_price`, `payment_fee_percent` and `withdrawal_fee` are **NULL** — not zero,
+  because zero is a price and NULL is "not decided". Nothing can be billed from a figure nobody
+  agreed. Blocks billing, not any schema.
+- **The notice period for a price change.** The same board says price and fee changes take effect after
+  `[NOTICE PERIOD]` while feature changes apply immediately. That needs effective-dated prices, which
+  cannot be designed until the period is a number.
+- **`plan_features.delivery_and_riders` overlaps the industry module `delivery`.** One is commercial,
+  one is by business type, and they gate the same capability. The effective answer is presumably "the
+  module is on AND the plan grants it", but no board says so — **milestone 12's resolver has to decide
+  it deliberately** rather than inherit it from the schema.
+- **Payment webhook hosts** are `example.invalid` until the domain question below is answered.
+  Deliberate: RFC 2606 guarantees it can never resolve, so a half-configured deployment fails loudly
+  instead of posting a payment confirmation to somebody else's server.
 
 Still open, and all five block something:
 
