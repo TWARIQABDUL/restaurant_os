@@ -120,6 +120,37 @@ export interface ModulesRow {
   created_at: Date;
 }
 
+/** `momo_transactions.direction`, from its CHECK constraint. */
+export type MomoTransactionsDirection =
+  | 'collection'
+  | 'disbursement';
+
+/** `momo_transactions.status`, from its CHECK constraint. */
+export type MomoTransactionsStatus =
+  | 'pending'
+  | 'successful'
+  | 'failed';
+
+/**
+ * One attempt at moving money through MTN MoMo. reference_id is the provider idempotency key and is reused on retry, never regenerated.
+ */
+export interface MomoTransactionsRow {
+  id: string;
+  store_id: string;
+  order_id: string | null;
+  direction: MomoTransactionsDirection;
+  reference_id: string;
+  phone: string;
+  amount: string;
+  currency: string;
+  status: MomoTransactionsStatus;
+  provider_status: string | null;
+  provider_message: string | null;
+  created_at: Date;
+  resolved_at: Date | null;
+  withdrawal_id: string | null;
+}
+
 /** `option_groups.select_mode`, from its CHECK constraint. */
 export type OptionGroupsSelectMode =
   | 'one'
@@ -150,6 +181,136 @@ export interface OptionValuesRow {
   price_delta: string;
   is_available: boolean;
   position: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Append-only record of every status change, with who and why. The audit a refund or a short cash payment is argued from.
+ */
+export interface OrderEventsRow {
+  id: string;
+  order_id: string;
+  store_id: string;
+  from_status: string | null;
+  to_status: string;
+  reason: string | null;
+  note: string | null;
+  actor_id: string | null;
+  actor_role: string | null;
+  created_at: Date;
+}
+
+/**
+ * The options chosen on one line, captured. Their deltas must sum to the line's options_amount — checked at commit.
+ */
+export interface OrderItemOptionValuesRow {
+  order_item_id: string;
+  option_value_id: string;
+  order_id: string;
+  group_name: string;
+  value_label: string;
+  price_delta: string;
+}
+
+/**
+ * One line, with the name, price and options CAPTURED as they were. line_total_amount is GENERATED, so a line total cannot disagree with its own parts.
+ */
+export interface OrderItemsRow {
+  id: string;
+  order_id: string;
+  store_id: string;
+  variant_id: string;
+  product_name: string;
+  variant_label: string;
+  sku: string | null;
+  unit_price_amount: string;
+  options_amount: string;
+  quantity: number;
+  line_total_amount: string;
+  created_at: Date;
+}
+
+/**
+ * Every move an order may make. Enforced by a trigger, so an illegal jump is refused by the database rather than prevented by whichever code path remembered.
+ */
+export interface OrderStatusTransitionsRow {
+  from_status: string;
+  to_status: string;
+  description: string;
+}
+
+/** `orders.fulfilment_type`, from its CHECK constraint. */
+export type OrdersFulfilmentType =
+  | 'delivery'
+  | 'pickup';
+
+/** `orders.payment_method`, from its CHECK constraint. */
+export type OrdersPaymentMethod =
+  | 'cash'
+  | 'momo';
+
+/** `orders.payment_status`, from its CHECK constraint. */
+export type OrdersPaymentStatus =
+  | 'unpaid'
+  | 'paid'
+  | 'refunded';
+
+/** `orders.settlement_status`, from its CHECK constraint. */
+export type OrdersSettlementStatus =
+  | 'not_applicable'
+  | 'pending'
+  | 'released'
+  | 'refunded';
+
+/** `orders.status`, from its CHECK constraint. */
+export type OrdersStatus =
+  | 'pending'
+  | 'approved'
+  | 'preparing'
+  | 'ready'
+  | 'assigned'
+  | 'out'
+  | 'delivered'
+  | 'collected'
+  | 'returned'
+  | 'closed_return'
+  | 'rejected'
+  | 'cancelled';
+
+/**
+ * One order. total_amount is GENERATED and the subtotal is checked against the lines at commit, so an order's total can never be a number someone chose.
+ */
+export interface OrdersRow {
+  id: string;
+  store_id: string;
+  order_number: number;
+  tracking_code: string;
+  /** One per checkout attempt, from the client. A retried request carries the same key and collides here instead of placing a second order. */
+  idempotency_key: string;
+  customer_user_id: string | null;
+  guest_name: string | null;
+  guest_phone: string | null;
+  guest_email: string | null;
+  delivery_address: string | null;
+  fulfilment_type: OrdersFulfilmentType;
+  status: OrdersStatus;
+  payment_method: OrdersPaymentMethod;
+  payment_status: OrdersPaymentStatus;
+  settlement_status: OrdersSettlementStatus;
+  currency: string;
+  subtotal_amount: string;
+  delivery_fee_amount: string;
+  discount_amount: string;
+  total_amount: string;
+  refunded_amount: string;
+  /** What the rider says they collected. May be less than the total — Rider.dc.html: "Short by 2,000 RWF. Your manager will see the difference." */
+  cash_reported_amount: string | null;
+  cash_confirmed_at: Date | null;
+  rider_user_id: string | null;
+  placed_at: Date;
+  paid_at: Date | null;
+  delivered_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -264,6 +425,38 @@ export interface ProductsRow {
   updated_at: Date;
 }
 
+/** `refunds.reason_code`, from its CHECK constraint. */
+export type RefundsReasonCode =
+  | 'item_missing'
+  | 'wrong_item'
+  | 'quality_problem'
+  | 'arrived_late'
+  | 'other';
+
+/** `refunds.status`, from its CHECK constraint. */
+export type RefundsStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected';
+
+/**
+ * A merchant's request, reviewed by the platform. Partial refunds are supported; the approved ones must sum to orders.refunded_amount.
+ */
+export interface RefundsRow {
+  id: string;
+  store_id: string;
+  order_id: string;
+  amount: string;
+  reason_code: RefundsReasonCode;
+  reason_note: string | null;
+  status: RefundsStatus;
+  requested_by: string | null;
+  reviewed_by: string | null;
+  reviewed_at: Date | null;
+  rejection_reason: string | null;
+  created_at: Date;
+}
+
 /** `role_permissions.scope`, from its CHECK constraint. */
 export type RolePermissionsScope =
   | 'platform'
@@ -302,6 +495,14 @@ export interface StoreMembersRow {
   created_by: string | null;
   created_at: Date;
   updated_at: Date;
+}
+
+/**
+ * Allocates order numbers per store. Starts at 1000 so the first order is not #1, which reads as a store with no customers.
+ */
+export interface StoreOrderCountersRow {
+  store_id: string;
+  next_order_number: number;
 }
 
 /** `stores.status`, from its CHECK constraint. */
@@ -352,6 +553,87 @@ export interface UsersRow {
   updated_at: Date;
 }
 
+/** `wallet_ledger.entry_type`, from its CHECK constraint. */
+export type WalletLedgerEntryType =
+  | 'order_payment_received'
+  | 'escrow_released_out'
+  | 'escrow_released_in'
+  | 'refund_paid'
+  | 'withdrawal_reserved'
+  | 'withdrawal_reversed'
+  | 'adjustment';
+
+/** `wallet_ledger.pot`, from its CHECK constraint. */
+export type WalletLedgerPot =
+  | 'pending'
+  | 'available';
+
+/**
+ * Append-only. sum(amount) per pot IS that pot's balance, because every internal movement writes both sides. balance_after chains, so a missing row is detectable.
+ */
+export interface WalletLedgerRow {
+  id: string;
+  store_id: string;
+  pot: WalletLedgerPot;
+  sequence: string;
+  entry_type: WalletLedgerEntryType;
+  amount: string;
+  balance_after: string;
+  transfer_id: string | null;
+  counterparty: string | null;
+  order_id: string | null;
+  momo_transaction_id: string | null;
+  refund_id: string | null;
+  withdrawal_id: string | null;
+  /** Unique per store. A replayed webhook or a retried sweep posts the same key and gets the existing entry back instead of moving money twice. */
+  idempotency_key: string;
+  note: string | null;
+  created_by: string | null;
+  created_at: Date;
+}
+
+/**
+ * A store's two pots. The balances are derived from wallet_ledger and maintained only by its trigger; a direct update is refused.
+ */
+export interface WalletsRow {
+  store_id: string;
+  currency: string;
+  pending_balance: string;
+  available_balance: string;
+  updated_at: Date;
+}
+
+/** `withdrawals.initiated_by`, from its CHECK constraint. */
+export type WithdrawalsInitiatedBy =
+  | 'manual'
+  | 'automatic';
+
+/** `withdrawals.status`, from its CHECK constraint. */
+export type WithdrawalsStatus =
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'rejected';
+
+/**
+ * A payout request. Funds leave available the moment it is requested, so the same money cannot be withdrawn twice while the first transfer is in flight.
+ */
+export interface WithdrawalsRow {
+  id: string;
+  store_id: string;
+  amount: string;
+  phone: string;
+  status: WithdrawalsStatus;
+  failure_reason: string | null;
+  initiated_by: WithdrawalsInitiatedBy;
+  idempotency_key: string;
+  requested_by: string | null;
+  reviewed_by: string | null;
+  requested_at: Date;
+  completed_at: Date | null;
+}
+
 /** Every table, for a repository layer that is generic over one. */
 export interface Database {
   cart_item_option_values: CartItemOptionValuesRow;
@@ -363,8 +645,14 @@ export interface Database {
   industry_template_versions: IndustryTemplateVersionsRow;
   industry_templates: IndustryTemplatesRow;
   modules: ModulesRow;
+  momo_transactions: MomoTransactionsRow;
   option_groups: OptionGroupsRow;
   option_values: OptionValuesRow;
+  order_events: OrderEventsRow;
+  order_item_option_values: OrderItemOptionValuesRow;
+  order_items: OrderItemsRow;
+  order_status_transitions: OrderStatusTransitionsRow;
+  orders: OrdersRow;
   platform_members: PlatformMembersRow;
   product_categories: ProductCategoriesRow;
   product_flags: ProductFlagsRow;
@@ -373,10 +661,15 @@ export interface Database {
   product_variant_values: ProductVariantValuesRow;
   product_variants: ProductVariantsRow;
   products: ProductsRow;
+  refunds: RefundsRow;
   role_permissions: RolePermissionsRow;
   store_members: StoreMembersRow;
+  store_order_counters: StoreOrderCountersRow;
   stores: StoresRow;
   users: UsersRow;
+  wallet_ledger: WalletLedgerRow;
+  wallets: WalletsRow;
+  withdrawals: WithdrawalsRow;
 }
 
 /** Table names as a value, so a runtime check can be exhaustive. */
@@ -390,8 +683,14 @@ export const TABLE_NAMES = [
   'industry_template_versions',
   'industry_templates',
   'modules',
+  'momo_transactions',
   'option_groups',
   'option_values',
+  'order_events',
+  'order_item_option_values',
+  'order_items',
+  'order_status_transitions',
+  'orders',
   'platform_members',
   'product_categories',
   'product_flags',
@@ -400,10 +699,15 @@ export const TABLE_NAMES = [
   'product_variant_values',
   'product_variants',
   'products',
+  'refunds',
   'role_permissions',
   'store_members',
+  'store_order_counters',
   'stores',
   'users',
+  'wallet_ledger',
+  'wallets',
+  'withdrawals',
 ] as const;
 
 export type TableName = (typeof TABLE_NAMES)[number];

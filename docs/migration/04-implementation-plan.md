@@ -436,6 +436,49 @@ Duplicating any of them is the likeliest source of "the preview doesn't match th
 - **`money`** — one formatter driven by the currency table: symbol, position, decimals, separator,
   and **cash rounding that applies only to cash-on-delivery totals**. Property tests, not examples.
 
+  > **The money schema landed at milestone 8** (`V005`). Six things it is built on:
+  >
+  > **Two pots, and every internal movement writes both sides.** `pending` and `available`, neither
+  > ever negative. A release debits `pending` and credits `available` as two rows sharing a
+  > `transfer_id`, checked at commit to sum to zero. **This is the exact bug the old database had** —
+  > it credited `available` and never debited `pending`, so the pending sum became "the total ever
+  > held" and the pots could not be reconciled by summing (profile §7.2). Money crossing the platform
+  > boundary writes one row that must name its `counterparty`, so no entry is anonymous.
+  >
+  > **The ledger is a chain, not a bag.** `sequence` is monotonic per (store, pot) and `balance_after`
+  > must equal the previous entry's plus this amount — enforced on INSERT, so a hand-written row cannot
+  > break it either. A missing or reordered entry is therefore detectable rather than merely unlikely.
+  >
+  > **A wallet balance cannot be set directly.** The balances are a cache of the ledger, written only
+  > by the ledger's own trigger; a direct `UPDATE` is refused by checking `pg_trigger_depth()`. The
+  > only way to change what a store is owed is to write an entry explaining it.
+  >
+  > **Three independent layers of idempotency** on every money path, any one sufficient: a single-shot
+  > claim (`UPDATE … WHERE status = 'pending' RETURNING`), a ledger idempotency key unique per store,
+  > and a uniqueness constraint on the outcome — at most one *successful* collection per order, and at
+  > most one in flight, so a second charge is unrepresentable rather than avoided by discipline.
+  >
+  > **A refund leaves the pot the money is actually in**, decided from the order's settlement state
+  > rather than guessed. That is the other half of the old database's ±100: its refund function chose
+  > the label with a single CASE and named the pot the money had not left. Tested both ways — before
+  > release it comes out of `pending`, after release out of `available`.
+  >
+  > **The escrow sweep no longer clamps.** The old `release_eligible_orders` used
+  > `LEAST(net, pending_balance)` as "belt and braces", which turned an inconsistency into a silent
+  > correction — one order released 200 more than it held and the next absorbed it. Here, if `pending`
+  > cannot cover a release, `wallet_post` raises and the sweep fails loudly. That is the only useful
+  > behaviour.
+  >
+  > **Cash writes no ledger entry at all.** With cash on delivery the merchant already has the money;
+  > the wallet tracks what the *platform* holds. Crediting it would invent a balance that cannot be
+  > withdrawn. A shortfall is recorded on the order — `total 12,500, received 10,000, short 2,500` —
+  > and the platform's commission on a cash order is plans & fees, at milestone 9.
+  >
+  > Two custom SQLSTATEs let the application tell a user's problem from a bug: **`VLSTK`** insufficient
+  > stock, **`VLFND`** insufficient funds. And `reserve_stock` locks variants in a **single global
+  > order**, because two orders containing the same two variants in opposite orders would otherwise
+  > deadlock.
+
 **One Vite app, three route trees** (`storefront/`, `merchant/`, `admin/`) plus `shared/ui`,
 code-split. Rejected: three separate deployables — not justified at this team size, and the
 current Render setup (one Node service + one static site) works.
@@ -728,6 +771,39 @@ not summable. Recomputing a running balance from them would bake both errors in 
 > **The cart stores no prices.** `States.dc.html`: "Prices are re-checked at checkout; any change is
 > shown before paying." A price copied into the cart is a second source of truth that goes stale in
 > silence.
+
+> **Orders landed at milestone 8's first half** (`V004`). What it establishes, and one question it
+> settles:
+>
+> **The twelve statuses are `Orders.dc.html`'s own**, not a guess: `pending approved preparing ready
+> assigned out delivered collected returned closed_return rejected cancelled`. Five are terminal —
+> `delivered collected rejected cancelled closed_return` — and they are terminal *because no
+> transition leaves them* in `order_status_transitions`, which is data rather than a code branch.
+>
+> **`orders.status` is the platform machine; a template's `order_steps` are presentation.** That
+> resolves the question milestone 6 left open. The money and lifecycle logic must not depend on
+> industry vocabulary, so the status vocabulary is fixed at twelve; Pharmacy's `pharmacist_check` is a
+> *label* on the timeline, most plausibly over `approved`. **The mapping from step keys to statuses is
+> still open** and belongs with the config resolver (milestone 12) or the Orders screen (milestone 20)
+> — it is presentation, so it can wait, but it cannot be forgotten.
+>
+> **The arithmetic is unforgeable.** `total_amount` is `GENERATED ALWAYS AS (subtotal + delivery −
+> discount)` and `line_total_amount` as `((unit_price + options) × quantity)`, so neither can be set
+> to a number somebody chose. Deferred constraints then check that an order **has at least one line**,
+> that its subtotal **equals the sum of those lines**, and that a line's `options_amount` equals the
+> sum of its captured option deltas. There is no path to an order whose total disagrees with what it
+> contains.
+>
+> **A retried checkout cannot charge twice.** `idempotency_key`, unique per store, one per checkout
+> attempt from the client. The second request collides instead of placing a second order.
+>
+> **What was charged is captured, not looked up.** `order_items` stores the product name, the price
+> and each option's label and delta as they were. Renaming a product tomorrow does not rewrite what
+> someone paid yesterday, and the variant cannot be deleted out from under an order.
+>
+> **Every state change is recorded** in append-only `order_events` with who and why — the table a
+> short cash payment or a refund is argued from. The reason lists are the board's: four decline
+> reasons, four cancel reasons, five refund reasons.
 
 **The variant gap.** Today a size is an `add_ons` row with its own stock: that expresses "M has 4
 left" but **not** "Black/M has 4 left", because size and colour stock are separate rows. The design
@@ -1055,7 +1131,7 @@ snapshot, and it aborts unless the server first refuses a write.
 | **5** ✅ | **Identity, stores & memberships (§5.4).** Done 2026-09-24. `V001`, five tables, `db/scripts/gen-types.ts`, `db/scripts/test-schema.sh` | **Met.** *The store-picker case:* one person holds `owner@nyama-and-co` **and** `manager@inzu-threads`, and the picker's own query returns both. *Row types:* `packages/core/src/generated/database.ts`, committed, with CHECK constraints emitted as union types and `numeric`/`bigint` as `string` — `npm run db:types -- --check` regenerates in CI and fails on any drift, so a column rename cannot merge beside stale types. **105 checks pass** across two suites (59 schema, 46 runner), including every scope rule, both uniqueness rules, one person's two roles in two stores, and the escalations the schema itself refuses |
 | **6** ✅ | **Config.** Done 2026-09-24. `V002`, six tables + `stores` columns, two validator functions, four triggers, and the templates shipped as data | **Met.** *The templates are rows* — **eight, not six** (see §3): every word map, attribute preset, module set and order flow from `AdminIndustries`, asserted against the board rather than against fixtures. *Pharmacy:* `new → pharmacist_check → preparing → ready → delivered`, the `rx` module, and the `prescription_required` flag — and it ships as a **draft**, as the board draws it, so no store can pin it. **55 config checks** pass, plus 105 from the earlier suites |
 | **7** ✅ | **Catalogue.** Done 2026-09-24. `V003`, ten tables, a deferred matrix-integrity constraint, and the server-side cart | **Met, all three.** *Twelve variants:* 4 sizes × 3 colours, each its own row with its own stock and SKU, built the way the app will — variant and values in one transaction, checked at commit. Black/M reads back as one row with stock of its own. *Shared group:* one `option_groups` row attached to two products through the join — **no copy**, so editing Cheese reaches both. *Cart:* keyed only by a server-issued session cookie, reads back whole from that id with nothing client-side, kept 7 days, and carries **no price columns at all** (asserted against `information_schema`). **50 catalogue checks** pass, 210 across four suites |
-| **8** | **Orders & money.** `orders` (12 statuses), `order_items`, `wallets`, `wallet_ledger` with running balance, withdrawals, refunds, momo transactions — plus the seven plpgsql functions, with **`reserve_stock` rewritten against variants** | Two concurrent reservations of the last unit: exactly one wins. This is a test, not an inspection |
+| **8** ✅ | **Orders & money.** Done 2026-09-25, in two migrations because one file of this would not be reviewable and §2.4 asks for one concern each. `V004` orders (46 checks), `V005` money and the money functions (94 checks) | **Met, and then some.** The done-when asked for two concurrent reservations of the last unit; it was run with **ten** — one won, nine were told it was gone, stock landed on exactly zero and never went negative. Two more real races: the **same webhook delivered ten times at once** produced exactly one credit, and **ten reviewers approving one refund** produced exactly one debit. Every internal transfer writes both sides; the ledger's sequence is an unbroken run and every `balance_after` follows its predecessor; a wallet balance cannot be set by hand; and after a full lifecycle — paid, released, withdrawn, reversed, partially then fully refunded, plus a short cash payment — **the ledger still sums to the balances** |
 | **9** | **Supporting domains.** complaints, reviews + replies, notifications, audit log, payment methods, currencies, KYC, delivery zones, promotions, plans & fees, rider shifts & cash | Every table the 53 boards need exists. No board has nowhere to store its data |
 
 ### Stage C — Platform
