@@ -1,11 +1,15 @@
-// The root project: the database tooling in db/scripts, run directly by Node.
+// The root project: the database tooling in db/scripts and db/seeds, run directly
+// by Node. allowImportingTsExtensions is on because these modules import each other
+// with the .ts suffix Node's own type stripping requires — there is no bundler and
+// no build step to rewrite the specifier.
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2023"],
-    "types": ["node"]
+    "types": ["node"],
+    "allowImportingTsExtensions": true
   },
-  "include": ["db/scripts/**/*.ts", "scripts/**/*.ts"]
+  "include": ["db/scripts/**/*.ts", "db/seeds/**/*.ts", "scripts/**/*.ts"]
 }

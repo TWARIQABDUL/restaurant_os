@@ -15,6 +15,7 @@
     "db:migrate:status": "bash db/scripts/migrate.sh status",
     "db:migrate:new": "bash db/scripts/migrate.sh new",
     "db:types": "bash db/scripts/gen-types.sh",
+    "db:seed": "bash db/scripts/seed.sh",
     "db:test": "bash db/scripts/test.sh",
     "db:profile": "bash db/scripts/profile-old-db.sh",
     "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p server && tsc -p client",
@@ -24,9 +25,11 @@
     "node": ">=22.18"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "pg": "^8.23.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^26.6.2",
     "@types/pg": "^8.23.1",
     "typescript": "^7.0.2"

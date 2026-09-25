@@ -639,7 +639,7 @@ db/
   bootstrap/local.sql   LOCAL ONLY — roles + diagnostics,     done, milestone 1
                         never anything the schema depends on
   migrations/       V000_init.sql, V001_…                    milestone 2
-  seeds/            dev.ts + fixtures/                       milestone 10
+  seeds/            dev.ts + fixtures/ + README.md            done, milestone 10
 packages/core/      theme-engine · config · money · types     skeleton done, milestone 3
   src/index.ts      empty; names what lands and when          fills at 12 and 13
 client/src/styles/   tokens.css (L0) · store-theme.ts (the nine) done, milestone 4
@@ -666,7 +666,7 @@ underneath a live money system months before anything needs it buys nothing. `pa
 `tsconfig` exists now, which is the part milestone 3 was actually for.
 
 **Built:** `db:up` · `db:down` · `db:reset` · `db:verify` · `db:psql` · `db:logs`.
-**Later:** `db:migrate` · `db:migrate:new` · `db:migrate:status` (milestone 2) · `db:seed` (10) ·
+**Later:** `db:migrate` · `db:migrate:new` · `db:migrate:status` (milestone 2) · `db:seed` (done, 10) ·
 `db:types` (5). There is no `db:baseline` — §2.4.
 
 The root `package.json` is deliberately dependency-free until milestone 3, when workspaces land. It
@@ -1158,7 +1158,7 @@ snapshot, and it aborts unless the server first refuses a write.
 
 | # | Milestone | Done when |
 |---|---|---|
-| **10** | **Seed.** TS program, guardrails, the design's fixtures, full status coverage, enough volume for EXPLAIN | `db:reset` gives a database where every screen has data, and a sequential scan is visibly slower than an index scan |
+| **10** ✅ | **Seed.** Done 2026-09-25. `db/seeds/dev.ts` + `fixtures/` (9 modules), `db:seed`, `db/scripts/test-seed.sh`. Six stores, the design's own demo data, 30,000 generated orders in 2m56s | **Met, both clauses.** *Every screen has data:* six stores covering all three `AdminMerchants` states; orders in **all twelve statuses**, each *walked* through `order_status_transitions` rather than inserted in place, so every timeline is real and the seed is itself a test of the machine; a wallet with money in **both pots** and one entry of each of the **seven** ledger types; refunds approved, rejected and **queued**; a payout that failed with a reason and had its money returned; riders on and off duty with one carrying a cash debt into the next shift; complaints in all four states; reviews with replies, one hidden after an upheld report; KYC approved, submitted and redo-requested; promo codes live, expired and spent, plus two automatic offers. *A sequential scan is visibly slower:* the Orders board's own query against 30,019 orders runs in **0.29 ms reading 24 buffers** on `orders_store_status_placed_idx`, and **15.36 ms reading 3,520** with index scans disabled — 53× the time, 147× the pages, scanning 30,019 rows to discard 17,585. The suite asserts the **planner's cost ratio** rather than a stopwatch, because cost is deterministic where wall-clock on a shared machine is not. **Three findings, each one the database refusing the seed:** the no-CASCADE truncate found that `industry_template_versions.created_by` references `users` — a migration-owned table pointing into seeded data; the phase order is the schema's, since `request_withdrawal()` refuses an unverified store and a discount must equal its rows; and V003's third matrix rule makes "fries or plantain" a **variant dimension**, not an add-on |
 | **11** | **`pg.Pool` + repository layer + authorization.** Connection, transaction helper, the first repositories (stores, users, memberships), and the membership-aware guard replacing `user.tenant_id !== req.tenant.id` | The server boots against the local container with no supabase-js in the path, and **all four escalation tests in §5.4 pass** |
 | **12** | **Core: config resolver.** `t(key)`, `has(module)`, the versioned payload with an ETag | Switching a store's template changes vocabulary and feature gates through one API call |
 | **13** | **Core: theme engine + money.** The compiler, contrast enforcement, draft/publish, server-side re-run gate; the currency formatter with cash rounding | The three stores in `ShoeStores` reproduced from three input sets. No input combination publishes something unreadable. Cash rounding property-tested |
