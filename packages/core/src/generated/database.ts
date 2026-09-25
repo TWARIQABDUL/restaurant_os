@@ -8,6 +8,43 @@
 //                          `number` here would invite arithmetic that loses cents.
 //   * bigint   -> string   it exceeds Number.MAX_SAFE_INTEGER.
 
+/** `audit_log.category`, from its CHECK constraint. */
+export type AuditLogCategory =
+  | 'sensitive'
+  | 'money'
+  | 'store'
+  | 'config'
+  | 'access';
+
+/**
+ * Every admin action and every sensitive view, chained by hash so that editing or removing an entry is detectable even by somebody who can turn the triggers off.
+ */
+export interface AuditLogRow {
+  id: string;
+  sequence: string;
+  category: AuditLogCategory;
+  /** A stable code for querying, open by design: the log never refuses an entry because nobody declared its kind yet. */
+  action: string;
+  summary: string;
+  detail: string | null;
+  actor_id: string | null;
+  actor_label: string;
+  actor_role: string | null;
+  store_id: string | null;
+  store_label: string | null;
+  /** What the entry is about, as loose text and an id rather than a foreign key — the one place in this schema where that is correct. Evidence must outlive its subject. */
+  subject_type: string | null;
+  subject_id: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  session_verified_at: Date | null;
+  context: unknown;
+  previous_hash: string | null;
+  /** sha256 over the previous hash and this entry's own fields. Recomputed and checked by verify_audit_chain(). */
+  entry_hash: string;
+  created_at: Date;
+}
+
 /**
  * The "pick several" choices on one line — Cheese and Extra sauce. The single-select choices are already the variant, so they are not repeated here.
  */
@@ -55,6 +92,137 @@ export interface CategoriesRow {
   image_url: string | null;
   is_visible: boolean;
   position: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** `complaint_events.actor_side`, from its CHECK constraint. */
+export type ComplaintEventsActorSide =
+  | 'customer'
+  | 'store'
+  | 'rider'
+  | 'platform'
+  | 'system';
+
+/** `complaint_events.event_type`, from its CHECK constraint. */
+export type ComplaintEventsEventType =
+  | 'filed'
+  | 'resolved'
+  | 'rejected'
+  | 'escalated'
+  | 'reopened'
+  | 'refund_requested'
+  | 'platform_refunded'
+  | 'platform_rejected'
+  | 'note';
+
+/** `complaint_events.to_status`, from its CHECK constraint. */
+export type ComplaintEventsToStatus =
+  | 'open'
+  | 'escalated'
+  | 'resolved'
+  | 'rejected'
+  | 'open'
+  | 'escalated'
+  | 'resolved'
+  | 'rejected';
+
+/**
+ * The complaint thread: append-only, totally ordered per complaint, and chained so the status and the timeline cannot disagree. The CASCADE above is unreachable — the append-only trigger refuses the delete — which is deliberate: a complaint, once filed, stays.
+ */
+export interface ComplaintEventsRow {
+  id: string;
+  complaint_id: string;
+  store_id: string;
+  sequence: number;
+  event_type: ComplaintEventsEventType;
+  from_status: string | null;
+  to_status: ComplaintEventsToStatus;
+  /** The four groups the boards colour separately, plus system. Not the role: actor_id and the memberships hold that. */
+  actor_side: ComplaintEventsActorSide;
+  actor_id: string | null;
+  actor_scope: string | null;
+  note: string | null;
+  created_at: Date;
+}
+
+/** `complaint_evidence.kind`, from its CHECK constraint. */
+export type ComplaintEvidenceKind =
+  | 'photo'
+  | 'document'
+  | 'location_log'
+  | 'other';
+
+/** `complaint_evidence.side`, from its CHECK constraint. */
+export type ComplaintEvidenceSide =
+  | 'customer'
+  | 'store'
+  | 'rider'
+  | 'platform';
+
+/**
+ * Photos, documents and logs attached to a complaint, labelled by the side that produced them. Insert-only: evidence that can be withdrawn after the fact is not evidence.
+ */
+export interface ComplaintEvidenceRow {
+  id: string;
+  complaint_id: string;
+  store_id: string;
+  side: ComplaintEvidenceSide;
+  kind: ComplaintEvidenceKind;
+  label: string;
+  storage_key: string | null;
+  content_type: string | null;
+  byte_size: string | null;
+  uploaded_by: string | null;
+  created_at: Date;
+}
+
+/**
+ * Every move a complaint may make. Enforced by a trigger, so an illegal jump is refused by the database rather than prevented by whichever code path remembered.
+ */
+export interface ComplaintStatusTransitionsRow {
+  from_status: string;
+  to_status: string;
+  description: string;
+}
+
+/** `complaints.reason_code`, from its CHECK constraint. */
+export type ComplaintsReasonCode =
+  | 'item_missing'
+  | 'wrong_item'
+  | 'quality_problem'
+  | 'arrived_late'
+  | 'other';
+
+/** `complaints.status`, from its CHECK constraint. */
+export type ComplaintsStatus =
+  | 'open'
+  | 'escalated'
+  | 'resolved'
+  | 'rejected';
+
+/**
+ * A customer's complaint about one order. Current state only: the thread is in complaint_events, and the timeline there is the record a dispute is argued from.
+ */
+export interface ComplaintsRow {
+  id: string;
+  /** Platform-wide, gaps allowed. Shown as C-nnn to the merchant and D-nnn to Vendlyfy once escalated — one complaint, two prefixes. */
+  reference_number: string;
+  store_id: string;
+  order_id: string;
+  customer_user_id: string | null;
+  reason_code: ComplaintsReasonCode;
+  detail: string;
+  status: ComplaintsStatus;
+  closed_by: string | null;
+  /** When the MERCHANT last closed it, by resolving or rejecting — not proof that it is closed now. A reopened complaint keeps this and returns to open. */
+  closed_at: Date | null;
+  escalated_by: string | null;
+  escalated_at: Date | null;
+  decided_by: string | null;
+  decided_at: Date | null;
+  decision: string | null;
+  reopened_count: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -185,6 +353,140 @@ export interface IndustryTemplatesRow {
   updated_at: Date;
 }
 
+/** `kyc_checks.check_code`, from its CHECK constraint. */
+export type KycChecksCheckCode =
+  | 'document_genuine'
+  | 'face_in_view'
+  | 'liveness'
+  | 'face_matches_document'
+  | 'name_matches_registration'
+  | 'not_used_by_another_store';
+
+/** `kyc_checks.outcome`, from its CHECK constraint. */
+export type KycChecksOutcome =
+  | 'pass'
+  | 'warn'
+  | 'fail';
+
+/**
+ * The six automatic checks AdminKYC lists, one row each, with the vendor's own result kept whole beside our summary of it.
+ */
+export interface KycChecksRow {
+  id: string;
+  submission_id: string;
+  store_id: string;
+  check_code: KycChecksCheckCode;
+  outcome: KycChecksOutcome;
+  note: string | null;
+  vendor_name: string | null;
+  vendor_result: unknown;
+  ran_at: Date;
+}
+
+/** `kyc_documents.part`, from its CHECK constraint. */
+export type KycDocumentsPart =
+  | 'id_front'
+  | 'id_back'
+  | 'face_video';
+
+/**
+ * The three parts of a submission, with a per-part review outcome so that a redo can ask for one photo and leave the other two accepted. Superseded rows stay: what was sent first is part of the record.
+ */
+export interface KycDocumentsRow {
+  id: string;
+  submission_id: string;
+  store_id: string;
+  part: KycDocumentsPart;
+  storage_key: string;
+  content_type: string;
+  byte_size: string | null;
+  quality: string | null;
+  quality_note: string | null;
+  review_outcome: string | null;
+  /** When the bytes may be deleted. NULL because the retention period is a placeholder in the design — one of the two things Part 8 says to answer before this phase ships. */
+  retain_until: Date | null;
+  purged_at: Date | null;
+  superseded_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** `kyc_extracted_fields.field_key`, from its CHECK constraint. */
+export type KycExtractedFieldsFieldKey =
+  | 'full_name'
+  | 'id_number'
+  | 'date_of_birth'
+  | 'document_expires_on'
+  | 'typed_name';
+
+/** `kyc_extracted_fields.verdict`, from its CHECK constraint. */
+export type KycExtractedFieldsVerdict =
+  | 'match'
+  | 'differs'
+  | 'unread';
+
+/**
+ * What was read off the document and whether it agrees with what the merchant typed. Display-safe throughout: the ID number appears here masked, so reading this table is not a sensitive view.
+ */
+export interface KycExtractedFieldsRow {
+  submission_id: string;
+  store_id: string;
+  field_key: KycExtractedFieldsFieldKey;
+  display_value: string;
+  verdict: KycExtractedFieldsVerdict;
+  created_at: Date;
+}
+
+/**
+ * Every move a submission may make. approved and rejected are terminal — "Start again" is a NEW submission, because a rejection is part of the record.
+ */
+export interface KycStatusTransitionsRow {
+  from_status: string;
+  to_status: string;
+  description: string;
+}
+
+/** `kyc_submissions.document_type`, from its CHECK constraint. */
+export type KycSubmissionsDocumentType =
+  | 'national_id'
+  | 'passport';
+
+/** `kyc_submissions.status`, from its CHECK constraint. */
+export type KycSubmissionsStatus =
+  | 'submitted'
+  | 'in_review'
+  | 'redo_requested'
+  | 'approved'
+  | 'rejected';
+
+/**
+ * One identity check. Holds the masked number, the encrypted number and a keyed fingerprint — never the number itself in readable form.
+ */
+export interface KycSubmissionsRow {
+  id: string;
+  reference_number: string;
+  store_id: string;
+  subject_user_id: string;
+  document_type: KycSubmissionsDocumentType;
+  status: KycSubmissionsStatus;
+  id_number_masked: string | null;
+  /** Encrypted outside the database, with a key that is not in it. Readable only through reveal_kyc_id_number(), which writes an audit entry first. */
+  id_number_encrypted: Uint8Array | null;
+  encryption_key_id: string | null;
+  /** A keyed hash for duplicate detection, computed outside the database with a pepper. Deliberately NOT unique: one person may own two stores. */
+  id_number_fingerprint: string | null;
+  full_name: string | null;
+  date_of_birth: Date | null;
+  document_expires_on: Date | null;
+  reviewed_by: string | null;
+  reviewed_at: Date | null;
+  decision_note: string | null;
+  submitted_at: Date;
+  checks_completed_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
 /**
  * Feature gates a template can switch on. has(module) reads these. Adding one is a migration because a module without code behind it does nothing.
  */
@@ -228,6 +530,104 @@ export interface MomoTransactionsRow {
   payment_method_key: string | null;
 }
 
+/**
+ * One row per device a person uses, identified by a server-issued cookie. Holds the per-device sound preference the design asks for, because there is no browser storage to hold it in.
+ */
+export interface NotificationDevicesRow {
+  id: string;
+  user_id: string;
+  device_token: string;
+  label: string | null;
+  sound_enabled: boolean;
+  last_seen_at: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Per person, per store: the "mark all as read" watermark and when they last had the inbox open.
+ */
+export interface NotificationInboxStateRow {
+  user_id: string;
+  store_id: string;
+  all_read_before: Date | null;
+  last_seen_at: Date | null;
+  updated_at: Date;
+}
+
+/**
+ * One row per person per notification they opened. A broadcast read by one manager stays unread for the others, which is what the per-person dot means.
+ */
+export interface NotificationReadsRow {
+  notification_id: string;
+  user_id: string;
+  read_at: Date;
+}
+
+/** `notification_types.audience`, from its CHECK constraint. */
+export type NotificationTypesAudience =
+  | 'store_staff'
+  | 'customer';
+
+/** `notification_types.subject`, from its CHECK constraint. */
+export type NotificationTypesSubject =
+  | 'order'
+  | 'complaint'
+  | 'review'
+  | 'withdrawal'
+  | 'store';
+
+/** `notification_types.tone`, from its CHECK constraint. */
+export type NotificationTypesTone =
+  | 'info'
+  | 'good'
+  | 'bad'
+  | 'attention'
+  | 'progress';
+
+/**
+ * The kinds of notification, seeded. A type says who may see it, which values the client needs and where it leads — so none of that is repeated on every row.
+ */
+export interface NotificationTypesRow {
+  code: string;
+  audience: NotificationTypesAudience;
+  /** Whose inbox a store broadcast reaches. Payouts do not reach a manager, per Auth's own description of the role. */
+  visible_to_roles: string[];
+  tone: NotificationTypesTone;
+  subject: NotificationTypesSubject;
+  route: string;
+  required_payload_keys: string[];
+  is_alert: boolean;
+  description: string;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** `notifications.audience`, from its CHECK constraint. */
+export type NotificationsAudience =
+  | 'store_staff'
+  | 'customer';
+
+/**
+ * One row per event, not per reader. A store broadcast has no user_id and is filtered by the type's roles; a customer's own notification names them. The words are composed at read time from the type and the payload.
+ */
+export interface NotificationsRow {
+  id: string;
+  store_id: string;
+  type_code: string;
+  audience: NotificationsAudience;
+  user_id: string | null;
+  /** The values the sentence needs — order number, amount, a name. Never the sentence: that is the industry template's, and it changes when a store changes template. */
+  payload: unknown;
+  order_id: string | null;
+  complaint_id: string | null;
+  review_id: string | null;
+  withdrawal_id: string | null;
+  idempotency_key: string;
+  created_at: Date;
+}
+
 /** `option_groups.select_mode`, from its CHECK constraint. */
 export type OptionGroupsSelectMode =
   | 'one'
@@ -260,6 +660,27 @@ export interface OptionValuesRow {
   position: number;
   created_at: Date;
   updated_at: Date;
+}
+
+/** `order_discounts.source`, from its CHECK constraint. */
+export type OrderDiscountsSource =
+  | 'promotion'
+  | 'manual';
+
+/**
+ * Every reduction of an order, with where it came from. orders.discount_amount must equal their sum, which is what stops a discount being a number a client sent.
+ */
+export interface OrderDiscountsRow {
+  id: string;
+  order_id: string;
+  store_id: string;
+  source: OrderDiscountsSource;
+  promotion_id: string | null;
+  code: string | null;
+  amount: string;
+  reason: string | null;
+  created_by: string | null;
+  created_at: Date;
 }
 
 /**
@@ -585,6 +1006,54 @@ export interface ProductsRow {
   updated_at: Date;
 }
 
+/** `promotions.discount_type`, from its CHECK constraint. */
+export type PromotionsDiscountType =
+  | 'percentage'
+  | 'fixed_amount'
+  | 'free_item';
+
+/** `promotions.kind`, from its CHECK constraint. */
+export type PromotionsKind =
+  | 'code'
+  | 'automatic';
+
+/**
+ * Promo codes and automatic promotions. The discount is one of three shapes, the window is a date range plus an optional day-and-hour rule, and the banner's words live here because Customize treats the banner as content.
+ */
+export interface PromotionsRow {
+  id: string;
+  store_id: string;
+  kind: PromotionsKind;
+  code: string | null;
+  discount_type: PromotionsDiscountType;
+  percent_off: string | null;
+  amount_off: string | null;
+  free_product_id: string | null;
+  required_product_id: string | null;
+  min_quantity: number | null;
+  min_subtotal_amount: string | null;
+  banner_title: string | null;
+  banner_subtitle: string | null;
+  starts_at: Date | null;
+  ends_at: Date | null;
+  /** ISO day numbers, 1 = Monday. Empty means every day. ISO rather than 0-6 because a weekend is {6,7} — contiguous — where Sunday-first splits it. */
+  days_of_week: number[];
+  time_from: string | null;
+  time_to: string | null;
+  /** No board draws a cap. It exists because a code with no cap is an unbounded claim on the merchant's own balance. NULL means no limit, so the default matches the boards exactly. */
+  max_redemptions: number | null;
+  max_redemptions_per_customer: number | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** `refunds.initiated_by`, from its CHECK constraint. */
+export type RefundsInitiatedBy =
+  | 'merchant'
+  | 'platform';
+
 /** `refunds.reason_code`, from its CHECK constraint. */
 export type RefundsReasonCode =
   | 'item_missing'
@@ -596,6 +1065,7 @@ export type RefundsReasonCode =
 /** `refunds.status`, from its CHECK constraint. */
 export type RefundsStatus =
   | 'pending'
+  | 'queued'
   | 'approved'
   | 'rejected';
 
@@ -606,6 +1076,7 @@ export interface RefundsRow {
   id: string;
   store_id: string;
   order_id: string;
+  /** What the merchant asked for. Never changed afterwards, because it is what they argue from. */
   amount: string;
   reason_code: RefundsReasonCode;
   reason_note: string | null;
@@ -614,6 +1085,76 @@ export interface RefundsRow {
   reviewed_by: string | null;
   reviewed_at: Date | null;
   rejection_reason: string | null;
+  created_at: Date;
+  reference_number: string;
+  /** What Vendlyfy granted, which the decision panel lets them lower or raise up to the order total. NULL until decided. */
+  approved_amount: string | null;
+  /** When the money left the wallet. A refund is approved exactly when this is set; queued is decided but unpaid. */
+  settled_at: Date | null;
+  complaint_id: string | null;
+  initiated_by: RefundsInitiatedBy;
+}
+
+/**
+ * The merchant's public reply, shown under the review. One per review, editable — which is why it is a table of its own rather than a column on an insert-only one.
+ */
+export interface ReviewRepliesRow {
+  review_id: string;
+  store_id: string;
+  body: string;
+  author_id: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** `review_reports.reason_code`, from its CHECK constraint. */
+export type ReviewReportsReasonCode =
+  | 'abusive'
+  | 'personal_info'
+  | 'not_a_customer'
+  | 'spam';
+
+/** `review_reports.status`, from its CHECK constraint. */
+export type ReviewReportsStatus =
+  | 'open'
+  | 'upheld'
+  | 'dismissed';
+
+/**
+ * A report against a review, decided by Vendlyfy. Upholding one hides the review; dismissing leaves it visible, which is what it was throughout.
+ */
+export interface ReviewReportsRow {
+  id: string;
+  review_id: string;
+  store_id: string;
+  reason_code: ReviewReportsReasonCode;
+  note: string | null;
+  reported_by: string | null;
+  status: ReviewReportsStatus;
+  decided_by: string | null;
+  decided_at: Date | null;
+  decision_note: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * A customer's rating of a product they bought, tied to the order line that proves it. Insert-only: a merchant can reply but cannot edit or remove a review, and only Vendlyfy can hide one.
+ */
+export interface ReviewsRow {
+  id: string;
+  store_id: string;
+  /** Derived from the order line's variant and pinned to it by a trigger. It exists because every read of this table is by product. */
+  product_id: string;
+  order_id: string;
+  order_item_id: string;
+  customer_user_id: string;
+  rating: number;
+  body: string | null;
+  /** Set only by moderate_review(), only by a Vendlyfy team member, and only after a report. A hidden review leaves the averages and the product page; it is not deleted. */
+  hidden_at: Date | null;
+  hidden_by: string | null;
+  hidden_reason: string | null;
   created_at: Date;
 }
 
@@ -909,10 +1450,15 @@ export interface WithdrawalsRow {
 
 /** Every table, for a repository layer that is generic over one. */
 export interface Database {
+  audit_log: AuditLogRow;
   cart_item_option_values: CartItemOptionValuesRow;
   cart_items: CartItemsRow;
   carts: CartsRow;
   categories: CategoriesRow;
+  complaint_events: ComplaintEventsRow;
+  complaint_evidence: ComplaintEvidenceRow;
+  complaint_status_transitions: ComplaintStatusTransitionsRow;
+  complaints: ComplaintsRow;
   countries: CountriesRow;
   currencies: CurrenciesRow;
   delivery_zone_areas: DeliveryZoneAreasRow;
@@ -921,10 +1467,21 @@ export interface Database {
   industry_template_version_product_flags: IndustryTemplateVersionProductFlagsRow;
   industry_template_versions: IndustryTemplateVersionsRow;
   industry_templates: IndustryTemplatesRow;
+  kyc_checks: KycChecksRow;
+  kyc_documents: KycDocumentsRow;
+  kyc_extracted_fields: KycExtractedFieldsRow;
+  kyc_status_transitions: KycStatusTransitionsRow;
+  kyc_submissions: KycSubmissionsRow;
   modules: ModulesRow;
   momo_transactions: MomoTransactionsRow;
+  notification_devices: NotificationDevicesRow;
+  notification_inbox_state: NotificationInboxStateRow;
+  notification_reads: NotificationReadsRow;
+  notification_types: NotificationTypesRow;
+  notifications: NotificationsRow;
   option_groups: OptionGroupsRow;
   option_values: OptionValuesRow;
+  order_discounts: OrderDiscountsRow;
   order_events: OrderEventsRow;
   order_item_option_values: OrderItemOptionValuesRow;
   order_items: OrderItemsRow;
@@ -944,7 +1501,11 @@ export interface Database {
   product_variant_values: ProductVariantValuesRow;
   product_variants: ProductVariantsRow;
   products: ProductsRow;
+  promotions: PromotionsRow;
   refunds: RefundsRow;
+  review_replies: ReviewRepliesRow;
+  review_reports: ReviewReportsRow;
+  reviews: ReviewsRow;
   rider_cash_handovers: RiderCashHandoversRow;
   rider_cash_settlements: RiderCashSettlementsRow;
   rider_profiles: RiderProfilesRow;
@@ -963,10 +1524,15 @@ export interface Database {
 
 /** Table names as a value, so a runtime check can be exhaustive. */
 export const TABLE_NAMES = [
+  'audit_log',
   'cart_item_option_values',
   'cart_items',
   'carts',
   'categories',
+  'complaint_events',
+  'complaint_evidence',
+  'complaint_status_transitions',
+  'complaints',
   'countries',
   'currencies',
   'delivery_zone_areas',
@@ -975,10 +1541,21 @@ export const TABLE_NAMES = [
   'industry_template_version_product_flags',
   'industry_template_versions',
   'industry_templates',
+  'kyc_checks',
+  'kyc_documents',
+  'kyc_extracted_fields',
+  'kyc_status_transitions',
+  'kyc_submissions',
   'modules',
   'momo_transactions',
+  'notification_devices',
+  'notification_inbox_state',
+  'notification_reads',
+  'notification_types',
+  'notifications',
   'option_groups',
   'option_values',
+  'order_discounts',
   'order_events',
   'order_item_option_values',
   'order_items',
@@ -998,7 +1575,11 @@ export const TABLE_NAMES = [
   'product_variant_values',
   'product_variants',
   'products',
+  'promotions',
   'refunds',
+  'review_replies',
+  'review_reports',
+  'reviews',
   'rider_cash_handovers',
   'rider_cash_settlements',
   'rider_profiles',

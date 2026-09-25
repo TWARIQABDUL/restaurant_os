@@ -64,7 +64,9 @@ db/
   seeds/                dev.ts + fixtures.               milestone 10
   scripts/
     migrate.ts          the runner
-    test-migrate.sh     its acceptance tests
+    gen-types.ts        migrations -> packages/core/src/generated/database.ts
+    profile-old-db.ts   read-only profile of the live Supabase database
+    test-*.sh           one acceptance suite per milestone; test.sh runs them all
     _lib.sh             shared shell helpers; parses docker-compose.yml
     up/down/reset/verify/psql/logs/migrate .sh
   README.md

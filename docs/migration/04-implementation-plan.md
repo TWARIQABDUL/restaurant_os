@@ -819,6 +819,26 @@ during a UI phase.** Cap the matrix and generate lazily with a clear message.
 `rider_shifts` / `rider_cash` · `review_replies` · `product_categories` (join) · **`store_members`**
 · **`platform_members`** · **`role_permissions`** (§5.4) · **`carts`** (§2.5).
 
+**What this list got wrong, now that it is built (V001–V013).** Three entries turned out not to be
+tables, and one turned out to be five:
+
+- **`merchant_verifications` does not exist.** Whether a store is verified is `store_is_verified()`,
+  derived from an approved `kyc_submissions` row. A flag beside the submissions would be a second
+  truth, and the first time one was set by hand the two would disagree about whether a merchant may be
+  paid.
+- **`plans_fees` is two tables**, `plans` and `plan_features` with `plan_feature_grants` between them,
+  because `AdminPlans` grants features per plan and prices them separately.
+- **`rider_shifts` is not a table either.** `CashReport` does not draw a shift; it draws a *day* that
+  is a running account of several hand-ins, so `rider_cash_handovers` and `rider_cash_settlements`
+  replaced it, with `rider_profiles` holding what is true of a rider.
+- **`promotions` needed a second table nobody listed**, and it is the more important of the two:
+  `order_discounts`. Without it `orders.discount_amount` stays a number a client can send.
+- **Added, from boards this list did not reach:** `complaints` / `complaint_events` /
+  `complaint_evidence` · `reviews` / `review_reports` · `notification_types` / `notifications` /
+  `notification_reads` / `notification_inbox_state` / `notification_devices` ·
+  `kyc_extracted_fields` · the four `*_status_transitions` tables that hold each state machine as
+  data.
+
 ### 5.3 Deltas the design rounds produced
 
 1. **Order statuses 7 → 12** — adds `out`, `returned`, `closedReturn`, `cancelled` (distinct from
@@ -1132,7 +1152,7 @@ snapshot, and it aborts unless the server first refuses a write.
 | **6** ✅ | **Config.** Done 2026-09-24. `V002`, six tables + `stores` columns, two validator functions, four triggers, and the templates shipped as data | **Met.** *The templates are rows* — **eight, not six** (see §3): every word map, attribute preset, module set and order flow from `AdminIndustries`, asserted against the board rather than against fixtures. *Pharmacy:* `new → pharmacist_check → preparing → ready → delivered`, the `rx` module, and the `prescription_required` flag — and it ships as a **draft**, as the board draws it, so no store can pin it. **55 config checks** pass, plus 105 from the earlier suites |
 | **7** ✅ | **Catalogue.** Done 2026-09-24. `V003`, ten tables, a deferred matrix-integrity constraint, and the server-side cart | **Met, all three.** *Twelve variants:* 4 sizes × 3 colours, each its own row with its own stock and SKU, built the way the app will — variant and values in one transaction, checked at commit. Black/M reads back as one row with stock of its own. *Shared group:* one `option_groups` row attached to two products through the join — **no copy**, so editing Cheese reaches both. *Cart:* keyed only by a server-issued session cookie, reads back whole from that id with nothing client-side, kept 7 days, and carries **no price columns at all** (asserted against `information_schema`). **50 catalogue checks** pass, 210 across four suites |
 | **8** ✅ | **Orders & money.** Done 2026-09-25, in two migrations because one file of this would not be reviewable and §2.4 asks for one concern each. `V004` orders (46 checks), `V005` money and the money functions (94 checks) | **Met, and then some.** The done-when asked for two concurrent reservations of the last unit; it was run with **ten** — one won, nine were told it was gone, stock landed on exactly zero and never went negative. Two more real races: the **same webhook delivered ten times at once** produced exactly one credit, and **ten reviewers approving one refund** produced exactly one debit. Every internal transfer writes both sides; the ledger's sequence is an unbroken run and every `balance_after` follows its predecessor; a wallet balance cannot be set by hand; and after a full lifecycle — paid, released, withdrawn, reversed, partially then fully refunded, plus a short cash payment — **the ledger still sums to the balances** |
-| **9** ◐ | **Supporting domains.** Eleven of them, so delivered in parts. **`V006`** (59 checks): currencies, countries, payment methods, plans & fees. **`V007`** (54 checks): delivery zones, pickup, payout settings, riders, rider cash. Both 2026-09-25. **Remaining:** complaints · reviews + replies · notifications · audit log · KYC · promotions | *V006 met:* the six currencies with their exact formatting from `AdminCurrencies`, five countries, four payment methods from `AdminPayments`, and Starter/Growth from `AdminPlans` — all seeded, so a fresh database can onboard a merchant. It also **closes loose ends left open on purpose**: `stores.country`, `stores.selling_currency`, `stores.plan_key`, `wallets.currency`, `orders.currency` and `orders.payment_method` are now references rather than bare text. A store cannot open in a country the platform has not launched, and an order cannot name a provider that is not live, not available in its country, or outside the provider's limits. *V007 met:* an area belongs to exactly **one** delivery zone per store, a rider profile requires the rider role and an order's rider must be a rider **of that store** (both by composite key, not by check), a day is a running account of multiple hand-ins, a shortfall must be accounted for by one of the board's three outcomes, a carried-over debt outlives the day, **a day cannot be closed while the rider still has cash orders out**, and a closed day's figures are frozen. Cash still writes no ledger entry |
+| **9** ✅ | **Supporting domains.** Eleven of them, so delivered in eight migrations. **`V006`** (59 checks) currencies, countries, payment methods, plans & fees · **`V007`** (54) delivery zones, pickup, payout settings, riders, rider cash · **`V008`** (147) complaints & disputes · **`V009`** (75) reviews & replies · **`V010`** (79) notifications · **`V011`** (58) the audit log · **`V012`** (93) KYC · **`V013`** (92) promotions. All 2026-09-25. **1,009 checks across fourteen suites**, every one green from an empty database | **Met, and three of the eight found something the earlier milestones had left open.** *V006:* the six currencies with their exact formatting from `AdminCurrencies`, five countries, four payment methods, Starter and Growth — seeded, so a fresh database can onboard a merchant — and `stores.country`, `stores.selling_currency`, `stores.plan_key`, `wallets.currency`, `orders.currency` and `orders.payment_method` became references rather than bare text. *V007:* an area belongs to exactly **one** delivery zone per store, an order's rider must be a rider **of that store** by composite key, a day is a running account of multiple hand-ins, a shortfall must be accounted for by one of the board's three outcomes, and **a day cannot be closed while the rider still has cash orders out**. *V008:* the complaint thread is **chained** — a status that moved without an event, an event that starts where the last one did not end, and a complaint with no events are all refused at commit — and it delivers §5.3's **fifth refund state**: `queued` is decided-but-unpaid, writes no ledger entry, **pauses the store's payouts** (`VLHLD`), and settles in one payment as soon as the balance covers it. Ten reviewers deciding one escalation produced one refund and one ledger entry. *V009:* `reviews` is **insert-only for everybody** — the merchant's reply is a separate table precisely so the review table need not be updatable — "Ordered here" is a composite key into `order_items` rather than a badge, and the no-average-below-three rule lives in one view that both screens read. *V010:* a store broadcast has **no addressee** and is filtered by its type's roles, so **a manager cannot see a payout** and the unread count agrees with the list for every role; "mark all as read" is a watermark, not two hundred rows; and the per-device sound preference is a server-issued cookie, which **answers the first of Part 9's two small things**. *V011:* the audit log is **hash-chained**, and the suite proves it the only way it can be proved — it disables the append-only trigger, edits an entry, deletes another and forges a third, and `verify_audit_chain()` reports every one. *V012:* **no plaintext ID number column exists anywhere**, asserted against `information_schema`; the number is encrypted with a key that is not in the database, masked for review, and fingerprinted for duplicate detection; **the reveal and its audit entry are one call**, so the number cannot be read unrecorded; and verification gates **payouts and nothing else**. *V013:* `orders.discount_amount` has been a plain column since V004 and now **must equal the rows behind it** — a checkout that posts a discount with nothing behind it no longer commits — which also gives CashReport's second gap outcome a home. Ten checkouts claiming a code limited to one use produced exactly one redemption |
 
 ### Stage C — Platform
 
@@ -1226,10 +1246,16 @@ schema and makes the container an exact match for deployment.
 the deployed instance, which must match. Confirm 17 is available on the target host before
 milestone 2 writes anything; a change after that is a `db:reset`, not an upgrade.
 
-**Two small things left over.** First, the **notification sound preference** — `Notifications` says
-*"Sound is off for this device"*, and with no browser storage that is either a per-user-per-device
-row keyed by a cookie, or per-user with the wording changed (§2.5). Second, image storage. Keep the existing Supabase bucket behind signed URLs,
-or move to S3/R2. Stub the endpoint locally. Does not block `V000`.
+**One small thing left over.** Image storage: keep the existing Supabase bucket behind signed URLs,
+or move to S3/R2. Stub the endpoint locally. Does not block `V000` — but it is no longer only about
+product photos, because `kyc_documents` and `complaint_evidence` both point into the same store and
+one of them holds biometric data.
+
+**Answered at milestone 9 (V010): the notification sound preference is per device.** `Notifications`
+says *"Sound is off for this device"*, and `notification_devices` takes it literally — one row per
+device, identified by a server-issued httpOnly cookie, which is the only way to honour the wording
+with no browser storage (§2.5). A person can leave the chime on at the counter tablet and off on their
+own phone, which is the case the wording exists for.
 
 **Newly open, from milestone 9's first part:**
 
@@ -1258,6 +1284,24 @@ or move to S3/R2. Stub the endpoint locally. Does not block `V000`.
   that is what is implemented. `States` tells a customer "this store delivers within 8 km of
   Kimihurura", which is a radius. Treated as approximate prose for now; if it is meant literally it is
   a new column and a map.
+- **Where the KYC encryption key lives.** `kyc_submissions` holds the ID number as `bytea` with an
+  `encryption_key_id` naming which key encrypted it, and **the key is deliberately not in the
+  database** — the same decision as provider credentials above, and the same reasoning. Adding a
+  pgcrypto call with the key in a settings table would be worse than plaintext, because it would look
+  solved. **Blocks milestone 26**, together with the vendor and the retention period.
+- **Re-verifying an expired document.** `kyc_submissions` records `document_expires_on` and no board
+  says what happens the day it passes — whether the approval lapses, whether payouts stop, how much
+  notice a merchant gets. `submit_kyc()` therefore refuses a verified store outright rather than
+  quietly opening a second case beside the approved one, which would leave `store_is_verified()` true
+  throughout and mean nothing.
+- **Whether two automatic promotions should stack.** `order_discounts` permits several rows, the
+  subtotal caps their sum and one promotion cannot apply twice, so the total can never go wrong. But
+  whether a store *wants* both its lunch offer and its weekly percentage to apply at once is
+  commercial, and no board answers it.
+- **Free delivery is not a promotion type**, because no board offers one and because it would have to
+  reach `delivery_fee_amount` rather than `discount_amount` — Shop is explicit that a discount is
+  "10% off your items". When it is wanted it is a fourth `discount_type` and a change to one
+  constraint, not a manual discount dressed up as one.
 - **Payment webhook hosts** are `example.invalid` until the domain question below is answered.
   Deliberate: RFC 2606 guarantees it can never resolve, so a half-configured deployment fails loudly
   instead of posting a payment confirmation to somebody else's server.
@@ -1278,6 +1322,12 @@ Still open, and all five block something:
 3. **KYC vendor and retention period** — automatic document authenticity, liveness, face match and
    duplicate detection are a vendor, not something to build. `AdminKYC` leaves
    `[RETENTION PERIOD]` as a placeholder; that is a legal decision. **Blocks milestone 26.**
+   *As of V012 both are ready to receive an answer and neither is guessed:* `kyc_checks` records the
+   six outcomes the board lists and keeps the vendor's own report whole in `vendor_result`, so
+   adopting a vendor is a mapping rather than a migration; and `purge_expired_kyc_documents()` acts on
+   `kyc_documents.retain_until`, which is NULL on every row, so the sweep does nothing at all until
+   somebody sets a period. Retention also interacts with the audit chain: pruning entries means the
+   chain no longer starts at 1, which is why `verify_audit_chain()` takes a starting point.
 4. **SMS provider** — none exists. **Blocks milestone 28.**
 5. **Cutover window** — the freeze at milestone 30 stops writes on the live system for as long as
    the ETL and its report take. Rehearsal (milestone 29) tells you how long that is; the decision

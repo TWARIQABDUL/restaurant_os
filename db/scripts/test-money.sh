@@ -37,6 +37,20 @@ parallel_sql() {   # parallel_sql <n> <sql> <outfile>
         psql -h 127.0.0.1 -U "$OWNER_ROLE" -d "$TEST_DB" -tAc "$2" > "$3" 2>&1 || true
 }
 
+# V012 made a payout require an approved identity check — "money you've earned is safe
+# in your balance but can't be withdrawn until you're verified". These are the real
+# calls rather than a hand-written approved row, because the deferred constraint
+# refuses an approval whose documents are missing or unaccepted.
+verify_store() {   # verify_store <label> <store_id> <owner_user_id> <platform_user_id>
+    accepts "$1 passes its identity check, so it may be paid out" \
+        "SELECT submit_kyc('$2','$3');
+         SELECT attach_kyc_document((SELECT id FROM kyc_submissions WHERE store_id='$2' AND status='submitted'),'id_front','kyc/f.jpg','image/jpeg');
+         SELECT attach_kyc_document((SELECT id FROM kyc_submissions WHERE store_id='$2' AND status='submitted'),'id_back','kyc/b.jpg','image/jpeg');
+         SELECT attach_kyc_document((SELECT id FROM kyc_submissions WHERE store_id='$2' AND status='submitted'),'face_video','kyc/v.mp4','video/mp4');
+         SELECT complete_kyc_checks((SELECT id FROM kyc_submissions WHERE store_id='$2' AND status='submitted'));
+         SELECT decide_kyc((SELECT id FROM kyc_submissions WHERE store_id='$2' AND status='in_review'),'$4','approve','All checks passed')"
+}
+
 printf '\nMoney acceptance tests\n'
 info "database  : ${TEST_DB}"
 
@@ -51,6 +65,8 @@ else
 fi
 
 ST='11111111-0000-0000-0000-000000000001'
+OWNER_USER='9999aaaa-0000-0000-0000-000000000001'
+VENDLY='9999aaaa-0000-0000-0000-000000000002'
 FASHION="$(q "SELECT id FROM industry_templates WHERE key='fashion'")"
 V1='dddd0000-0000-0000-0000-000000000001'   # tracked, stock 1 — the last unit
 V2='dddd0000-0000-0000-0000-000000000002'   # untracked
@@ -65,6 +81,13 @@ accepts "a store, a tracked product with ONE left, and an untracked one" \
        ('${V2}','aaaa0000-0000-0000-0000-000000000002','${ST}','GIFT',NULL,true)"
 equals "the store got a wallet the moment it existed" "RWF|0.00|0.00" \
     "SELECT currency || '|' || pending_balance || '|' || available_balance FROM wallets WHERE store_id='${ST}'"
+accepts "an owner and a Vendlyfy reviewer, so the store can be verified" \
+    "INSERT INTO users (id,scope,email,password_hash,name) VALUES
+       ('${OWNER_USER}','platform','owner@inzu.example.com','h','Kevin Nkusi'),
+       ('${VENDLY}','platform','team@vendlyfy.com','h','Vendlyfy Support');
+     INSERT INTO store_members (user_id,store_id,role) VALUES ('${OWNER_USER}','${ST}','owner');
+     INSERT INTO platform_members (user_id,role) VALUES ('${VENDLY}','super_admin')"
+verify_store "Inzu Threads" "${ST}" "${OWNER_USER}" "${VENDLY}"
 
 # =============================================================================
 step "The last unit, contested by ten connections at once"
