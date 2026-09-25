@@ -37,6 +37,7 @@ precisely because the legacy files are still there.
 | `db/tx.ts` | `withTransaction()`, `readConsistent()`, savepoint nesting, retry on 40001/40P01 |
 | `db/errors.ts` | SQLSTATE → HTTP, and the only place that decides whether a message may leave the process |
 | `db/rows.ts` | the one file that knows where `packages/core`'s generated row types live |
+| `core.ts` | the one file that imports `@vendlyfy/core` — by relative path, and it says why |
 | `repositories/` | all the SQL. Parameterized, explicit column lists, `storeId` first |
 | `middleware/authorize.ts` | the membership-aware guard |
 | `routes/` | HTTP shape only. No SQL, no permission lists |
@@ -54,13 +55,17 @@ Present and complete:
 - `GET /api/session` — the person, their memberships across stores, the role→permission map
 - `GET|POST /api/stores/:storeId/members`, `DELETE …/members/:userId`
 - `GET /api/stores/:storeId/wallet` · `/payouts` · `/settings` — reads
+- `GET /api/storefront/:slug/config` — the effective config, with an ETag. **Public**, and
+  keyed by slug: see the note below
+- `GET /api/stores/:storeId/config/templates` · `PUT …/config/template` ·
+  `PATCH …/config/overrides`
 
 Deliberately absent, with the milestone that owns it:
 
 - signing in, the cookie session, CSRF, the staff invite — **15**
 - requesting a payout, the ledger, the Wallet board — **23**
 - writing settings, transferring ownership — **25**
-- everything `/api/admin/*` — **27**
+- everything `/api/admin/*`, including publishing a template version and its rollout — **27**
 
 There are no stubs. An endpoint here is complete for what it claims, or it is not here.
 
@@ -91,6 +96,18 @@ cannot be mistaken for an oversight later.
 **Amounts are strings.** `numeric` arrives as a string from `pg` and stays one. The
 formatter is `packages/core`'s at milestone 13, driven by the currencies table.
 
+**The config is resolved server-side and served by slug.** `GET /api/storefront/:slug/config`
+answers with one payload — words, feature gates, attribute presets, the order timeline — and a
+strong ETag over the payload itself. It is unauthenticated because it is rendered to every
+anonymous shopper, and keyed by **slug** rather than store id because a slug is already in the
+storefront's URL while a uuid is not: an unauthenticated endpoint keyed by uuid would hand back
+the store-existence signal the guard deliberately hides. The merchant console reads the same
+endpoint, so the storefront and the console cannot drift on what a store calls its categories.
+
+**`has()` throws on an unknown module.** Returning false would hide a feature from every store
+while looking exactly like a feature switched off — the same failure V002 refuses at the column
+with a foreign key, made in a component where no constraint can see it.
+
 ## Tests
 
 ```
@@ -112,3 +129,10 @@ The runner (`scripts/api-test.sh`) supplies the connection string from
 | `guard.test.ts` | bad tokens, deleted accounts, no super_admin bypass, customers |
 | `members.test.ts` | delegated creation, and that a refusal leaves nothing behind |
 | `payouts.test.ts` | the keyset cursor across rows with identical timestamps |
+| `config.test.ts` | a template switch end to end, the ETag and its 304, the override merge |
+
+`packages/core`'s own suite is separate and needs nothing running:
+
+```
+npm run core:test        # the resolver, t(), has(), and singularize's property tests
+```

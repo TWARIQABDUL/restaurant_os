@@ -1,0 +1,16 @@
+// packages/core's tests — milestone 12.
+//
+// A SECOND project rather than widening tsconfig.json, and the reason is the guard that file
+// exists for. Its `types: []` is what makes a module reaching for `process` fail to compile;
+// a test needs node:test and node:assert, so it needs node types. Widening the main project
+// would hand src/ the same types and quietly retire the isomorphism check.
+//
+// Both run in `npm run typecheck`, so a `process` in src/ still fails — under tsconfig.json,
+// where it is meant to.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

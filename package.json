@@ -18,8 +18,9 @@
     "db:seed": "bash db/scripts/seed.sh",
     "db:test": "bash db/scripts/test.sh",
     "api:test": "bash scripts/api-test.sh",
+    "core:test": "node --test packages/core/test/*.test.ts",
     "db:profile": "bash db/scripts/profile-old-db.sh",
-    "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p server && tsc -p client",
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p packages/core/tsconfig.test.json && tsc -p server && tsc -p client",
     "check:styles": "node scripts/check-styles.ts"
   },
   "engines": {

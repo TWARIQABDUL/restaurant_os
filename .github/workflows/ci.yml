@@ -28,7 +28,7 @@ env:
 
 jobs:
   typecheck:
-    name: Types (all four projects)
+    name: Types (five projects) + packages/core
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,6 +41,11 @@ jobs:
       - run: npm ci
         working-directory: client
       - run: npm run typecheck
+
+      # packages/core is pure functions — the config resolver, and from milestone 13 the theme
+      # compiler and the money formatter. No database and no server, so it runs here rather
+      # than in a job that has to start one.
+      - run: npm run core:test
 
   database:
     name: Migrations and runner tests
