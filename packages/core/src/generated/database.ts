@@ -109,6 +109,32 @@ export interface CurrenciesRow {
 }
 
 /**
+ * The areas a zone covers. An area belongs to exactly ONE zone per store, or checkout cannot say which fee applies.
+ */
+export interface DeliveryZoneAreasRow {
+  zone_id: string;
+  store_id: string;
+  area_name: string;
+  created_at: Date;
+}
+
+/**
+ * Where a store delivers, for how much, and how long it takes. A zone covers named areas — see delivery_zone_areas.
+ */
+export interface DeliveryZonesRow {
+  id: string;
+  store_id: string;
+  name: string;
+  fee_amount: string;
+  eta_min_minutes: number;
+  eta_max_minutes: number;
+  is_active: boolean;
+  position: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
  * Modules a version turns on by default. Absence means off. Merchants can still change these in Settings, which is what stores.config_overrides carries.
  */
 export interface IndustryTemplateVersionModulesRow {
@@ -359,6 +385,8 @@ export interface OrdersRow {
   delivered_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  /** Derived, never passed in: rider when there is a rider, NULL otherwise. It exists only to carry the composite FK that makes assigning a manager or a customer as the rider unrepresentable. */
+  rider_member_role: string | null;
 }
 
 /**
@@ -589,6 +617,75 @@ export interface RefundsRow {
   created_at: Date;
 }
 
+/** `rider_cash_handovers.member_role`, from its CHECK constraint. */
+export type RiderCashHandoversMemberRole =
+  | 'rider';
+
+/**
+ * Each time a rider hands cash over, including part-way through a day — "Handed in at 12:00 − 6,000". A day is a running account, not one payment.
+ */
+export interface RiderCashHandoversRow {
+  id: string;
+  store_id: string;
+  rider_user_id: string;
+  member_role: RiderCashHandoversMemberRole;
+  amount: string;
+  handed_at: Date;
+  received_by: string | null;
+  note: string | null;
+  created_at: Date;
+}
+
+/** `rider_cash_settlements.member_role`, from its CHECK constraint. */
+export type RiderCashSettlementsMemberRole =
+  | 'rider';
+
+/**
+ * Closing one rider's day. Figures are captured, not recomputed, so a settled record does not change when an order is later amended.
+ */
+export interface RiderCashSettlementsRow {
+  id: string;
+  store_id: string;
+  rider_user_id: string;
+  member_role: RiderCashSettlementsMemberRole;
+  business_date: Date;
+  expected_amount: string;
+  handed_over_amount: string;
+  counted_amount: string;
+  /** Positive is short, negative is over. GENERATED from the three captured figures so it cannot be set independently of them. */
+  gap_amount: string;
+  gap_resolution: string | null;
+  gap_order_id: string | null;
+  gap_note: string | null;
+  carried_over_settled_at: Date | null;
+  carried_over_settled_by: string | null;
+  closed_by: string | null;
+  closed_at: Date;
+}
+
+/** `rider_profiles.availability`, from its CHECK constraint. */
+export type RiderProfilesAvailability =
+  | 'available'
+  | 'off_duty';
+
+/** `rider_profiles.member_role`, from its CHECK constraint. */
+export type RiderProfilesMemberRole =
+  | 'rider';
+
+/**
+ * A rider of one store. availability is what the rider sets; "on a delivery" is derived from their orders so the two can never disagree.
+ */
+export interface RiderProfilesRow {
+  user_id: string;
+  store_id: string;
+  member_role: RiderProfilesMemberRole;
+  plate_number: string;
+  availability: RiderProfilesAvailability;
+  availability_changed_at: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
 /** `role_permissions.scope`, from its CHECK constraint. */
 export type RolePermissionsScope =
   | 'platform'
@@ -635,6 +732,48 @@ export interface StoreMembersRow {
 export interface StoreOrderCountersRow {
   store_id: string;
   next_order_number: number;
+}
+
+/**
+ * Which methods a store offers. NO CREDENTIALS HERE: provider keys are secrets and do not belong in a table every repository method can read. Where they live is an open decision — see the foot of this file.
+ */
+export interface StorePaymentMethodsRow {
+  store_id: string;
+  payment_method_key: string;
+  is_connected: boolean;
+  connected_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** `store_payout_settings.settlement_mode`, from its CHECK constraint. */
+export type StorePayoutSettingsSettlementMode =
+  | 'manual'
+  | 'automatic';
+
+/**
+ * Where a merchant's money goes and on what schedule. A payout is never converted — the merchant is paid in the store's own currency.
+ */
+export interface StorePayoutSettingsRow {
+  store_id: string;
+  payout_method_key: string;
+  payout_phone: string;
+  settlement_mode: StorePayoutSettingsSettlementMode;
+  automatic_at: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Where and how soon a customer can collect. "Free · ready in 15 min". Absent when the store does not offer pickup.
+ */
+export interface StorePickupSettingsRow {
+  store_id: string;
+  address: string;
+  ready_minutes: number;
+  instructions: string | null;
+  created_at: Date;
+  updated_at: Date;
 }
 
 /** `stores.status`, from its CHECK constraint. */
@@ -776,6 +915,8 @@ export interface Database {
   categories: CategoriesRow;
   countries: CountriesRow;
   currencies: CurrenciesRow;
+  delivery_zone_areas: DeliveryZoneAreasRow;
+  delivery_zones: DeliveryZonesRow;
   industry_template_version_modules: IndustryTemplateVersionModulesRow;
   industry_template_version_product_flags: IndustryTemplateVersionProductFlagsRow;
   industry_template_versions: IndustryTemplateVersionsRow;
@@ -804,9 +945,15 @@ export interface Database {
   product_variants: ProductVariantsRow;
   products: ProductsRow;
   refunds: RefundsRow;
+  rider_cash_handovers: RiderCashHandoversRow;
+  rider_cash_settlements: RiderCashSettlementsRow;
+  rider_profiles: RiderProfilesRow;
   role_permissions: RolePermissionsRow;
   store_members: StoreMembersRow;
   store_order_counters: StoreOrderCountersRow;
+  store_payment_methods: StorePaymentMethodsRow;
+  store_payout_settings: StorePayoutSettingsRow;
+  store_pickup_settings: StorePickupSettingsRow;
   stores: StoresRow;
   users: UsersRow;
   wallet_ledger: WalletLedgerRow;
@@ -822,6 +969,8 @@ export const TABLE_NAMES = [
   'categories',
   'countries',
   'currencies',
+  'delivery_zone_areas',
+  'delivery_zones',
   'industry_template_version_modules',
   'industry_template_version_product_flags',
   'industry_template_versions',
@@ -850,9 +999,15 @@ export const TABLE_NAMES = [
   'product_variants',
   'products',
   'refunds',
+  'rider_cash_handovers',
+  'rider_cash_settlements',
+  'rider_profiles',
   'role_permissions',
   'store_members',
   'store_order_counters',
+  'store_payment_methods',
+  'store_payout_settings',
+  'store_pickup_settings',
   'stores',
   'users',
   'wallet_ledger',
