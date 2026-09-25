@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Vendlyfy — repository root. Carries the db:* scripts for the local Postgres container and the migration runner. Workspaces (client, server, packages/core) arrive at milestone 3.",
+  "description": "Vendlyfy \u2014 repository root. Carries the db:* scripts for the local Postgres container and the migration runner. Workspaces (client, server, packages/core) arrive at milestone 3.",
   "scripts": {
     "db:up": "bash db/scripts/up.sh",
     "db:down": "bash db/scripts/down.sh",
@@ -17,6 +17,7 @@
     "db:types": "bash db/scripts/gen-types.sh",
     "db:seed": "bash db/scripts/seed.sh",
     "db:test": "bash db/scripts/test.sh",
+    "api:test": "bash scripts/api-test.sh",
     "db:profile": "bash db/scripts/profile-old-db.sh",
     "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p server && tsc -p client",
     "check:styles": "node scripts/check-styles.ts"

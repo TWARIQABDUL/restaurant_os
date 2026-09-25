@@ -106,7 +106,11 @@ sql "CREATE TABLE _saved_migration AS SELECT * FROM schema_migrations WHERE vers
      DELETE FROM schema_migrations WHERE version = (SELECT max(version) FROM schema_migrations)"
 refuses "a schema that is not fully migrated" "have not been applied" --yes
 sql "INSERT INTO schema_migrations SELECT * FROM _saved_migration; DROP TABLE _saved_migration"
-equals "and the ledger was put back exactly" "14" "SELECT count(*)::text FROM schema_migrations"
+# COUNTED FROM THE DIRECTORY, not written here. This assertion is about the ledger being
+# restored to exactly what it was, and a literal turns the arrival of any new migration
+# into a failure of the wrong test — which is what V014 did.
+MIGRATION_COUNT="$(find "$REPO_ROOT/db/migrations" -maxdepth 1 -name 'V*.sql' | wc -l | tr -d ' ')"
+equals "and the ledger was put back exactly" "$MIGRATION_COUNT" "SELECT count(*)::text FROM schema_migrations"
 
 run_seed "$TEST_URL" --dry-run
 if [ "$SEED_RC" -eq 0 ]; then pass "--dry-run passes every check"; else flunk "--dry-run failed"; fi

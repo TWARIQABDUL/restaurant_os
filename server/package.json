@@ -1,12 +1,14 @@
 {
   "name": "restaurant-os-server",
   "version": "1.0.0",
-  "description": "Restaurant OS — Backend API",
+  "description": "Restaurant OS \u2014 Backend API",
   "main": "src/server.js",
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "api:dev": "node --watch src/api/server.ts",
+    "api:start": "node src/api/server.ts",
     "test": "node --test \"test/**/*.test.js\"",
     "smoketest": "node smoketest.js"
   },
@@ -30,5 +32,12 @@
   },
   "overrides": {
     "qs": "^6.16.0"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.25",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/pg": "^8.23.1"
   }
 }

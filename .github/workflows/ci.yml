@@ -4,7 +4,7 @@
 # build does not either — esbuild strips types without checking them. A green
 # build proves nothing about types."
 #
-# Four independent jobs, so one failure names one thing.
+# Five independent jobs, so one failure names one thing.
 
 name: CI
 
@@ -78,6 +78,41 @@ jobs:
         run: |
           npm run db:reset -- -y
           npm run db:migrate
+
+      - name: Postgres log on failure
+        if: failure()
+        run: npm run db:logs -- --tail 200
+
+  api:
+    name: New API (pg, no supabase-js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      # Root deps for the db:* scripts that start and migrate the container.
+      - run: npm ci
+      # Server deps for express, pg and jsonwebtoken.
+      - run: npm ci
+        working-directory: server
+
+      - name: Start Postgres
+        run: npm run db:up
+
+      - name: Apply migrations
+        run: npm run db:migrate
+
+      # Boots the real app on an ephemeral port and makes real HTTP requests
+      # against the container: §5.4's four escalation tests, the transaction
+      # helper, the keyset cursor, the boot refusals, and the import-graph walk
+      # that proves no supabase-js is reachable from the new entrypoint.
+      #
+      # Unlike `npm test` in the server job, this needs no production credentials:
+      # it creates and deletes its own fixtures in the local container.
+      - name: API suite
+        run: npm run api:test
 
       - name: Postgres log on failure
         if: failure()
