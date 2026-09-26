@@ -28,6 +28,10 @@ import storeConfigRoutes from '../routes/storeConfig.ts';
 import storeThemeRoutes from '../routes/storeTheme.ts';
 import storefrontConfigRoutes from '../routes/storefrontConfig.ts';
 import storefrontThemeRoutes from '../routes/storefrontTheme.ts';
+import storefrontStoreRoutes from '../routes/storefrontStore.ts';
+import storefrontCatalogueRoutes from '../routes/storefrontCatalogue.ts';
+import storefrontReviewRoutes from '../routes/storefrontReviews.ts';
+import storefrontCartRoutes from '../routes/storefrontCart.ts';
 import membersRoutes from '../routes/members.ts';
 import storeSettingsRoutes from '../routes/storeSettings.ts';
 import { payoutsRouter, walletRouter } from '../routes/storeWallet.ts';
@@ -127,8 +131,19 @@ export function createApp(): Express {
   // Unauthenticated, because the invitee has no account yet — the TOKEN is the credential.
   app.use('/api/invites', publicInvitesRouter);
 
+  // THE SHOPFRONT. All six mount on the same prefix and each declares its own full path, so the
+  // ORDER HERE DOES NOT MATTER — which is deliberate: `/:slug` and `/:slug/products` are different
+  // patterns to Express, not a prefix and a suffix, so no route can shadow another by being mounted
+  // first. The one thing that would break that is a router declaring a bare '/:slug/*' catch-all, and
+  // none does.
   app.use('/api/storefront', storefrontConfigRoutes);
   app.use('/api/storefront', storefrontThemeRoutes);
+  app.use('/api/storefront', storefrontCatalogueRoutes);
+  app.use('/api/storefront', storefrontReviewRoutes);
+  app.use('/api/storefront', storefrontCartRoutes);
+  // Last of the six, because '/:slug' is the least specific pattern among them. Express matches by
+  // pattern rather than by order for these, but a reader should not have to know that to be sure.
+  app.use('/api/storefront', storefrontStoreRoutes);
 
   // Anything unmatched becomes a 404 through the same handler as everything else, so
   // there is one response shape for every failure.

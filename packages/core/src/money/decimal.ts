@@ -157,6 +157,52 @@ export function toDecimalString(value: Decimal): string {
   return (value.negative ? '-' : '') + body;
 }
 
+/**
+ * Exact addition, at the wider of the two scales.
+ *
+ * ADDED AT MILESTONE 16, for the cart subtotal. Until then nothing in the money path added two
+ * amounts together: a price was formatted, a cash total was rounded, and the arithmetic was the
+ * database's. A cart is the first screen that sums lines the server has already priced.
+ *
+ * It is here rather than in the repository that needed it because a second place that adds money is a
+ * second place that can lose a cent — the whole argument of this file. A signed BigInt of minor units
+ * makes the sign handling fall out rather than being cased.
+ */
+export function addDecimal(a: Decimal, b: Decimal): Decimal {
+  const scale = Math.max(a.scale, b.scale);
+  const left = rescale(a, scale);
+  const right = rescale(b, scale);
+  const total = (left.negative ? -left.digits : left.digits) + (right.negative ? -right.digits : right.digits);
+  return { negative: total < 0n, digits: total < 0n ? -total : total, scale };
+}
+
+/**
+ * Add up a list, exactly. Empty sums to zero at scale 0, which `toDecimalString` renders as "0".
+ *
+ * A fold over addDecimal rather than its own loop: one implementation of carrying, one place for a
+ * rounding bug to fail to be.
+ */
+export function sumDecimals(values: readonly Decimal[]): Decimal {
+  return values.reduce(addDecimal, { negative: false, digits: 0n, scale: 0 });
+}
+
+/**
+ * Multiply by a whole number of units. A line total is unit price × quantity, and nothing else.
+ *
+ * WHOLE NUMBERS ONLY — a quantity, not a rate. Multiplying two decimals would double the scale and the
+ * result would need a rounding rule, which is a decision no caller here has to make: the database
+ * computes line_total_amount the same way, as `(unit + options) * quantity`, with quantity an integer
+ * column. Anything fractional is a percentage, and a percentage of money is a discount, which V013
+ * computes in SQL where the rounding rule is written down once.
+ */
+export function multiplyDecimal(value: Decimal, times: number): Decimal {
+  if (!Number.isInteger(times) || times < 0) {
+    throw new Error(`a quantity must be a whole number of units, got ${times}`);
+  }
+  const digits = value.digits * BigInt(times);
+  return { negative: value.negative && digits !== 0n, digits, scale: value.scale };
+}
+
 /** -1, 0 or 1. For tests and for ordering; no money path needs subtraction yet. */
 export function compareDecimal(a: Decimal, b: Decimal): number {
   const scale = Math.max(a.scale, b.scale);

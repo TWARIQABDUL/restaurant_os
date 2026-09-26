@@ -9,16 +9,21 @@
 // cannot corrupt anything; the price of that is that the application must read
 // the refusals properly.
 //
-// Three custom SQLSTATEs are Vendlyfy's own (V005, V008, V012):
+// Four custom SQLSTATEs are Vendlyfy's own (V005, V008, V012, V018):
 //
 //   VLSTK  insufficient stock  — "Grilled Chicken has 2 left, not 5"
 //   VLFND  insufficient funds  — a pot would go negative
 //   VLHLD  payouts held        — unverified store, or a refund queued ahead of it
+//   VLCAT  stale catalogue     — the page is out of date: that variant or option is gone
 //
-// VLSTK and VLHLD carry MESSAGE and HINT text written for a person to read, so
+// VLSTK, VLHLD and VLCAT carry MESSAGE and HINT text written for a person to read, so
 // they are passed through. VLFND's message names the pot and the store id and is
 // written for an operator: it is logged and replaced. That distinction is the
 // whole reason `expose` exists below rather than a blanket rule.
+//
+// VLCAT was added at milestone 16 after the storefront's add-to-cart refusals came back as the generic
+// P0001 sentence. A shopper whose page has gone stale needs "reload the page", and the function that
+// refused them had already written it.
 
 /** Postgres' own codes, named where we act on them. */
 const UNIQUE_VIOLATION = '23505';
@@ -42,6 +47,7 @@ const RAISE_EXCEPTION = 'P0001';
 const INSUFFICIENT_STOCK = 'VLSTK';
 const INSUFFICIENT_FUNDS = 'VLFND';
 const PAYOUTS_HELD = 'VLHLD';
+const STALE_CATALOGUE = 'VLCAT';
 
 /**
  * A transaction that failed for a reason that re-running can fix. withTransaction()
@@ -256,6 +262,20 @@ export function toAppError(err: unknown): AppError {
       status: 409,
       code: 'INSUFFICIENT_STOCK',
       message: pgMessage ?? 'There is not enough stock left.',
+      ...(pgHint === undefined ? {} : { hint: pgHint }),
+      detail,
+      cause: err,
+    });
+  }
+
+  if (code === STALE_CATALOGUE) {
+    return new AppError({
+      // 409 rather than 404: the product may well exist, and what actually happened is that the page
+      // the shopper is looking at disagrees with the catalogue. The code is distinct so a client can
+      // refetch rather than only apologise.
+      status: 409,
+      code: 'STALE_CATALOGUE',
+      message: pgMessage ?? 'That is not on sale here any more.',
       ...(pgHint === undefined ? {} : { hint: pgHint }),
       detail,
       cause: err,

@@ -12,13 +12,16 @@ import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  addDecimal,
   cashDue,
   compareDecimal,
   formatCashDue,
   formatMoney,
+  multiplyDecimal,
   parseDecimal,
   rescale,
   roundToStep,
+  sumDecimals,
   toDecimalString,
 } from '../src/index.ts';
 import type { CurrencyFormat } from '../src/index.ts';
@@ -350,6 +353,86 @@ describe('exact decimals — no amount becomes a float', () => {
   it('round-trips every scale', () => {
     for (const value of ['0', '0.0', '0.00', '1', '1.1', '1.10', '123.456', '-9.99']) {
       assert.equal(toDecimalString(parseDecimal(value)), value);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Addition and multiplication — milestone 16.
+//
+// Added for the cart: a line total is unit x quantity and a subtotal is the sum of the lines. Before this
+// the money path never added two amounts together, so these are the first arithmetic in it beyond
+// rescaling, and they are the operations a cart total is wrong by a cent because of.
+// ---------------------------------------------------------------------------
+describe('exact addition', () => {
+  const sum = (...values: string[]): string =>
+    toDecimalString(sumDecimals(values.map((v) => parseDecimal(v))));
+
+  it('adds at the wider scale', () => {
+    assert.equal(toDecimalString(addDecimal(parseDecimal('1.5'), parseDecimal('2.25'))), '3.75');
+    assert.equal(toDecimalString(addDecimal(parseDecimal('1'), parseDecimal('0.01'))), '1.01');
+    assert.equal(toDecimalString(addDecimal(parseDecimal('3500.00'), parseDecimal('500.00'))), '4000.00');
+  });
+
+  it('is where a float would have been wrong', () => {
+    // The canonical one: 0.1 + 0.2 is 0.30000000000000004 in binary.
+    assert.notEqual(0.1 + 0.2, 0.3);
+    assert.equal(toDecimalString(addDecimal(parseDecimal('0.1'), parseDecimal('0.2'))), '0.3');
+    // And a cart of ten 0.07 items, which floats also get wrong.
+    assert.notEqual(Array.from({ length: 10 }).reduce<number>((a) => a + 0.07, 0), 0.7);
+    assert.equal(sum(...Array.from({ length: 10 }, () => '0.07')), '0.70');
+  });
+
+  it('handles signs', () => {
+    assert.equal(toDecimalString(addDecimal(parseDecimal('5.00'), parseDecimal('-2.50'))), '2.50');
+    assert.equal(toDecimalString(addDecimal(parseDecimal('-5'), parseDecimal('-5'))), '-10');
+    // Cancelling to zero must not produce "-0".
+    assert.equal(toDecimalString(addDecimal(parseDecimal('2.50'), parseDecimal('-2.50'))), '0.00');
+  });
+
+  it('sums an empty list to zero, and one item to itself', () => {
+    assert.equal(sum(), '0');
+    assert.equal(sum('1234.56'), '1234.56');
+  });
+
+  it('is associative over a cart of lines', () => {
+    const lines = ['1200.00', '3500.00', '500.00', '8000.00', '1500.00'];
+    assert.equal(sum(...lines), '14700.00');
+    assert.equal(sum(...[...lines].reverse()), '14700.00');
+  });
+
+  it('multiplies by a quantity', () => {
+    assert.equal(toDecimalString(multiplyDecimal(parseDecimal('4000.00'), 2)), '8000.00');
+    assert.equal(toDecimalString(multiplyDecimal(parseDecimal('0.07'), 3)), '0.21');
+    assert.equal(toDecimalString(multiplyDecimal(parseDecimal('1200'), 0)), '0');
+    assert.equal(toDecimalString(multiplyDecimal(parseDecimal('-2.50'), 4)), '-10.00');
+    // Zero times a negative is zero, not "-0.00".
+    assert.equal(toDecimalString(multiplyDecimal(parseDecimal('-2.50'), 0)), '0.00');
+  });
+
+  it('refuses a quantity that is not a whole number of units', () => {
+    assert.throws(() => multiplyDecimal(parseDecimal('1.00'), 1.5), /whole number/);
+    assert.throws(() => multiplyDecimal(parseDecimal('1.00'), -1), /whole number/);
+    assert.throws(() => multiplyDecimal(parseDecimal('1.00'), Number.NaN), /whole number/);
+  });
+
+  it('agrees with the database on a line total', () => {
+    // V004 computes line_total_amount as (unit_price_amount + options_amount) * quantity. This is the
+    // same arithmetic in the same order, which is what lets the cart's CTA and the order's total match.
+    const unit = addDecimal(parseDecimal('3500.00'), parseDecimal('500.00'));
+    assert.equal(toDecimalString(multiplyDecimal(unit, 3)), '12000.00');
+  });
+
+  it('repeated addition and multiplication agree', () => {
+    for (const amount of ['0.01', '0.07', '1.005', '3500.00', '12345.67']) {
+      for (const times of [1, 2, 3, 7, 13, 99]) {
+        const added = sumDecimals(Array.from({ length: times }, () => parseDecimal(amount)));
+        assert.equal(
+          toDecimalString(added),
+          toDecimalString(multiplyDecimal(parseDecimal(amount), times)),
+          `${amount} x ${times}`,
+        );
+      }
     }
   });
 });

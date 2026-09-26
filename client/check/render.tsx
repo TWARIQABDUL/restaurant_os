@@ -25,6 +25,15 @@ import {
   StorePickerStep,
 } from '../src/auth/steps.tsx';
 import { evaluateRules } from '../src/auth/passwordRules.ts';
+import { StoreContext } from '../src/storefront/StoreProvider.tsx';
+import type { StoreContextValue } from '../src/storefront/StoreProvider.tsx';
+import type { ProductDetailData, StoreFace } from '../src/storefront/api.ts';
+import { CategoryNav, PromoBanner, SearchField, StoreHeader, StoreInfo, fulfilmentLine, hoursLines, openLabel } from '../src/storefront/ShopChrome.tsx';
+import { OptionSheet, availableValues, matchVariant, unitPriceOf } from '../src/storefront/OptionSheet.tsx';
+import { CartSummary, StickyCartBar } from '../src/storefront/CartViews.tsx';
+import { ratingLine, relativeDay } from '../src/storefront/ProductPage.tsx';
+import { tileFor } from '../src/storefront/tiles.ts';
+import { formatMoney } from '../src/app/core.ts';
 
 const problems: string[] = [];
 let checks = 0;
@@ -138,6 +147,273 @@ expect(
   'the store name is refused locally as well as on the server',
 );
 
+// --- milestone 16: the storefront ---------------------------------------------
+//
+// THE PURE PARTS ARE ASSERTED, NOT JUST RENDERED. Most of what could be wrong on a shopfront is not
+// "does this throw" but "is the right size struck through" — so the functions that decide that are
+// checked against the boards' OWN fixtures: Shop.dc.html's clothing store, with XL sold out.
+
+/** Shop.dc.html's clothing product, as the schema would hold it: two pick-one groups, one gap. */
+const TEE: ProductDetailData = {
+  id: 'tee',
+  name: 'Everyday T-Shirt',
+  description: 'Sizes S · M · L · XL',
+  price: '15000.00',
+  compareAtPrice: null,
+  coverImageUrl: null,
+  defaultVariantId: 'v-s-black',
+  hasChoices: true,
+  hasExtras: false,
+  stock: { soldOut: false, lowStock: true, fewestLeft: 1 },
+  rating: null,
+  trackStock: true,
+  categoryIds: [],
+  groups: [
+    {
+      id: 'size',
+      name: 'Size',
+      selectMode: 'one',
+      isRequired: true,
+      values: [
+        { id: 's', label: 'S', priceDelta: '0.00', isAvailable: true },
+        { id: 'm', label: 'M', priceDelta: '0.00', isAvailable: true },
+        { id: 'xl', label: 'XL', priceDelta: '0.00', isAvailable: true },
+      ],
+    },
+    {
+      id: 'colour',
+      name: 'Color',
+      selectMode: 'one',
+      isRequired: true,
+      values: [
+        { id: 'black', label: 'Black', priceDelta: '0.00', isAvailable: true },
+        { id: 'white', label: 'White', priceDelta: '0.00', isAvailable: true },
+      ],
+    },
+  ],
+  // S and M in both colours; XL only in black, and that one is counted down to nothing. So XL is
+  // reachable as a size only while nothing else rules it out, and XL/white never exists at all.
+  variants: [
+    { id: 'v-s-black', sku: 'TS-BLK-S', stockQuantity: 4, isAvailable: true, isDefault: true, optionValueIds: ['s', 'black'] },
+    { id: 'v-s-white', sku: 'TS-WHT-S', stockQuantity: 2, isAvailable: true, isDefault: false, optionValueIds: ['s', 'white'] },
+    { id: 'v-m-black', sku: 'TS-BLK-M', stockQuantity: 0, isAvailable: true, isDefault: false, optionValueIds: ['m', 'black'] },
+    { id: 'v-m-white', sku: 'TS-WHT-M', stockQuantity: 5, isAvailable: true, isDefault: false, optionValueIds: ['m', 'white'] },
+    { id: 'v-xl-black', sku: 'TS-BLK-XL', stockQuantity: 0, isAvailable: true, isDefault: false, optionValueIds: ['xl', 'black'] },
+  ],
+};
+
+/** A burger: no dimensions, one default variant, priced extras. */
+const BURGER: ProductDetailData = {
+  ...TEE,
+  id: 'burger',
+  name: 'Chicken Burger',
+  price: '3500.00',
+  trackStock: false,
+  hasChoices: false,
+  hasExtras: true,
+  defaultVariantId: 'v-burger',
+  stock: { soldOut: false, lowStock: false, fewestLeft: null },
+  groups: [
+    {
+      id: 'extras',
+      name: 'Extras',
+      selectMode: 'several',
+      isRequired: false,
+      values: [
+        { id: 'cheese', label: 'Cheese', priceDelta: '500.00', isAvailable: true },
+        { id: 'fries', label: 'Fries', priceDelta: '1000.00', isAvailable: true },
+      ],
+    },
+  ],
+  variants: [
+    { id: 'v-burger', sku: null, stockQuantity: null, isAvailable: true, isDefault: true, optionValueIds: [] },
+  ],
+};
+
+// Nothing chosen: every size with at least one buyable variant, and both colours.
+{
+  const open = availableValues(TEE, {});
+  expect(open.has('s'), 'S has stock in both colours, so it is pickable');
+  expect(open.has('m'), 'M is out in black but in stock in white, so the SIZE is still pickable');
+  expect(!open.has('xl'), 'XL exists only in black, and that one is out — so XL is struck through');
+}
+
+// Choose black, and M becomes unpickable: M/black is the combination with nothing left.
+{
+  const inBlack = availableValues(TEE, { colour: ['black'] });
+  expect(inBlack.has('s'), 'S/black has four left');
+  expect(!inBlack.has('m'), 'M/black is out, so M is struck through once black is chosen');
+  expect(!inBlack.has('xl'), 'XL/black is out too');
+}
+
+// Choose M, and black becomes unpickable — the same rule read the other way round.
+{
+  const inM = availableValues(TEE, { size: ['m'] });
+  expect(!inM.has('black'), 'M/black is out, so black is struck through once M is chosen');
+  expect(inM.has('white'), 'M/white has five left');
+}
+
+// A combination the merchant never created is not a hole to be discovered at checkout.
+expect(matchVariant(TEE, { size: ['xl'], colour: ['white'] }) === null, 'XL/white does not exist');
+expect(matchVariant(TEE, { size: ['s'], colour: ['black'] })?.id === 'v-s-black', 'S/black is one variant');
+expect(matchVariant(TEE, { size: ['s'] }) === null, 'a variant needs every pick-one group answered');
+expect(matchVariant(BURGER, {})?.id === 'v-burger', 'a product with no dimensions has its default');
+
+// Extras are priced per line; dimensions are not.
+expect(unitPriceOf(BURGER, {}) === '3500.00', 'no extras, base price');
+expect(unitPriceOf(BURGER, { extras: ['cheese'] }) === '4000.00', 'cheese is +500');
+expect(unitPriceOf(BURGER, { extras: ['cheese', 'fries'] }) === '5000.00', 'cheese and fries are +1,500');
+expect(unitPriceOf(TEE, { size: ['s'], colour: ['black'] }) === '15000.00', 'a size costs nothing extra');
+
+/** Declared here because the fulfilment assertions below need them before the full FACE fixture. */
+const CURRENCY_FOR_LINE = { code: 'RWF', symbol: 'RWF', symbolPosition: 'after' as const, decimals: 0, thousandsSeparator: ',', cashRounding: 0 };
+const FACE_FOR_LINE = {
+  delivery: { fromFee: '1000.00', etaMinMinutes: 25, etaMaxMinutes: 35, zoneCount: 2 },
+  pickup: { address: 'KG 7 Ave, Kacyiru', readyMinutes: 15, instructions: null },
+} as StoreFace;
+
+// V009's rule, as the line beside the price.
+expect(ratingLine({ reviewCount: 0, averageRating: null, counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } }).text === 'New · no reviews yet', 'no reviews');
+expect(
+  ratingLine({ reviewCount: 2, averageRating: null, counts: { 1: 0, 2: 1, 3: 0, 4: 0, 5: 1 } }).text ===
+    '2 reviews · too few for a rating',
+  'below the threshold the count is shown, never an average',
+);
+expect(
+  ratingLine({ reviewCount: 3, averageRating: '3.7', counts: { 1: 0, 2: 1, 3: 0, 4: 1, 5: 1 } }).text === '★ 3.7 (3)',
+  'at three reviews the average appears',
+);
+
+// The open/closed sentence, from V018's answer.
+expect(openLabel({ isOpen: true, closesAt: '22:00', opensAt: '10:00', opensOn: 1 }, 1) === 'Open · closes 22:00', 'the board\'s own open line');
+expect(openLabel({ isOpen: false, closesAt: null, opensAt: '10:00', opensOn: 1 }, 1) === 'Closed · opens 10:00', 'shut, opening later today');
+expect(
+  openLabel({ isOpen: false, closesAt: null, opensAt: '10:00', opensOn: 1 }, 7) === 'Closed · opens Mon 10:00',
+  'shut until another day, which needs the day named',
+);
+expect(openLabel({ isOpen: false, closesAt: null, opensAt: null, opensOn: null }, 3) === 'Closed', 'a store with no hours at all');
+
+// "Daily 10:00–22:00" rather than seven identical lines.
+const daily: StoreFace['hours'] = [1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => ({ dayOfWeek, opensAt: '10:00', closesAt: '22:00' }));
+expect(hoursLines(daily).length === 1 && hoursLines(daily)[0] === 'Daily 10:00–22:00', 'seven identical days collapse');
+const sixDays = daily.slice(0, 6);
+expect(hoursLines(sixDays)[0] === 'Mon–Sat 10:00–22:00', 'a run of days collapses into a range');
+expect(hoursLines([]).length === 0, 'no hours is no lines, not an empty one');
+const split: StoreFace['hours'] = [
+  { dayOfWeek: 1, opensAt: '10:00', closesAt: '22:00' },
+  { dayOfWeek: 2, opensAt: '10:00', closesAt: '22:00' },
+  { dayOfWeek: 5, opensAt: '18:00', closesAt: '01:00' },
+];
+expect(hoursLines(split).length === 2, 'a gap in the week breaks the run');
+expect(hoursLines(split)[1] === 'Fri 18:00–01:00', 'and a past-midnight day is written as it is stored');
+
+// The fulfilment line, which both boards write above the grid.
+expect(
+  fulfilmentLine(FACE_FOR_LINE, (amount) => formatMoney(amount, CURRENCY_FOR_LINE), () => true) ===
+    'Delivery 25–35 min · from 1,000 RWF · Pickup in 15 min',
+  'the delivery and pickup line is the boards\' own, in their order',
+);
+expect(
+  fulfilmentLine(FACE_FOR_LINE, (amount) => formatMoney(amount, CURRENCY_FOR_LINE), (module) => module !== 'pickup') ===
+    'Delivery 25–35 min · from 1,000 RWF',
+  'a store without the pickup module says nothing about pickup',
+);
+
+// A tile is stable for a product and spread across the palette.
+expect(tileFor('a-product-id').background === tileFor('a-product-id').background, 'the same product keeps its tile');
+expect(new Set(Array.from({ length: 40 }, (_, n) => tileFor(`33333333-0000-4000-8000-0000000000${n}`).background)).size >= 5, 'tiles are spread, not all one colour');
+
+// "Today", "2 days ago" — the board's own scale.
+expect(relativeDay(new Date().toISOString()) === 'Today', 'today');
+expect(relativeDay(new Date(Date.now() - 2 * 86_400_000).toISOString()) === '2 days ago', 'two days');
+expect(relativeDay(new Date(Date.now() - 21 * 86_400_000).toISOString()) === '3 weeks ago', 'three weeks');
+
+// --- and every storefront component renders -----------------------------------
+const FACE: StoreFace = {
+  store: { id: 's', slug: 'nyama', name: 'Nyama & Co.', currency: 'RWF', country: 'RW', phone: '+250 78 000 0000' },
+  open: { isOpen: true, closesAt: '22:00', opensAt: '10:00', opensOn: 1 },
+  hours: daily,
+  delivery: { fromFee: '1000.00', etaMinMinutes: 25, etaMaxMinutes: 35, zoneCount: 2 },
+  pickup: { address: 'KG 7 Ave, Kacyiru', readyMinutes: 15, instructions: null },
+  banner: { promotionId: 'p', title: 'Two burgers, free fries', subtitle: 'Weekdays 12:00–15:00. Added automatically at checkout.' },
+  categories: [
+    { id: 'burgers', name: 'Burgers', description: '', imageUrl: null, productCount: 2 },
+    { id: 'sides', name: 'Sides', description: '', imageUrl: null, productCount: 3 },
+  ],
+};
+
+const CURRENCY = CURRENCY_FOR_LINE;
+
+const STORE_VALUE: StoreContextValue = {
+  face: FACE,
+  currency: CURRENCY,
+  // The real vocabulary and gates come from the config engine; the gate only needs them to answer.
+  t: ((key: string, form?: string) => (form === 'one' ? key : `${key}s`)) as StoreContextValue['t'],
+  has: () => true,
+  money: (amount) => formatMoney(amount, CURRENCY),
+  cart: {
+    id: 'cart',
+    itemCount: 3,
+    subtotal: '9500.00',
+    expiresAt: null,
+    lines: [
+      {
+        id: 'l1',
+        variantId: 'v',
+        productId: 'p1',
+        productName: 'Chicken Burger',
+        optionLabels: ['Medium', 'Cheese'],
+        quantity: 2,
+        unitPrice: '4000.00',
+        lineTotal: '8000.00',
+        coverImageUrl: null,
+        unavailable: false,
+      },
+      {
+        id: 'l2',
+        variantId: 'v2',
+        productId: 'p2',
+        productName: 'Fries',
+        optionLabels: [],
+        quantity: 1,
+        unitPrice: '1500.00',
+        lineTotal: '1500.00',
+        coverImageUrl: null,
+        // The state States.dc.html draws, which milestone 17's cart screen has to resolve.
+        unavailable: true,
+      },
+    ],
+  },
+  setCart: noop,
+  refreshCart: noop,
+};
+
+function inStore(node: ReactNode): ReactNode {
+  return <StoreContext.Provider value={STORE_VALUE}>{node}</StoreContext.Provider>;
+}
+
+const storefrontParts: readonly (readonly [string, ReactNode])[] = [
+  ['Shop · header', inStore(<StoreHeader query="" onSearch={noop} cartCount={3} onCart={noop} today={1} />)],
+  ['Shop · search', <SearchField value="" onChange={noop} placeholder="Search the menu" />],
+  ['Shop · promo banner', <PromoBanner title={FACE.banner?.title ?? null} subtitle={FACE.banner?.subtitle ?? null} />],
+  ['Shop · categories', <CategoryNav categories={FACE.categories} active={null} onPick={noop} allLabel="Menu" totalCount={null} />],
+  ['StoreDesktop · store info', inStore(<StoreInfo />)],
+  ['StoreDesktop · cart aside', inStore(<CartSummary onCheckout={noop} />)],
+  ['Shop · sticky cart bar', inStore(<StickyCartBar onOpen={noop} />)],
+  // The sheet renders CLOSED, which is its correct initial state: renderToStaticMarkup runs no effects,
+  // so a <dialog> that only opens in one is exactly what a first paint should produce.
+  ['Shop · option sheet', inStore(<OptionSheet product={TEE} open onClose={noop} onAdd={noop} />)],
+  ['Shop · option sheet, refused', inStore(<OptionSheet product={BURGER} open onClose={noop} onAdd={noop} error="Chicken Burger is sold out" />)],
+];
+
+for (const [name, node] of storefrontParts) {
+  const html = render(name, node);
+  allHtml += html;
+  kitHtml += html;
+}
+
+expect(storefrontParts.length >= 9, `the storefront has ${storefrontParts.length} parts rendered`);
+
 /**
  * The rendered text, with tags removed and the entities React escapes decoded.
  *
@@ -170,6 +446,14 @@ for (const phrase of [
   'Keep me signed in on this device',
   'We only show stores after the password matches one of them',
   'This signs you out on every other device.',
+  // The storefront's own wording, milestone 16.
+  'Open · closes 22:00',
+  'Two burgers, free fries',
+  'Weekdays 12:00–15:00. Added automatically at checkout.',
+  'Daily 10:00–22:00',
+  'Delivery 25–35 min · from 1,000 RWF',
+  'Sold out while you were choosing',
+  'The total is confirmed before you pay.',
 ]) {
   expect(visibleText.includes(phrase), `the boards' wording is missing: ${phrase}`);
 }
@@ -189,6 +473,14 @@ const ALLOWED_TILE_HEX = [
   // The toast's undo, which Main.dc.html sets as a light green on ink. A token would be a token used
   // once; it is noted here instead so it cannot spread.
   '#BFE3CD',
+  // The storefront's tile palette — milestone 16, from client/src/storefront/tiles.ts, which took them
+  // from Shop, StoreDesktop and ReviewsCustomer.
+  //
+  // ALL TEN ARE LISTED, not just the ones that happen to appear. tileFor() picks a tint by hashing the
+  // product id, so which tints reach the markup depends on the fixture ids — and a list holding only the
+  // two that showed up today would fail the next time somebody changed a fixture. The gate stays
+  // deterministic, and adding an ELEVENTH tint still means editing this list, which is the point.
+  '#EAD9C3', '#E3D5CB', '#F2D7C2', '#E5D0C0', '#F0E2B8', '#DCE4CD', '#DADCE2', '#E6D6C6', '#E8DCC8',
 ];
 const hexes = [...kitHtml.matchAll(/#[0-9A-Fa-f]{6}\b/g)].map((m) => m[0]);
 const stray = [...new Set(hexes)].filter((h) => !ALLOWED_TILE_HEX.includes(h.toUpperCase()));

@@ -30,6 +30,13 @@ type ProductRow = {
   status?: 'draft' | 'active';
   /** Stock for the single default variant. Ignored when the product has a matrix. */
   stock?: number | null;
+  /**
+   * V018. Struck through beside the price, and the source of Shop.dc.html's "-17%" badge: the
+   * storefront derives the percentage rather than storing it, so the two can never disagree.
+   */
+  compareAt?: number;
+  /** V018. At or below this many left, the storefront badges the product "Few left". */
+  lowStockThreshold?: number;
 };
 
 const CATEGORIES = [
@@ -48,7 +55,7 @@ const PRODUCTS: ProductRow[] = [
   // Nyama & Co. — Customize.dc.html's ITEMS list, in its order.
   { id: PRODUCT.chickenBurger, store: STORE.nyama, name: 'Chicken Burger', price: 3500, categories: [CATEGORY.burgers], description: 'Grilled chicken, slaw' },
   { id: PRODUCT.beefBurger, store: STORE.nyama, name: 'Beef Burger', price: 4000, categories: [CATEGORY.burgers], description: 'Double patty' },
-  { id: PRODUCT.brochettePlate, store: STORE.nyama, name: 'Brochette Plate', price: 5000, categories: [CATEGORY.grills], description: 'Two skewers, plantain' },
+  { id: PRODUCT.brochettePlate, store: STORE.nyama, name: 'Brochette Plate', price: 5000, categories: [CATEGORY.grills], description: 'Two skewers, plantain', compareAt: 6000 },
   { id: PRODUCT.grilledChicken, store: STORE.nyama, name: 'Grilled chicken', price: 8000, categories: [CATEGORY.grills], description: 'Half chicken, flame-grilled with pili-pili butter. Comes with salad and your choice of fries or plantain.' },
   { id: PRODUCT.fries, store: STORE.nyama, name: 'Fries', price: 1500, categories: [CATEGORY.sides], description: 'Salted, hot' },
   { id: PRODUCT.salad, store: STORE.nyama, name: 'Salad', price: 3000, categories: [CATEGORY.sides] },
@@ -60,13 +67,13 @@ const PRODUCTS: ProductRow[] = [
   { id: PRODUCT.veggieWrap, store: STORE.nyama, name: 'Veggie Wrap', price: 3000, categories: [CATEGORY.grills, CATEGORY.sides], description: 'Avocado, beans' },
 
   // Inzu Threads — stock tracked, because fashion sells out.
-  { id: PRODUCT.linenTee, store: STORE.inzu, name: 'Linen tee', price: 18000, categories: [CATEGORY.tops], trackStock: true, description: 'Breathable linen, cut in Kigali.' },
-  { id: PRODUCT.kitengeShirt, store: STORE.inzu, name: 'Kitenge shirt', price: 22000, categories: [CATEGORY.tops], trackStock: true, stock: 6 },
-  { id: PRODUCT.denimJacket, store: STORE.inzu, name: 'Denim jacket', price: 35000, categories: [CATEGORY.outerwear], trackStock: true, stock: 3 },
-  { id: PRODUCT.canvasTote, store: STORE.inzu, name: 'Canvas tote', price: 9000, categories: [CATEGORY.bags], trackStock: true, stock: 4 },
+  { id: PRODUCT.linenTee, store: STORE.inzu, name: 'Linen tee', price: 18000, categories: [CATEGORY.tops], trackStock: true, description: 'Breathable linen, cut in Kigali.', lowStockThreshold: 3 },
+  { id: PRODUCT.kitengeShirt, store: STORE.inzu, name: 'Kitenge shirt', price: 22000, categories: [CATEGORY.tops], trackStock: true, stock: 6, lowStockThreshold: 3 },
+  { id: PRODUCT.denimJacket, store: STORE.inzu, name: 'Denim jacket', price: 35000, categories: [CATEGORY.outerwear], trackStock: true, stock: 3, lowStockThreshold: 3 },
+  { id: PRODUCT.canvasTote, store: STORE.inzu, name: 'Canvas tote', price: 9000, categories: [CATEGORY.bags], trackStock: true, stock: 4, lowStockThreshold: 3 },
 
   // Kigali Kicks — one live, one still a draft, so Products has both states.
-  { id: PRODUCT.roadRunner, store: STORE.kicks, name: 'Road Runner', price: 68000, categories: [CATEGORY.sneakers], trackStock: true },
+  { id: PRODUCT.roadRunner, store: STORE.kicks, name: 'Road Runner', price: 68000, categories: [CATEGORY.sneakers], trackStock: true, lowStockThreshold: 2 },
   { id: PRODUCT.courtLow, store: STORE.kicks, name: 'Court Low', price: 54000, categories: [CATEGORY.sneakers], trackStock: true, stock: 0, status: 'draft' },
 
   // Kigali Tech Hub — the earbuds a customer says never arrived.
@@ -142,16 +149,26 @@ export async function seedCatalogue(ctx: Ctx): Promise<void> {
   }
   ctx.ok(`${CATEGORIES.length} categories across 4 stores`);
 
+  // product_categories.position is the order WITHIN A SECTION — V003: "Where this product sits within
+  // this section, which differs per section." So it counts per category, not per product: numbering it
+  // by the product's own index among its categories (which it did at first) makes every product position
+  // 1 in its first section, and the storefront's section order then falls back to the id tie-break.
+  const withinSection = new Map<string, number>();
+
   for (const [i, p] of PRODUCTS.entries()) {
     await ctx.sql(
-      `INSERT INTO products (id, store_id, name, description, base_price, track_stock, status, position)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [p.id, p.store, p.name, p.description ?? '', p.price, p.trackStock ?? false, p.status ?? 'active', i + 1],
+      `INSERT INTO products (id, store_id, name, description, base_price, compare_at_price,
+                             low_stock_threshold, track_stock, status, position)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [p.id, p.store, p.name, p.description ?? '', p.price, p.compareAt ?? null,
+       p.lowStockThreshold ?? 0, p.trackStock ?? false, p.status ?? 'active', i + 1],
     );
-    for (const [j, cat] of p.categories.entries()) {
+    for (const cat of p.categories) {
+      const next = (withinSection.get(cat) ?? 0) + 1;
+      withinSection.set(cat, next);
       await ctx.sql(
         `INSERT INTO product_categories (product_id, category_id, store_id, position) VALUES ($1, $2, $3, $4)`,
-        [p.id, cat, p.store, j + 1],
+        [p.id, cat, p.store, next],
       );
     }
   }

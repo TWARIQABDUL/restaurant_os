@@ -27,14 +27,17 @@
 // own lockfile. See §4.6 and the note in that file.
 
 export {
+  addDecimal,
   cashDue,
   compareDecimal,
   formatCashDue,
   formatMoney,
   isZero,
+  multiplyDecimal,
   parseDecimal,
   rescale,
   roundToStep,
+  sumDecimals,
   toDecimalString,
 } from './money/index.ts';
 

@@ -11,6 +11,12 @@
 // ALL THREE USE <dialog>. The browser gives the focus trap, the Escape key, the inert background and
 // the top layer for free — a hand-rolled overlay gets at most three of those and usually loses the
 // focus trap, which is the one a keyboard user needs.
+//
+// THE SHEET AND THE DRAWER CARRY THE PER-STORE SURFACE, added at milestone 16. Both appear over a
+// shopfront — the sheet holds product options and the drawer holds the cart — and a store whose theme is
+// dark would otherwise get a white panel over a dark page. The modal keeps the fixed palette, because
+// confirming something destructive is console chrome and is never themed. Where no store theme is
+// applied these resolve to the platform default in tokens.css, so the gallery is unchanged.
 
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
@@ -71,7 +77,7 @@ export function BottomSheet({ open, onClose, title, children, footer }: OverlayP
         onClose();
       }}
       aria-label={title}
-      className={`m-0 mt-auto max-h-[85vh] w-full max-w-none rounded-t-sheet bg-surface p-0 text-ink ${BACKDROP}`}
+      className={`m-0 mt-auto max-h-[85vh] w-full max-w-none rounded-t-sheet bg-store-surface p-0 text-store-text ${BACKDROP}`}
     >
       <div className="flex flex-col">
         <span aria-hidden="true" className="mx-auto mt-2 h-[3px] w-7 rounded-pill bg-control-line" />
@@ -97,7 +103,7 @@ export function Drawer({ open, onClose, title, children, footer }: OverlayProps)
         onClose();
       }}
       aria-label={title}
-      className={`m-0 ml-auto h-full max-h-none w-[min(420px,100vw)] max-w-none rounded-none bg-surface p-0 text-ink ${BACKDROP}`}
+      className={`m-0 ml-auto h-full max-h-none w-[min(420px,100vw)] max-w-none rounded-none bg-store-surface p-0 text-store-text ${BACKDROP}`}
     >
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b border-line-subtle px-4 py-2">

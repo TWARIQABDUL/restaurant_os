@@ -189,6 +189,12 @@ if (galleryCss.length === 0) {
   // can silently stop being emitted.
   const kitUtilities: readonly string[] = [
     'bg-store-primary', 'text-store-on-primary', 'text-store-primary', 'bg-store-tint', 'border-store-primary',
+    // The rest of the per-store set, which the storefront uses at milestone 16. A shopfront is the one
+    // surface where EVERY one of these has to resolve: the page, the cards, the text, the lines and the
+    // banner are all the merchant's colours, and a missing utility here renders a store unstyled rather
+    // than wrongly styled — which reads as a CSS bug instead of as the typo it is.
+    'bg-store-bg', 'bg-store-surface', 'text-store-text', 'text-store-muted', 'border-store-border',
+    'bg-store-border', 'bg-store-muted', 'bg-store-hero-bg', 'text-store-hero-text',
     'bg-status-neutral', 'text-status-neutral-fg', 'bg-status-info', 'text-status-info-fg',
     'bg-status-warn', 'text-status-warn-fg', 'bg-status-progress', 'text-status-progress-fg',
     'bg-status-success', 'text-status-success-fg', 'bg-status-danger', 'text-status-danger-fg',

@@ -229,11 +229,17 @@ refuses "a flag that does not exist at all" "product_product_flags_flag_key_fkey
 step "A cart that survives a browser with storage disabled"
 # =============================================================================
 SESSION='s_9f2b7c14e8a04d6fb3125ae7'
+# option_signature arrives with the line, not after it — V018. It is the sorted, comma-joined list of the
+# line's option value ids, and cart_items_signature_agrees refuses a line whose signature and child rows
+# disagree. It cannot be filled in afterwards by a trigger: the unique index that makes "same product, same
+# options" atomic needs the value AT INSERT TIME, or two concurrent adds of different extras would both
+# insert an empty signature and be merged into one line.
 accepts "an anonymous cart, keyed only by a cookie the server issued" \
     "INSERT INTO carts (id,store_id,anonymous_session_id) VALUES
        ('eeee0000-0000-0000-0000-000000000001','${S2}','${SESSION}');
-     INSERT INTO cart_items (id,cart_id,variant_id,store_id,quantity)
-       SELECT 'ffff0000-0000-0000-0000-000000000001','eeee0000-0000-0000-0000-000000000001',v.id,'${S2}',2
+     INSERT INTO cart_items (id,cart_id,variant_id,store_id,quantity,option_signature)
+       SELECT 'ffff0000-0000-0000-0000-000000000001','eeee0000-0000-0000-0000-000000000001',v.id,'${S2}',2,
+              (SELECT string_agg(id::text, ',' ORDER BY id::text) FROM option_values WHERE label IN ('Cheese','Extra sauce'))
          FROM product_variants v WHERE v.product_id='${P2}';
      INSERT INTO cart_item_option_values (cart_item_id,cart_id,option_value_id)
        SELECT 'ffff0000-0000-0000-0000-000000000001','eeee0000-0000-0000-0000-000000000001',id
@@ -273,6 +279,28 @@ refuses "a line naming another store's variant" "cart_items_variant_id_store_id_
        SELECT 'eeee0000-0000-0000-0000-000000000001', v.id, '${S2}' FROM product_variants v WHERE v.product_id='${P1}' LIMIT 1"
 refuses "a quantity of zero" "cart_items_quantity_positive" \
     "UPDATE cart_items SET quantity=0 WHERE id='ffff0000-0000-0000-0000-000000000001'"
+refuses "a quantity past the bound, before the integer could overflow" "cart_items_quantity_bounded" \
+    "UPDATE cart_items SET quantity=1000 WHERE id='ffff0000-0000-0000-0000-000000000001'"
+
+# -----------------------------------------------------------------------------
+# V018: the line's option set is a value the database can index, and it cannot drift.
+# -----------------------------------------------------------------------------
+refuses "a signature that disagrees with the line's own options" "cart_items_signature" \
+    "UPDATE cart_items SET option_signature='not-the-options'
+      WHERE id='ffff0000-0000-0000-0000-000000000001'"
+refuses "removing an option without updating the signature" "cart_items_signature" \
+    "DELETE FROM cart_item_option_values WHERE cart_item_id='ffff0000-0000-0000-0000-000000000001'"
+refuses "a second line with the same product and the same options" "cart_items_one_line_per_choice" \
+    "INSERT INTO cart_items (cart_id,variant_id,store_id,quantity,option_signature)
+     SELECT cart_id,variant_id,store_id,1,option_signature FROM cart_items
+      WHERE id='ffff0000-0000-0000-0000-000000000001'"
+equals "and add_to_cart() merges into the line instead, atomically" "3" \
+    "SELECT quantity FROM add_to_cart(
+       'eeee0000-0000-0000-0000-000000000001',
+       (SELECT variant_id FROM cart_items WHERE id='ffff0000-0000-0000-0000-000000000001'),
+       (SELECT array_agg(option_value_id) FROM cart_item_option_values
+         WHERE cart_item_id='ffff0000-0000-0000-0000-000000000001'),
+       1)"
 accepts "emptying a cart removes its lines" "DELETE FROM carts WHERE id='eeee0000-0000-0000-0000-000000000001'"
 equals  "and their option choices with them" "0" "SELECT count(*) FROM cart_item_option_values"
 

@@ -1,11 +1,14 @@
 // packages/core/src/money/index.ts — milestone 13.
 
 export {
+  addDecimal,
   compareDecimal,
   isZero,
+  multiplyDecimal,
   parseDecimal,
   rescale,
   roundToStep,
+  sumDecimals,
   toDecimalString,
 } from './decimal.ts';
 export type { Decimal } from './decimal.ts';

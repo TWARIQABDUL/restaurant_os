@@ -18,23 +18,47 @@ type StoreRow = {
   status: 'pending' | 'active' | 'suspended';
   plan: string;
   why: string;
+  /** V018. The tel: link on StoreDesktop's store-info panel. */
+  phone?: string;
+  /**
+   * V018. Opening hours as [day, opens, closes] with ISO day numbers, 1 = Monday.
+   * A day with no entry is closed, so Inzu's missing Sunday IS its Sunday.
+   */
+  hours?: [number, string, string][];
 };
+
+/** Monday to Sunday at the same times — how most of these stores trade, and what "Daily 10:00-22:00" means. */
+const daily = (opens: string, closes: string): [number, string, string][] =>
+  [1, 2, 3, 4, 5, 6, 7].map((d) => [d, opens, closes]);
+
+/** Monday to Saturday. The seventh day is absent rather than zeroed. */
+const weekdaysAndSaturday = (opens: string, closes: string): [number, string, string][] =>
+  [1, 2, 3, 4, 5, 6].map((d) => [d, opens, closes]);
 
 const STORES: StoreRow[] = [
   {
     id: STORE.nyama, slug: 'nyama', name: 'Nyama & Co.', template: 'food',
     status: 'active', plan: 'growth',
     why: 'the demo store almost every board is drawn against',
+    // Shop.dc.html's header reads "Open · closes 22:00" and StoreDesktop's panel "Daily 10:00-22:00".
+    phone: '+250 78 000 0000', hours: daily('10:00', '22:00'),
   },
   {
     id: STORE.inzu, slug: 'inzu', name: 'Inzu Threads', template: 'fashion',
     status: 'active', plan: 'starter',
     why: 'the second industry, and the one carrying a real variant matrix',
+    // StoreDesktop's clothing variant: "Open · closes 19:00", and shut on Sunday.
+    phone: '+250 78 111 2020', hours: weekdaysAndSaturday('10:00', '19:00'),
   },
   {
     id: STORE.kicks, slug: 'kigali-kicks', name: 'Kigali Kicks', template: 'fashion',
     status: 'active', plan: 'starter',
     why: "ShoeStores' first palette — milestone 13 themes this one",
+    // THE PAST-MIDNIGHT CASE, seeded so it is exercised by a real store rather than only by a unit
+    // test: Friday and Saturday 18:00-01:00, which store_open_state() has to read as one session
+    // spanning two days.
+    phone: '+250 78 222 3030',
+    hours: [[5, '18:00', '01:00'], [6, '18:00', '01:00']],
   },
   {
     id: STORE.ubwiza, slug: 'ubwiza-beauty', name: 'Ubwiza Beauty', template: 'beauty',
@@ -59,16 +83,22 @@ export async function seedStores(ctx: Ctx): Promise<void> {
   for (const s of STORES) {
     await ctx.sql(
       `INSERT INTO stores (id, slug, name, country, selling_currency, status, plan_key,
-                           industry_template_id, industry_template_version)
-       SELECT $1, $2, $3, 'RW', 'RWF', $4, $5, t.id, v.version
+                           public_phone, industry_template_id, industry_template_version)
+       SELECT $1, $2, $3, 'RW', 'RWF', $4, $5, $7, t.id, v.version
          FROM industry_templates t
          JOIN industry_template_versions v
            ON v.template_id = t.id AND v.status = 'published'
         WHERE t.key = $6
         ORDER BY v.version DESC
         LIMIT 1`,
-      [s.id, s.slug, s.name, s.status, s.plan, s.template],
+      [s.id, s.slug, s.name, s.status, s.plan, s.template, s.phone ?? null],
     );
+    for (const [day, opens, closes] of s.hours ?? []) {
+      await ctx.sql(
+        `INSERT INTO store_hours (store_id, day_of_week, opens_at, closes_at) VALUES ($1, $2, $3, $4)`,
+        [s.id, day, opens, closes],
+      );
+    }
     ctx.info(`${s.name.padEnd(17)} ${s.status.padEnd(10)} ${s.template.padEnd(12)} ${s.why}`);
   }
 
@@ -80,6 +110,12 @@ export async function seedStores(ctx: Ctx): Promise<void> {
     throw new Error(`expected ${STORES.length} wallets from the stores trigger, found ${wallets.rows[0]!.n}`);
   }
   ctx.ok(`${STORES.length} stores, each with the wallet its trigger created`);
+
+  const hours = await ctx.sql<{ n: string }>(`SELECT count(*)::text AS n FROM store_hours`);
+  ctx.ok(
+    `${hours.rows[0]!.n} opening-hour rows across 3 trading stores — Nyama daily, Inzu closed Sunday, ` +
+      'Kicks 18:00–01:00 on Friday and Saturday (the past-midnight case)',
+  );
 
   // ------------------------------------------------------------------
   // Delivery zones — Settings' own example, down to the areas and the ETA.

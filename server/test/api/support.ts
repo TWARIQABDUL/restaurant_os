@@ -10,7 +10,8 @@
 // would be testing something the application cannot do.
 
 import bcrypt from 'bcryptjs';
-import { db, sql } from '../../src/db/index.ts';
+import { Client } from 'pg';
+import { db, sql, withTransaction } from '../../src/db/index.ts';
 
 function uid(n: number): string {
   return `eeeeeeee-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
@@ -33,6 +34,39 @@ export const USER = {
   multiStore: uid(0x18),
 } as const;
 
+/**
+ * The shopfront's own fixtures — milestone 16. A catalogue on store A with one product of every shape the
+ * storefront has to render, and one delivered order behind it so a review has a line to attach to.
+ */
+export const CATALOGUE = {
+  /** Sections. */
+  mains: uid(0x100),
+  drinks: uid(0x101),
+  /** A plain product: no options, no stock tracking. One tap adds it. */
+  juice: uid(0x110),
+  /** Two "pick one" groups, so its variants are a 2x2 matrix with one combination sold out. */
+  tee: uid(0x111),
+  /** A "pick several" group — priced extras, not a variant dimension. */
+  burger: uid(0x112),
+  /** Every variant withdrawn: the sold-out card. */
+  wrap: uid(0x113),
+  /** Tracked, and below its threshold: the "Few left" card. */
+  cap: uid(0x114),
+  /** status = draft. Must not appear on the shopfront at all. */
+  secret: uid(0x115),
+  /** compare_at_price above the price: the discount badge. */
+  plate: uid(0x116),
+  /** In BOTH sections, which is what makes product_categories a join. */
+  water: uid(0x117),
+
+  size: uid(0x120),
+  colour: uid(0x121),
+  extras: uid(0x122),
+
+  promo: uid(0x130),
+  order: uid(0x140),
+} as const;
+
 /** Every fixture email ends this way, so cleanup can find accounts the endpoints created. */
 export const EMAIL_DOMAIN = 'escalation.test';
 
@@ -50,22 +84,103 @@ const STAFF: { id: string; name: string; email: string; store: string; role: str
   { id: USER.adminB, name: 'Admin B', email: `admin-b@${EMAIL_DOMAIN}`, store: STORE.b, role: 'admin' },
 ];
 
+/**
+ * Remove the fixture stores' reviews, which needs table ownership.
+ *
+ * V009'S PROMISE IS ABSOLUTE, and this function is the proof. `reviews_immutable` raises on DELETE for
+ * every role — "Reviews go live straight away and stay. Vendlyfy can hide one after a report; nobody can
+ * remove it." The application role cannot delete a review, the OWNER cannot delete a review, and neither
+ * can a test. So teardown turns that one trigger off for the length of one transaction, which is a thing
+ * only the table's owner may do.
+ *
+ * THIS IS TEARDOWN, NOT A FIXTURE, and the distinction is what keeps support.ts's rule intact: every row
+ * a test reads was written through the app role, so no test asserts on a state the application could not
+ * produce. Removing rows afterwards is housekeeping, and it is the only thing this connection does.
+ *
+ * ALTER TABLE ... DISABLE TRIGGER is transactional and takes an ACCESS EXCLUSIVE lock, so the window
+ * where reviews are mutable is one transaction long on a local test database, and a rollback puts the
+ * trigger back without anybody's help.
+ */
+async function deleteReviewsAsOwner(stores: readonly string[]): Promise<void> {
+  const url = process.env['OWNER_DATABASE_URL'];
+  if (url === undefined || url === '') {
+    throw new Error(
+      'OWNER_DATABASE_URL is not set, so the fixture reviews cannot be removed — a review is undeletable ' +
+        'by design (V009) and teardown needs to disable that trigger. Run the suite through npm run api:test.',
+    );
+  }
+
+  const owner = new Client({ connectionString: url });
+  await owner.connect();
+  try {
+    await owner.query('BEGIN');
+    await owner.query('ALTER TABLE reviews DISABLE TRIGGER reviews_immutable');
+    // The children first: a reply and a report both reference the review.
+    await owner.query(
+      `DELETE FROM review_reports WHERE review_id IN (SELECT id FROM reviews WHERE store_id = ANY($1::uuid[]))`,
+      [stores],
+    );
+    await owner.query(`DELETE FROM review_replies WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await owner.query(`DELETE FROM reviews WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await owner.query('ALTER TABLE reviews ENABLE TRIGGER reviews_immutable');
+    await owner.query('COMMIT');
+  } catch (error) {
+    await owner.query('ROLLBACK');
+    throw error;
+  } finally {
+    await owner.end();
+  }
+}
+
 export async function cleanup(): Promise<void> {
   const stores = [STORE.a, STORE.b];
   const like = `%@${EMAIL_DOMAIN}`;
 
-  // Order is the schema's, not a guess. wallets and users both reference stores with
-  // ON DELETE RESTRICT, so the stores go last; store_members cascades from users, but
-  // is removed explicitly so a failure names the right table.
-  await sql(`DELETE FROM rider_profiles WHERE store_id = ANY($1::uuid[])`, [stores]);
-  await sql(`DELETE FROM store_members WHERE store_id = ANY($1::uuid[])`, [stores]);
-  await sql(`DELETE FROM platform_members WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)`, [like]);
-  await sql(`DELETE FROM store_payment_methods WHERE store_id = ANY($1::uuid[])`, [stores]);
-  await sql(`DELETE FROM store_payout_settings WHERE store_id = ANY($1::uuid[])`, [stores]);
-  await sql(`DELETE FROM store_pickup_settings WHERE store_id = ANY($1::uuid[])`, [stores]);
-  await sql(`DELETE FROM users WHERE email LIKE $1`, [like]);
-  await sql(`DELETE FROM wallets WHERE store_id = ANY($1::uuid[])`, [stores]);
-  await sql(`DELETE FROM stores WHERE id = ANY($1::uuid[])`, [stores]);
+  // Reviews first, and through the owner: see deleteReviewsAsOwner(). Everything below is the app role.
+  await deleteReviewsAsOwner(stores);
+
+  // ONE TRANSACTION for every delete, and this is not tidiness either. Several of these tables carry
+  // DEFERRABLE constraint triggers that check a SET of rows — a variant must name one value per group, an
+  // order must have at least one line — so deleting the children in one statement and the parents in the
+  // next leaves an invalid state committed in between, and the trigger refuses it. Inside a transaction
+  // every check runs once, at the end, when the rows are all gone.
+  // Order is still the schema's, not a guess: wallets and users both reference stores with ON DELETE
+  // RESTRICT, so the stores go last, and the shopfront's rows go first because reviews reference order
+  // lines and lines reference variants. Inside one transaction the ORDER no longer has to be right for
+  // the deletes to succeed — but keeping it right means a failure names the table that actually refused.
+  await withTransaction(async (tx) => {
+    await tx.query(`DELETE FROM cart_item_option_values WHERE cart_id IN (SELECT id FROM carts WHERE store_id = ANY($1::uuid[]))`, [stores]);
+    await tx.query(`DELETE FROM cart_items WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM carts WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM order_item_option_values WHERE order_item_id IN (SELECT id FROM order_items WHERE store_id = ANY($1::uuid[]))`, [stores]);
+    await tx.query(`DELETE FROM order_items WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM order_events WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM order_discounts WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM orders WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM store_order_counters WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM promotions WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM product_variant_values WHERE variant_id IN (SELECT id FROM product_variants WHERE store_id = ANY($1::uuid[]))`, [stores]);
+    await tx.query(`DELETE FROM product_variants WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM product_option_groups WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM option_values WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM option_groups WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM product_categories WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM products WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM categories WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM delivery_zone_areas WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM delivery_zones WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM store_hours WHERE store_id = ANY($1::uuid[])`, [stores]);
+
+    await tx.query(`DELETE FROM rider_profiles WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM store_members WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM platform_members WHERE user_id IN (SELECT id FROM users WHERE email LIKE $1)`, [like]);
+    await tx.query(`DELETE FROM store_payment_methods WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM store_payout_settings WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM store_pickup_settings WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM users WHERE email LIKE $1`, [like]);
+    await tx.query(`DELETE FROM wallets WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM stores WHERE id = ANY($1::uuid[])`, [stores]);
+  });
 }
 
 export async function seedFixtures(): Promise<void> {
@@ -175,4 +290,205 @@ export async function userExistsWithEmail(email: string): Promise<boolean> {
     [email],
   );
   return Number(rows[0]?.n ?? '0') > 0;
+}
+
+/**
+ * The shopfront's fixtures — milestone 16.
+ *
+ * ONE PRODUCT OF EVERY SHAPE the browse boards draw, because the interesting bugs are in the shapes
+ * rather than in the count: a variant matrix with a hole in it, a product whose every variant is
+ * withdrawn, a tracked product under its threshold, a draft that must stay invisible, and one filed in
+ * two sections.
+ *
+ * Called by the storefront suite only. The authorization suites do not need a catalogue and paying for
+ * one on every file would slow them all down.
+ */
+export async function seedStorefront(): Promise<void> {
+  // Hours: open every day, 00:00–23:59, so "is the shop open" never depends on when the suite runs.
+  // The open/closed logic itself is tested against store_open_state() directly, with fixed timestamps.
+  await sql(
+    `INSERT INTO store_hours (store_id, day_of_week, opens_at, closes_at)
+     SELECT $1, d, '00:00', '23:59' FROM generate_series(1, 7) d`,
+    [STORE.a],
+  );
+  await sql(`UPDATE stores SET public_phone = '+250 78 000 1234' WHERE id = $1`, [STORE.a]);
+
+  await sql(
+    `INSERT INTO delivery_zones (store_id, name, fee_amount, eta_min_minutes, eta_max_minutes, position)
+          VALUES ($1, 'Near', 1000, 25, 35, 1), ($1, 'Far', 2500, 40, 60, 2)`,
+    [STORE.a],
+  );
+
+  await sql(
+    `INSERT INTO categories (id, store_id, name, position)
+          VALUES ($1, $3, 'Mains', 1), ($2, $3, 'Drinks', 2)`,
+    [CATALOGUE.mains, CATALOGUE.drinks, STORE.a],
+  );
+
+  // (id, name, price, compare_at, tracked, threshold, status, position)
+  const products: [string, string, number, number | null, boolean, number, 'active' | 'draft', number][] = [
+    [CATALOGUE.juice, 'Passion Juice', 1200, null, false, 0, 'active', 1],
+    [CATALOGUE.tee, 'Linen Tee', 18000, null, true, 3, 'active', 2],
+    [CATALOGUE.burger, 'Chicken Burger', 3500, null, false, 0, 'active', 3],
+    [CATALOGUE.wrap, 'Veggie Wrap', 3000, null, false, 0, 'active', 4],
+    [CATALOGUE.cap, 'Cotton Cap', 7000, null, true, 3, 'active', 5],
+    [CATALOGUE.secret, 'Unreleased Special', 9000, null, false, 0, 'draft', 6],
+    [CATALOGUE.plate, 'Brochette Plate', 5000, 6000, false, 0, 'active', 7],
+    [CATALOGUE.water, 'Still Water', 500, null, false, 0, 'active', 8],
+  ];
+  for (const [id, name, price, compareAt, tracked, threshold, status, position] of products) {
+    await sql(
+      `INSERT INTO products (id, store_id, name, description, base_price, compare_at_price,
+                             low_stock_threshold, track_stock, status, position)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [id, STORE.a, name, `${name} description`, price, compareAt, threshold, tracked, status, position],
+    );
+  }
+
+  // Sections, numbered WITHIN each section — V003's own meaning for the column.
+  await sql(
+    `INSERT INTO product_categories (product_id, category_id, store_id, position) VALUES
+       ($1, $9, $11, 1), ($2, $9, $11, 2), ($3, $9, $11, 3), ($4, $9, $11, 4),
+       ($5, $9, $11, 5), ($6, $9, $11, 6), ($7, $9, $11, 7),
+       ($8, $10, $11, 1),
+       -- Still Water is in BOTH, at a different position in each.
+       ($8, $9, $11, 8)`,
+    [
+      CATALOGUE.juice, CATALOGUE.tee, CATALOGUE.burger, CATALOGUE.wrap, CATALOGUE.cap,
+      CATALOGUE.secret, CATALOGUE.plate, CATALOGUE.water,
+      CATALOGUE.mains, CATALOGUE.drinks, STORE.a,
+    ],
+  );
+
+  await sql(
+    `INSERT INTO option_groups (id, store_id, name, select_mode, is_required, position) VALUES
+       ($1, $4, 'Size',   'one',     true,  1),
+       ($2, $4, 'Colour', 'one',     true,  2),
+       ($3, $4, 'Extras', 'several', false, 3)`,
+    [CATALOGUE.size, CATALOGUE.colour, CATALOGUE.extras, STORE.a],
+  );
+
+  const values: [string, string, string, number][] = [
+    [uid(0x200), CATALOGUE.size, 'S', 0],
+    [uid(0x201), CATALOGUE.size, 'M', 0],
+    [uid(0x210), CATALOGUE.colour, 'Black', 0],
+    [uid(0x211), CATALOGUE.colour, 'Sand', 0],
+    [uid(0x220), CATALOGUE.extras, 'Extra cheese', 500],
+    [uid(0x221), CATALOGUE.extras, 'Extra chilli', 300],
+  ];
+  for (const [id, group, label, delta] of values) {
+    await sql(
+      `INSERT INTO option_values (id, option_group_id, store_id, label, price_delta, position)
+            VALUES ($1, $2, $3, $4, $5, 1)`,
+      [id, group, STORE.a, label, delta],
+    );
+  }
+
+  await sql(
+    `INSERT INTO product_option_groups (product_id, option_group_id, store_id, position) VALUES
+       ($1, $3, $5, 1), ($1, $4, $5, 2), ($2, $6, $5, 1)`,
+    [CATALOGUE.tee, CATALOGUE.burger, CATALOGUE.size, CATALOGUE.colour, STORE.a, CATALOGUE.extras],
+  );
+
+  // The tee's matrix: S/Black, S/Sand, M/Black, M/Sand. M/Sand is counted down to nothing, so exactly
+  // one combination is struck through and "fewestLeft" has something to report.
+  //
+  // IN ONE TRANSACTION, and not by preference. V003's matrix rule — "every variant must name one value
+  // from EVERY single-select group its product offers" — is a DEFERRABLE INITIALLY DEFERRED constraint
+  // trigger, so it fires at COMMIT. sql() commits each statement on its own, which means a variant
+  // inserted by itself is checked before its values exist and is refused for being incomplete. The
+  // constraint is right; writing the two halves outside a transaction was not.
+  const matrix: [string, string, string, number][] = [
+    [uid(0x300), uid(0x200), uid(0x210), 7],
+    [uid(0x301), uid(0x200), uid(0x211), 5],
+    [uid(0x302), uid(0x201), uid(0x210), 2],
+    [uid(0x303), uid(0x201), uid(0x211), 0],
+  ];
+  await withTransaction(async (tx) => {
+    for (const [variant, size, colour, stock] of matrix) {
+      await tx.query(
+        `INSERT INTO product_variants (id, product_id, store_id, sku, stock_quantity, is_default, position)
+              VALUES ($1, $2, $3, $4, $5, $6, 1)`,
+        [variant, CATALOGUE.tee, STORE.a, `TEE-${variant.slice(-3)}`, stock, variant === uid(0x300)],
+      );
+      await tx.query(
+        `INSERT INTO product_variant_values (variant_id, option_group_id, option_value_id, product_id)
+              VALUES ($1, $2, $3, $5), ($1, $4, $6, $5)`,
+        [variant, CATALOGUE.size, size, CATALOGUE.colour, CATALOGUE.tee, colour],
+      );
+    }
+  });
+
+  // A default variant each for everything without a matrix. V003: every product has at least one.
+  const singles: [string, string, number | null, boolean][] = [
+    [uid(0x310), CATALOGUE.juice, null, true],
+    [uid(0x311), CATALOGUE.burger, null, true],
+    // Withdrawn rather than counted to zero, which is the other way to be sold out.
+    [uid(0x312), CATALOGUE.wrap, null, false],
+    [uid(0x313), CATALOGUE.cap, 2, true],
+    [uid(0x314), CATALOGUE.secret, null, true],
+    [uid(0x315), CATALOGUE.plate, null, true],
+    [uid(0x316), CATALOGUE.water, null, true],
+  ];
+  for (const [variant, product, stock, available] of singles) {
+    await sql(
+      `INSERT INTO product_variants (id, product_id, store_id, stock_quantity, is_available, is_default, position)
+            VALUES ($1, $2, $3, $4, $5, true, 1)`,
+      [variant, product, STORE.a, stock, available],
+    );
+  }
+
+  // An automatic promotion with a banner, live at every moment: no dates, no days, no hours.
+  await sql(
+    `INSERT INTO promotions (id, store_id, kind, discount_type, percent_off, banner_title, banner_subtitle)
+          VALUES ($1, $2, 'automatic', 'percentage', 10, 'Ten per cent off this week', 'Applied automatically at checkout.')`,
+    [CATALOGUE.promo, STORE.a],
+  );
+
+  // A DELIVERED order for customer A, with one line of the juice — so exactly one product on this
+  // shopfront can be reviewed, and the rest answer "nothing to review". V009 makes that structural.
+  //
+  // ONE TRANSACTION, for the same reason the matrix above needs one: V004 requires an order to have at
+  // least one line and enforces it with a deferred constraint trigger, so an order written by itself is
+  // refused at its own commit. Two of these in one fixture is a pattern worth naming — the schema's
+  // invariants are about SETS of rows, and a fixture that writes rows one statement at a time is
+  // asserting things the application never does.
+  await withTransaction(async (tx) => {
+    await tx.query(
+      `INSERT INTO orders (id, store_id, order_number, tracking_code, idempotency_key, customer_user_id,
+                           delivery_address, fulfilment_type, status, payment_method, currency, subtotal_amount)
+            VALUES ($1, $2, 9001, 'trk_storefront_1', 'idem_storefront_1', $3,
+                    'KG 11 Ave, Kigali', 'delivery', 'delivered', 'cash', 'RWF', 1200)`,
+      [CATALOGUE.order, STORE.a, USER.customerA],
+    );
+    await tx.query(
+      `INSERT INTO order_items (id, order_id, store_id, variant_id, product_name, unit_price_amount, quantity)
+            VALUES ($1, $2, $3, $4, 'Passion Juice', 1200, 1)`,
+      [uid(0x400), CATALOGUE.order, STORE.a, uid(0x310)],
+    );
+  });
+}
+
+/** How many reviews exist for a product, hidden ones included. */
+export async function countReviews(productId: string): Promise<number> {
+  const { rows } = await db.query<{ n: string }>(
+    `SELECT count(*)::text AS n FROM reviews WHERE product_id = $1`,
+    [productId],
+  );
+  return Number(rows[0]?.n ?? '0');
+}
+
+/** The cart lines a shopper holds at a store, for asserting the merge rather than trusting the answer. */
+export async function cartLines(
+  storeId: string,
+  sessionId: string,
+): Promise<{ quantity: number; signature: string }[]> {
+  const { rows } = await db.query<{ quantity: number; option_signature: string }>(
+    `SELECT i.quantity, i.option_signature
+       FROM cart_items i JOIN carts c ON c.id = i.cart_id
+      WHERE c.store_id = $1 AND c.anonymous_session_id = $2
+      ORDER BY i.created_at, i.id`,
+    [storeId, sessionId],
+  );
+  return rows.map((r) => ({ quantity: r.quantity, signature: r.option_signature }));
 }
