@@ -100,13 +100,38 @@ for (const dir of NEW_TREE) {
 // D. The built gallery stylesheet must contain none of the legacy design system.
 // ---------------------------------------------------------------------------
 const requireDist = process.argv.includes('--require-dist');
-const assets = path.join(CLIENT, 'dist', 'assets');
-const galleryCss = existsSync(assets)
-  ? readdirSync(assets).filter((f) => /^gallery-.*\.css$/.test(f)).map((f) => path.join(assets, f))
-  : [];
+const dist = path.join(CLIENT, 'dist');
+
+/**
+ * The stylesheets the NEW documents load, read out of the built HTML rather than matched by filename.
+ *
+ * It used to be `gallery-*.css`, which broke the moment milestone 15 added a third entry: with two
+ * documents importing shared/ui, Rollup hoists the common CSS into a chunk of its own and names it after
+ * that module — `ui-*.css` — so the pattern found nothing and the check silently had nothing to assert
+ * on. Reading the <link> tags is exact, and it cannot drift as chunking changes.
+ *
+ * index.html is deliberately excluded: it is the legacy document, and its stylesheet is the thing every
+ * assertion below is checking the new ones are free of.
+ */
+const NEW_DOCUMENTS = ['gallery.html', 'app.html'];
+
+function stylesheetsOf(document: string): string[] {
+  const file = path.join(dist, document);
+  if (!existsSync(file)) return [];
+  const html = readFileSync(file, 'utf8');
+  return [...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/g)]
+    .map((m) => m[1])
+    .filter((href): href is string => href !== undefined)
+    .filter((href) => !href.startsWith('http'))
+    .map((href) => path.join(dist, href.replace(/^\//, '')))
+    .filter((f) => existsSync(f));
+}
+
+const galleryCss = [...new Set(NEW_DOCUMENTS.flatMap(stylesheetsOf))];
 
 if (galleryCss.length === 0) {
-  const message = 'client/dist has no gallery-*.css — run `npm run build` in client/ first.';
+  const message =
+    `client/dist has no stylesheets for ${NEW_DOCUMENTS.join(' or ')} — run \`npm run build\` in client/ first.`;
   if (requireDist) fail(message);
   else notes.push(`skipped built-output checks: ${message}`);
 } else {

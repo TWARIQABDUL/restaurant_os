@@ -15,6 +15,16 @@ import { ALL_STATES, ADMIN_STATES, PRODUCT_STATES } from '../src/shared/states/i
 import { ComponentSheet } from '../src/gallery/ComponentSheet.tsx';
 import { AdminStateSheet, ProductStateSheet } from '../src/gallery/StateSheet.tsx';
 import { TokenSheet } from '../src/gallery/TokenSheet.tsx';
+import { AuthShell, StepHeading } from '../src/auth/AuthShell.tsx';
+import {
+  CodeStep,
+  ForgotStep,
+  NewPasswordStep,
+  RoutedStep,
+  SignInStep,
+  StorePickerStep,
+} from '../src/auth/steps.tsx';
+import { evaluateRules } from '../src/auth/passwordRules.ts';
 
 const problems: string[] = [];
 let checks = 0;
@@ -84,6 +94,50 @@ for (const [name, node] of sheets) {
   if (name !== 'TokenSheet') kitHtml += html;
 }
 
+// --- milestone 15: Auth's steps ----------------------------------------------
+//
+// Rendered the same way as the states: if a step throws on first paint, the build fails rather than the
+// page. AuthPage itself is not rendered here — it calls the API on mount, and a render gate that needed a
+// server would stop being a build-time check.
+const RULES = ['At least 8 characters', 'Includes a number', 'Not your phone number or store name'];
+const noop = (): void => undefined;
+
+const authSteps: readonly (readonly [string, ReactNode])[] = [
+  ['Auth · shell', <AuthShell><StepHeading title="Sign in">Use the email or phone number you were invited with.</StepHeading></AuthShell>],
+  ['Auth · sign in', <SignInStep error={null} busy={false} onSubmit={noop} onForgot={noop} />],
+  ['Auth · sign in, session expired', <SignInStep notice="You were signed out after a while without activity." error={null} busy={false} onSubmit={noop} onForgot={noop} />],
+  ['Auth · sign in, busy', <SignInStep error={null} busy onSubmit={noop} onForgot={noop} />],
+  ['Auth · sign in, failed', <SignInStep error={{ message: 'That email or password is not right.' }} busy={false} onSubmit={noop} onForgot={noop} />],
+  [
+    'Auth · which store',
+    <StorePickerStep
+      memberships={[
+        { storeId: 'a', slug: 'nyama', name: 'Nyama & Co.', role: 'owner' },
+        { storeId: 'b', slug: 'inzu', name: 'Inzu Threads', role: 'manager' },
+      ]}
+      onPick={noop}
+    />,
+  ],
+  ['Auth · two-step', <CodeStep title="Confirm it’s you" sub="Vendlyfy team accounts need a second step." error={null} busy={false} resendLabel="Send again" onSubmit={noop} onResend={noop} onBack={noop} />],
+  ['Auth · forgot', <ForgotStep error={null} busy={false} onSubmit={noop} onBack={noop} />],
+  ['Auth · new password', <NewPasswordStep title="Choose a new password" sub="This signs you out on every other device." cta="Save password" rules={RULES} context={{}} error={null} busy={false} onSubmit={noop} />],
+  ['Auth · invite', <NewPasswordStep title="Join Nyama & Co." sub="Aline Uwase invited Patrick Niyonzima as a manager." cta="Join and sign in" rules={RULES} context={{ storeName: 'Nyama & Co.' }} error={null} busy={false} onSubmit={noop} />],
+  ['Auth · invite, rider', <NewPasswordStep title="Join Nyama & Co." sub="Invited as a rider." cta="Join and sign in" rules={RULES} context={{}} error={null} busy={false} needsPlate onSubmit={noop} />],
+  ['Auth · routed, owner', <RoutedStep title="Welcome back, Aline" sub="Opening the Nyama & Co. dashboard." cta="Go to dashboard" onContinue={noop} />],
+];
+
+for (const [name, node] of authSteps) allHtml += render(name, node);
+
+expect(authSteps.length >= 12, `Auth has ${authSteps.length} steps rendered`);
+
+// The password checklist has to evaluate locally, because the board ticks it as you type.
+expect(evaluateRules(RULES, '').every((r) => !r.passed), 'an empty password passes no rule');
+expect(evaluateRules(RULES, 'correct-horse-42').every((r) => r.passed), 'a good one passes all three');
+expect(
+  evaluateRules(RULES, 'nyama2024', { storeName: 'Nyama & Co.' })[2]?.passed === false,
+  'the store name is refused locally as well as on the server',
+);
+
 /**
  * The rendered text, with tags removed and the entities React escapes decoded.
  *
@@ -111,6 +165,11 @@ for (const phrase of [
   'The store’s wallet wasn’t charged.',
   'Nyama & Co. is getting ready',
   'Add a street, building or landmark the rider can find.',
+  // Auth's own wording, milestone 15.
+  'One sign-in for owners, staff, riders and the Vendlyfy team.',
+  'Keep me signed in on this device',
+  'We only show stores after the password matches one of them',
+  'This signs you out on every other device.',
 ]) {
   expect(visibleText.includes(phrase), `the boards' wording is missing: ${phrase}`);
 }

@@ -40,6 +40,8 @@ export type AuthContext = {
   storeRole: StoreMembersRole | null;
   platformRole: PlatformMembersRole | null;
   permissions: readonly string[];
+  /** users.session_version, which the guard compares against the token's. See V016. */
+  sessionVersion: number;
 };
 
 type AuthContextRow = {
@@ -52,6 +54,7 @@ type AuthContextRow = {
   store_role: StoreMembersRole | null;
   platform_role: PlatformMembersRole | null;
   permissions: string[];
+  session_version: number;
 };
 
 // $2 is the store the request named, or NULL when it named none.
@@ -64,7 +67,7 @@ type AuthContextRow = {
 // membership of a store with none.
 const LOAD = `
     WITH me AS (
-        SELECT id, scope, store_id, email, name, phone
+        SELECT id, scope, store_id, email, name, phone, session_version
           FROM users
          WHERE id = $1
     ),
@@ -96,6 +99,7 @@ const LOAD = `
            me.email,
            me.name,
            me.phone,
+           me.session_version,
            (SELECT role FROM store_role)    AS store_role,
            (SELECT role FROM platform_role) AS platform_role,
            COALESCE(
@@ -131,5 +135,6 @@ export async function loadAuthContext(
     storeRole: row.store_role,
     platformRole: row.platform_role,
     permissions: row.permissions,
+    sessionVersion: row.session_version,
   };
 }

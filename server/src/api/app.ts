@@ -21,6 +21,7 @@ import express from 'express';
 import type { Express } from 'express';
 import helmet from 'helmet';
 import { globalLimiter } from '../middleware/rateLimit.js';
+import { issueCsrfToken, requireCsrf } from '../auth/csrf.ts';
 import { errorHandler, unmatchedRoute } from './errorHandler.ts';
 import sessionRoutes from '../routes/session.ts';
 import storeConfigRoutes from '../routes/storeConfig.ts';
@@ -31,6 +32,8 @@ import membersRoutes from '../routes/members.ts';
 import storeSettingsRoutes from '../routes/storeSettings.ts';
 import { payoutsRouter, walletRouter } from '../routes/storeWallet.ts';
 import healthRoutes from '../routes/health.ts';
+import { publicInvitesRouter, storeInvitesRouter } from '../routes/invites.ts';
+import { passwordRouter, staffPasswordRouter } from '../routes/password.ts';
 
 /**
  * Every permission string the routers above ask for, checked against role_permissions
@@ -83,7 +86,20 @@ export function createApp(): Express {
   // Backstop. Per-route limiters, where a route needs one, run before it.
   app.use('/api', globalLimiter);
 
+  // Health first, and outside the CSRF layer: it is a GET, a load balancer calls it, and it changes
+  // nothing.
   app.use('/api/health', healthRoutes);
+
+  // CSRF. §2.5: "Cookie-borne credentials are sent automatically, so every state-changing request needs
+  // a token or a strict same-origin check."
+  //
+  // Issued for every request so a fresh browser has a token before its first POST — otherwise the first
+  // sign-in would fail and the client would have to know to fetch something first. Required on every
+  // unsafe method, mounted ONCE for the whole API rather than per route: a route added later that forgot
+  // it would be a hole nobody notices. Webhooks are the only endpoints that must not have it, and they
+  // are the legacy server's until Stage D moves them.
+  app.use('/api', issueCsrfToken);
+  app.use('/api', requireCsrf);
 
   // Names no store: it tells a signed-in person which stores they are a member of.
   app.use('/api/session', sessionRoutes);
@@ -93,6 +109,8 @@ export function createApp(): Express {
   // on each of these reads the membership for the :storeId it is mounted under, so a
   // caller naming a store they do not work at gets 403 from the store they named.
   app.use('/api/stores/:storeId/members', membersRoutes);
+  app.use('/api/stores/:storeId/members/:userId/password', staffPasswordRouter);
+  app.use('/api/stores/:storeId/invites', storeInvitesRouter);
   app.use('/api/stores/:storeId/wallet', walletRouter);
   app.use('/api/stores/:storeId/payouts', payoutsRouter);
   app.use('/api/stores/:storeId/settings', storeSettingsRoutes);
@@ -104,6 +122,11 @@ export function createApp(): Express {
   // through the console. The console reads this same endpoint — it has the slug from
   // GET /api/session — so the storefront and the console cannot drift on what a store calls
   // its categories. See routes/storefrontConfig.ts.
+  app.use('/api/password', passwordRouter);
+
+  // Unauthenticated, because the invitee has no account yet — the TOKEN is the credential.
+  app.use('/api/invites', publicInvitesRouter);
+
   app.use('/api/storefront', storefrontConfigRoutes);
   app.use('/api/storefront', storefrontThemeRoutes);
 

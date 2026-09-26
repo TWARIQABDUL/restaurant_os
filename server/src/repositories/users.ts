@@ -67,6 +67,33 @@ export async function findPlatformCredentials(
   return rows[0] ?? null;
 }
 
+/** The stored hash for a person known by id — for verifying a current password before changing it. */
+export async function findCredentialsById(
+  userId: string,
+  on: Queryable = db,
+): Promise<{ id: string; password_hash: string } | null> {
+  const { rows } = await on.query<{ id: string; password_hash: string }>(
+    `SELECT id, password_hash FROM users WHERE id = $1`,
+    [userId],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Replaces a password hash.
+ *
+ * Takes a HASH, not a password, so no caller can write a plaintext by mistake — and it deliberately
+ * does not touch session_version: revoking sessions is auth.revokeAllSessions(), and keeping them
+ * separate means a caller has to say which it meant.
+ */
+export async function setPassword(userId: string, passwordHash: string, tx: Queryable): Promise<void> {
+  const { rowCount } = await tx.query(`UPDATE users SET password_hash = $2 WHERE id = $1`, [
+    userId,
+    passwordHash,
+  ]);
+  if (rowCount === 0) throw new Error(`user ${userId} disappeared while setting a password`);
+}
+
 export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, BCRYPT_COST);
 }

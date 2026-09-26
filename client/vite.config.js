@@ -25,6 +25,8 @@ export default defineConfig({
       input: {
         main: 'index.html',
         gallery: 'gallery.html',
+        // The new app, milestone 15 onward. Replaces index.html at cutover.
+        app: 'app.html',
       },
     },
   },
@@ -35,6 +37,15 @@ export default defineConfig({
     // treat localhost:5000 as a separate origin and the cookie behaviour here
     // wouldn't match what ships.
     proxy: {
+      // The NEW server (milestone 11's server/src/api), which listens on API_PORT 5100 so it can run
+      // beside the legacy one. Mounted at /api because that is the path it serves and the path the new
+      // client calls — which also makes the session cookie first-party in dev, as §2.5 requires: the
+      // cookie is host-only on the store's own host in production, and a cross-origin dev setup would
+      // exercise cookie behaviour that never ships.
+      '/api': {
+        target: 'http://localhost:5100',
+        changeOrigin: true,
+      },
       // Matches the vercel.json rewrite: /backend/* here maps to /api/* on the
       // API server. Kept identical so cookie behaviour in dev matches what ships.
       '/backend': {

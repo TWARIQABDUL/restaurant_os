@@ -101,8 +101,8 @@ export function isUuid(value: unknown): value is string {
   return typeof value === 'string' && UUID.test(value);
 }
 
-/** The user id this request's token claims. Throws an AppError if there is no valid one. */
-function callerId(req: Request): string {
+/** The identity and session version this request's token claims. Throws an AppError otherwise. */
+function caller(req: Request): { userId: string; sessionVersion: number } {
   const token = readToken(req);
   if (token === null || token === undefined || token === '') {
     throw unauthorized();
@@ -116,7 +116,7 @@ function guard(
 ): RequestHandler {
   return (req: Request, _res: Response, next: NextFunction): void => {
     void (async (): Promise<void> => {
-      const userId = callerId(req);
+      const { userId, sessionVersion } = caller(req);
       const storeId = resolveStoreId(req);
 
       // THE RE-READ. Not cached, not taken from the token. This is the statement that
@@ -127,6 +127,15 @@ function guard(
       // authorize, and telling the client to sign in again is the useful answer.
       if (context === null) {
         throw unauthorized('Your account is no longer available.', 'ACCOUNT_GONE');
+      }
+
+      // THE OTHER HALF OF THE RE-READ, added at milestone 15. A password change bumps
+      // users.session_version (V016), so a token issued before it no longer matches — which is how
+      // Auth's "This signs you out on every other device" is true of tokens already in the wild.
+      // Compared here rather than in verifySessionToken() because only the database knows the
+      // current version, and a stateless check could never see a change.
+      if (context.sessionVersion !== sessionVersion) {
+        throw unauthorized('Your password changed, so you were signed out here.', 'SESSION_REVOKED');
       }
 
       if (permission !== null && !context.permissions.includes(permission)) {

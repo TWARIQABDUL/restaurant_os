@@ -9,6 +9,7 @@
 // privileges come from V000's default grants. A fixture that needed the owner role
 // would be testing something the application cannot do.
 
+import bcrypt from 'bcryptjs';
 import { db, sql } from '../../src/db/index.ts';
 
 function uid(n: number): string {
@@ -40,11 +41,12 @@ export const EMAIL_DOMAIN = 'escalation.test';
 // obviously-not-a-hash placeholder and the suite stays fast. Nothing can sign in with it.
 const PASSWORD_HASH = '$2a$12$notarealhashnotarealhashnotarealhashnotarealhashnotar';
 
-const STAFF: { id: string; name: string; email: string; store: string; role: string }[] = [
+const STAFF: { id: string; name: string; email: string; store: string; role: string; phone?: string }[] = [
   { id: USER.ownerA, name: 'Owner A', email: `owner-a@${EMAIL_DOMAIN}`, store: STORE.a, role: 'owner' },
   { id: USER.adminA, name: 'Admin A', email: `admin-a@${EMAIL_DOMAIN}`, store: STORE.a, role: 'admin' },
   { id: USER.managerA, name: 'Manager A', email: `manager-a@${EMAIL_DOMAIN}`, store: STORE.a, role: 'manager' },
-  { id: USER.riderA, name: 'Rider A', email: `rider-a@${EMAIL_DOMAIN}`, store: STORE.a, role: 'rider' },
+  // A phone, because Auth's rider signs in with one: "078 455 9012".
+  { id: USER.riderA, name: 'Rider A', email: `rider-a@${EMAIL_DOMAIN}`, store: STORE.a, role: 'rider', phone: '078 455 9012' },
   { id: USER.adminB, name: 'Admin B', email: `admin-b@${EMAIL_DOMAIN}`, store: STORE.b, role: 'admin' },
 ];
 
@@ -78,8 +80,8 @@ export async function seedFixtures(): Promise<void> {
 
   for (const person of STAFF) {
     await sql(
-      `INSERT INTO users (id, scope, email, name, password_hash) VALUES ($1, 'platform', $2, $3, $4)`,
-      [person.id, person.email, person.name, PASSWORD_HASH],
+      `INSERT INTO users (id, scope, email, name, phone, password_hash) VALUES ($1, 'platform', $2, $3, $4, $5)`,
+      [person.id, person.email, person.name, person.phone ?? null, PASSWORD_HASH],
     );
     await sql(`INSERT INTO store_members (user_id, store_id, role) VALUES ($1, $2, $3)`, [
       person.id,
@@ -137,6 +139,27 @@ export async function seedFixtures(): Promise<void> {
     `INSERT INTO store_payment_methods (store_id, payment_method_key, is_connected, connected_at)
           VALUES ($1, 'cash', true, now()), ($1, 'mtn_momo', true, now())`,
     [STORE.a],
+  );
+}
+
+/**
+ * The password the sign-in tests use, and the one account per persona that really has it.
+ *
+ * The fixtures above store an obviously-fake hash so eight accounts do not cost eight bcrypt runs —
+ * every other suite authenticates with a signed token. The sign-in tests cannot: verifying a password is
+ * the thing under test. So this hashes once, at cost 12, and applies it to the accounts those tests use.
+ *
+ * It satisfies the board's three rules (8+, a digit, not the store name or phone) on purpose: a fixture
+ * password that the server would reject would make every test here pass or fail for the wrong reason.
+ */
+export const FIXTURE_PASSWORD = 'correct-horse-42';
+
+export async function seedAuthPasswords(): Promise<void> {
+  const hash = await bcrypt.hash(FIXTURE_PASSWORD, 12);
+  await sql(
+    `UPDATE users SET password_hash = $2
+      WHERE id = ANY($1::uuid[])`,
+    [[USER.ownerA, USER.managerA, USER.adminB, USER.superAdmin, USER.multiStore, USER.riderA, USER.customerA], hash],
   );
 }
 
