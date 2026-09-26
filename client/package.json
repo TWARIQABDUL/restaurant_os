@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "ui:check": "vite build --ssr check/render.tsx --outDir dist-check --emptyOutDir && node dist-check/render.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },

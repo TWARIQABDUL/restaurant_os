@@ -152,7 +152,41 @@ if (galleryCss.length === 0) {
       fail(`the built gallery stylesheet still emits .${utility} — Tailwind's default namespace was not cleared.`);
     }
   }
-  notes.push(`checked ${galleryCss.map((f) => path.basename(f)).join(', ')} against ${legacyOnly.length} legacy-only tokens`);
+  // E. Every utility the UI kit uses must actually have been EMITTED.
+  //
+  // This is the failure mode that nothing else catches. A mistyped class — `bg-status-progres` — is
+  // valid TypeScript, valid JSX, builds cleanly, and Tailwind simply generates no rule for it: the
+  // component renders unstyled and looks like a CSS bug rather than a typo. Asserting the class is in
+  // the output is the only place that shows up before someone opens the page.
+  //
+  // The list is the kit's token-derived utilities. Adding a token to tokens.css and using it in a
+  // component means adding it here, which is the point — a token nothing asserts on is a token that
+  // can silently stop being emitted.
+  const kitUtilities: readonly string[] = [
+    'bg-store-primary', 'text-store-on-primary', 'text-store-primary', 'bg-store-tint', 'border-store-primary',
+    'bg-status-neutral', 'text-status-neutral-fg', 'bg-status-info', 'text-status-info-fg',
+    'bg-status-warn', 'text-status-warn-fg', 'bg-status-progress', 'text-status-progress-fg',
+    'bg-status-success', 'text-status-success-fg', 'bg-status-danger', 'text-status-danger-fg',
+    'border-status-danger-fg', 'border-status-info-fg', 'border-status-progress-fg',
+    'border-status-success-fg', 'border-status-warn-fg',
+    'bg-ink', 'text-ink', 'text-ink-2', 'text-muted', 'text-disabled', 'bg-ground', 'bg-surface',
+    'bg-line', 'bg-line-subtle', 'border-line', 'border-line-subtle', 'border-control-line', 'bg-control-line',
+    'rounded-chip', 'rounded-control', 'rounded-card', 'rounded-sheet', 'rounded-pill',
+    'shadow-menu', 'shadow-sheet', 'font-display', 'font-mono', 'font-sans',
+    'text-display', 'text-heading', 'text-title', 'text-body', 'text-caption', 'text-mono',
+  ];
+  const notEmitted = kitUtilities.filter((u) => !built.includes(`.${u}`));
+  if (notEmitted.length > 0) {
+    fail(
+      `the UI kit uses utilities Tailwind did not emit — a class name is misspelt or its token is gone: ` +
+        notEmitted.join(', '),
+    );
+  }
+
+  notes.push(
+    `checked ${galleryCss.map((f) => path.basename(f)).join(', ')} against ${legacyOnly.length} legacy-only tokens ` +
+      `and ${kitUtilities.length} kit utilities`,
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -108,6 +108,15 @@
   --color-status-info: #E7EEF9;
   --color-status-info-fg: #1F437F;
 
+  /* A SIXTH TONE, added at milestone 14. This layer took the status palette from
+     States.dc.html, which has five — but Main.dc.html's order badges have six: it
+     uses #EDE9F6 / #4B3A83 for "Out for delivery", and no other board uses it.
+     Named for the meaning rather than the label, because the label is per-industry:
+     food and fashion say "Out for delivery", services says "In progress", and both
+     mean the step is underway. */
+  --color-status-progress: #EDE9F6;
+  --color-status-progress-fg: #4B3A83;
+
   /* Kept because utilities reference them and the design uses both literally. */
   --color-white: #FFFFFF;
   --color-black: #000000;

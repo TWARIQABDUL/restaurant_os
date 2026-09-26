@@ -1,0 +1,15 @@
+// client/check — the UI render gate, milestone 14.
+//
+// A SECOND project rather than widening tsconfig.json, for the same reason packages/core has
+// tsconfig.test.json: the gate runs in Node and calls process.exit, while src/ must keep NO node
+// types — a browser component that reaches for `process` has to fail to compile.
+//
+// Both run in `npm run typecheck`, so a `process` in src/ still fails under the project where it
+// matters.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "check/**/*"]
+}

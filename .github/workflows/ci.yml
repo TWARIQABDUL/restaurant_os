@@ -180,6 +180,12 @@ jobs:
       - run: npm run build
         working-directory: client
 
+      # Renders every component in the kit and all 28 states to static HTML and asserts on the
+      # result. `tsc` proves the types and `vite build` proves the JSX compiles; neither proves a
+      # component RUNS, or that the copy is still the boards' wording.
+      - run: npm run ui:check
+        working-directory: client
+
       # §2.2 is "Tailwind utilities only", and the boundary between the new token
       # layer and the legacy stylesheet that cannot be deleted yet. Runs after the
       # build so it can assert on the emitted CSS, not just the source.

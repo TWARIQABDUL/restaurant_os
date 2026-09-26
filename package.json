@@ -20,8 +20,9 @@
     "api:test": "bash scripts/api-test.sh",
     "core:test": "node --test packages/core/test/*.test.ts",
     "db:profile": "bash db/scripts/profile-old-db.sh",
-    "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p packages/core/tsconfig.test.json && tsc -p server && tsc -p client",
-    "check:styles": "node scripts/check-styles.ts"
+    "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p packages/core/tsconfig.test.json && tsc -p server && tsc -p client && tsc -p client/tsconfig.check.json",
+    "check:styles": "node scripts/check-styles.ts",
+    "ui:check": "npm --prefix client run ui:check"
   },
   "engines": {
     "node": ">=22.18"
