@@ -59,11 +59,15 @@ Present and complete:
   keyed by slug: see the note below
 - `GET /api/stores/:storeId/config/templates` · `PUT …/config/template` ·
   `PATCH …/config/overrides`
+- `GET /api/storefront/:slug/theme` — the published look and the store's currency, with an ETag
+- `GET /api/stores/:storeId/theme` · `PUT …/theme/draft` · `POST …/theme/publish` ·
+  `DELETE …/theme/published`
 
 Deliberately absent, with the milestone that owns it:
 
 - signing in, the cookie session, CSRF, the staff invite — **15**
 - requesting a payout, the ledger, the Wallet board — **23**
+- the ThemeStudio and Customize screens themselves — **25**
 - writing settings, transferring ownership — **25**
 - everything `/api/admin/*`, including publishing a template version and its rollout — **27**
 
@@ -103,6 +107,14 @@ anonymous shopper, and keyed by **slug** rather than store id because a slug is 
 storefront's URL while a uuid is not: an unauthenticated endpoint keyed by uuid would hand back
 the store-existence signal the guard deliberately hides. The merchant console reads the same
 endpoint, so the storefront and the console cannot drift on what a store calls its categories.
+
+**A palette can only enter the database as the compiler's output.** `POST …/theme/publish` takes
+the eight inputs and returns `compileTheme()`'s value; there is no endpoint anywhere that accepts a
+colour for a token. So §3's "reject any token set that is not its own output" is true by
+construction rather than by a comparison that could be got wrong — a client that sends its preview
+palette has it ignored, not merged. And V015 checks the result again in SQL, refusing a published
+row whose text pairs fall below 4.5:1, so the guarantee does not rest on this route being the only
+writer.
 
 **`has()` throws on an unknown module.** Returning false would hide a feature from every store
 while looking exactly like a feature switched off — the same failure V002 refuses at the column

@@ -22,6 +22,11 @@ import type { StoreTheme, StoreTokenName } from '../styles/store-theme.ts';
    color changes per store." — so only the last four differ. `tint` is the
    canvas's published mix, round(channel * 0.12 + 255 * 0.88) per channel.
    -------------------------------------------------------------------------- */
+// Illustrative fixtures for showing the token plumbing, hand-written at milestone 4 when there
+// was no compiler to ask. Milestone 13 built one, so these could now be compileTheme() output —
+// which would also make the gallery a live demonstration of it. Left for milestone 14, which owns
+// the gallery and the client's route to packages/core; a hand-written swatch is illustrative
+// rather than a second theme engine, so the duplication here costs nothing real.
 const NEUTRAL = {
   bg: '#F6F5F1',
   surface: '#FFFFFF',
@@ -29,14 +34,17 @@ const NEUTRAL = {
   muted: '#5F5C53',
   border: '#E5E2DA',
   onPrimary: '#FFFFFF',
+  // The three the compiler added at milestone 13. Banner values track the tint below per fixture.
+  onAccent: '#FFFFFF',
+  heroText: '#17160F',
 } as const;
 
 const FIXTURES: readonly { readonly label: string; readonly theme: StoreTheme }[] = [
-  { label: 'Platform default', theme: { ...NEUTRAL, primary: '#1D6B47', accent: '#1D6B47', tint: '#E4EDE9' } },
-  { label: 'Ember', theme: { ...NEUTRAL, primary: '#C2410C', accent: '#C2410C', tint: '#F8E8E2' } },
-  { label: 'Deep blue', theme: { ...NEUTRAL, primary: '#1F437F', accent: '#1F437F', tint: '#E4E8F0' } },
-  { label: 'Plum', theme: { ...NEUTRAL, primary: '#9D174D', accent: '#9D174D', tint: '#F3E3EA' } },
-  { label: 'Ink', theme: { ...NEUTRAL, primary: '#17160F', accent: '#17160F', tint: '#E3E3E2' } },
+  { label: 'Platform default', theme: { ...NEUTRAL, primary: '#1D6B47', accent: '#1D6B47', tint: '#E4EDE9', heroBg: '#E4EDE9' } },
+  { label: 'Ember', theme: { ...NEUTRAL, primary: '#C2410C', accent: '#C2410C', tint: '#F8E8E2', heroBg: '#F8E8E2' } },
+  { label: 'Deep blue', theme: { ...NEUTRAL, primary: '#1F437F', accent: '#1F437F', tint: '#E4E8F0', heroBg: '#E4E8F0' } },
+  { label: 'Plum', theme: { ...NEUTRAL, primary: '#9D174D', accent: '#9D174D', tint: '#F3E3EA', heroBg: '#F3E3EA' } },
+  { label: 'Ink', theme: { ...NEUTRAL, primary: '#17160F', accent: '#17160F', tint: '#E3E3E2', heroBg: '#E3E3E2' } },
 ];
 
 const NEUTRALS: readonly { readonly name: string; readonly hex: string; readonly klass: string }[] = [

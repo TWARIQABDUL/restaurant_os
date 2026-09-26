@@ -7,13 +7,17 @@
 //                                with an ETag. Exposes t(key) and has(module) — the only two
 //                                primitives a component gets. A component that branches on
 //                                an industry name means this failed.
-//   theme-engine   milestone 13  eight inputs → nine tokens + a contrast report. Enforces
-//                                4.5:1 for text and 3:1 for buttons, and is the ONLY path to
-//                                a published theme: the API re-runs it on publish and rejects
-//                                any token set that is not its own output.
-//   money          milestone 13  one formatter driven by the currency table, with cash
-//                                rounding that applies only to cash-on-delivery totals.
-//                                Property-tested.
+//   theme          milestone 13  DONE. eight inputs → twelve colours + a contrast report +
+//                                a plain-language list of what it adjusted. Transcribed from
+//                                ThemeStudio.dc.html, which contains a working makeTheme(), and
+//                                pinned against a 535-case golden table generated from it. The
+//                                ONLY path to a published theme: the API re-runs it on publish
+//                                and rejects any token set that is not its own output.
+//   money          milestone 13  DONE. one formatter driven by the currencies table, with cash
+//                                rounding that applies only to cash-on-delivery totals. Exact
+//                                decimal arithmetic on BigInt minor units — amounts arrive from
+//                                Postgres as strings and never become floats. Property-tested,
+//                                and pinned against a golden table from AdminCurrencies.dc.html.
 //
 // The package's tsconfig is what keeps everything here isomorphic: lib ES2023 and types []
 // mean a module reaching for `document` OR for `process` fails to compile.
@@ -21,6 +25,57 @@
 // NOT YET RESOLVABLE BY NAME. server/src/core.ts imports this package by relative path and
 // says why; npm workspaces stay deferred while the legacy server is still deploying from its
 // own lockfile. See §4.6 and the note in that file.
+
+export {
+  cashDue,
+  compareDecimal,
+  formatCashDue,
+  formatMoney,
+  isZero,
+  parseDecimal,
+  rescale,
+  roundToStep,
+  toDecimalString,
+} from './money/index.ts';
+
+export type { CurrencyFormat, Decimal, MoneyInput } from './money/index.ts';
+
+export {
+  CARD_TREATMENTS,
+  HARMONIES,
+  HEADING_FONTS,
+  HEROES,
+  MERCHANT_VISIBLE_TOKENS,
+  MOODS,
+  SHAPES,
+  compileTheme,
+  contrast,
+  failingChecks,
+  hsl,
+  isPublishable,
+  luminance,
+  mix,
+  pickOn,
+  rgbToHsl,
+  shiftLightness,
+  toHex,
+  toRgb,
+} from './theme/index.ts';
+
+export type {
+  CardTreatment,
+  CompiledColors,
+  CompiledTheme,
+  ContrastCheck,
+  Harmony,
+  HeadingFont,
+  Hero,
+  Hsl,
+  Mood,
+  Rgb,
+  Shape,
+  ThemeInputs,
+} from './theme/index.ts';
 
 export {
   PLATFORM_WORDS,

@@ -53,4 +53,5 @@ exec node --test --test-concurrency=1 \
     test/api/guard.test.ts \
     test/api/members.test.ts \
     test/api/payouts.test.ts \
-    test/api/config.test.ts
+    test/api/config.test.ts \
+    test/api/theme.test.ts

@@ -1317,6 +1317,83 @@ export interface StorePickupSettingsRow {
   updated_at: Date;
 }
 
+/** `store_themes.input_card_treatment`, from its CHECK constraint. */
+export type StoreThemesInputCardTreatment =
+  | 'flat'
+  | 'outlined'
+  | 'shadow';
+
+/** `store_themes.input_harmony`, from its CHECK constraint. */
+export type StoreThemesInputHarmony =
+  | 'complementary'
+  | 'analogous'
+  | 'split'
+  | 'mono';
+
+/** `store_themes.input_heading_font`, from its CHECK constraint. */
+export type StoreThemesInputHeadingFont =
+  | 'modern'
+  | 'editorial'
+  | 'sport'
+  | 'classic';
+
+/** `store_themes.input_hero`, from its CHECK constraint. */
+export type StoreThemesInputHero =
+  | 'soft'
+  | 'fill';
+
+/** `store_themes.input_mood`, from its CHECK constraint. */
+export type StoreThemesInputMood =
+  | 'light'
+  | 'warm'
+  | 'dark';
+
+/** `store_themes.input_shape`, from its CHECK constraint. */
+export type StoreThemesInputShape =
+  | 'sharp'
+  | 'soft'
+  | 'round';
+
+/** `store_themes.status`, from its CHECK constraint. */
+export type StoreThemesStatus =
+  | 'draft'
+  | 'published';
+
+/**
+ * A store's look. One draft and one published row. A published row is refused unless every text pair reaches 4.5:1 — the database's own half of ThemeStudio's promise, independent of the compiler that produced the colours.
+ */
+export interface StoreThemesRow {
+  store_id: string;
+  status: StoreThemesStatus;
+  input_brand: string;
+  /** NULL means "let Vendlyfy pick": the harmony decides. A value means the merchant chose it and the harmony is irrelevant. */
+  input_accent: string | null;
+  input_harmony: StoreThemesInputHarmony;
+  input_mood: StoreThemesInputMood;
+  input_shape: StoreThemesInputShape;
+  input_heading_font: StoreThemesInputHeadingFont;
+  input_card_treatment: StoreThemesInputCardTreatment;
+  input_hero: StoreThemesInputHero;
+  color_bg: string;
+  color_surface: string;
+  color_text: string;
+  color_muted: string;
+  color_border: string;
+  color_primary: string;
+  color_on_primary: string;
+  color_accent: string;
+  color_on_accent: string;
+  color_tint: string;
+  color_hero_bg: string;
+  color_hero_text: string;
+  is_dark: boolean;
+  /** Derived, and checked: true exactly when the button colour is within 3:1 of the page. Components read it rather than re-measuring. */
+  needs_outline: boolean;
+  created_at: Date;
+  updated_at: Date;
+  published_at: Date | null;
+}
+
 /** `stores.status`, from its CHECK constraint. */
 export type StoresStatus =
   | 'pending'
@@ -1515,6 +1592,7 @@ export interface Database {
   store_payment_methods: StorePaymentMethodsRow;
   store_payout_settings: StorePayoutSettingsRow;
   store_pickup_settings: StorePickupSettingsRow;
+  store_themes: StoreThemesRow;
   stores: StoresRow;
   users: UsersRow;
   wallet_ledger: WalletLedgerRow;
@@ -1589,6 +1667,7 @@ export const TABLE_NAMES = [
   'store_payment_methods',
   'store_payout_settings',
   'store_pickup_settings',
+  'store_themes',
   'stores',
   'users',
   'wallet_ledger',

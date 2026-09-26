@@ -24,7 +24,9 @@ import { globalLimiter } from '../middleware/rateLimit.js';
 import { errorHandler, unmatchedRoute } from './errorHandler.ts';
 import sessionRoutes from '../routes/session.ts';
 import storeConfigRoutes from '../routes/storeConfig.ts';
+import storeThemeRoutes from '../routes/storeTheme.ts';
 import storefrontConfigRoutes from '../routes/storefrontConfig.ts';
+import storefrontThemeRoutes from '../routes/storefrontTheme.ts';
 import membersRoutes from '../routes/members.ts';
 import storeSettingsRoutes from '../routes/storeSettings.ts';
 import { payoutsRouter, walletRouter } from '../routes/storeWallet.ts';
@@ -95,6 +97,7 @@ export function createApp(): Express {
   app.use('/api/stores/:storeId/payouts', payoutsRouter);
   app.use('/api/stores/:storeId/settings', storeSettingsRoutes);
   app.use('/api/stores/:storeId/config', storeConfigRoutes);
+  app.use('/api/stores/:storeId/theme', storeThemeRoutes);
 
   // PUBLIC, and keyed by SLUG rather than by store id. A slug is already in the storefront's
   // URL; a store uuid is not, and milestone 11 deliberately made store existence unobservable
@@ -102,6 +105,7 @@ export function createApp(): Express {
   // GET /api/session — so the storefront and the console cannot drift on what a store calls
   // its categories. See routes/storefrontConfig.ts.
   app.use('/api/storefront', storefrontConfigRoutes);
+  app.use('/api/storefront', storefrontThemeRoutes);
 
   // Anything unmatched becomes a 404 through the same handler as everything else, so
   // there is one response shape for every failure.

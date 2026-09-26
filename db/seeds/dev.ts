@@ -46,6 +46,7 @@ import bcrypt from 'bcryptjs';
 
 import { seedPeople } from './fixtures/people.ts';
 import { seedStores } from './fixtures/stores.ts';
+import { seedThemes } from './fixtures/themes.ts';
 import { seedCatalogue } from './fixtures/catalogue.ts';
 import { seedOrders } from './fixtures/orders.ts';
 import { seedMoney } from './fixtures/money.ts';
@@ -128,6 +129,10 @@ const SEED_TABLES = [
 
   // Promotions.
   'promotions',
+
+  // Store look (V015). Cleared with the fulfilment settings because it is the same kind of
+  // thing — per-store configuration hanging off `stores`.
+  'store_themes',
 
   // Fulfilment.
   'rider_cash_settlements',
@@ -408,6 +413,9 @@ async function main(): Promise<void> {
     await seedStores(ctx);
     await seedPeople(ctx);
     await seedCatalogue(ctx);
+    // Themes need only the stores, and they are compiled rather than written, so they sit with
+    // the stores rather than in a phase of their own.
+    await seedThemes(ctx);
     await client.query('COMMIT');
 
     await client.query('BEGIN');

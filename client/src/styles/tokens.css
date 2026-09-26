@@ -162,6 +162,20 @@
   --color-store-on-primary: var(--store-on-primary);  /* Button text */
   --color-store-accent: var(--store-accent);          /* Highlights */
   --color-store-tint: var(--store-tint);              /* Selected   */
+
+  /* THREE MORE THAN THE NINE THEMESTUDIO SHOWS — added at milestone 13, when the
+     compiler was transcribed from the board and turned out to produce twelve.
+     ThemeStudio lists nine to the merchant ("9 colors from your 1 pick") but its
+     own makeTheme() also derives the text colour for a sale badge and the two for
+     the top banner, and its preview uses all three.
+
+     They are tokens rather than something a component works out, because §2.2 is
+     explicit that the runtime "never derives a value": store-theme.ts applies what
+     the compiler produced, or falls back to the default below. A component
+     computing its own badge text colour is a second theme engine. */
+  --color-store-on-accent: var(--store-on-accent);    /* Sale badge text */
+  --color-store-hero-bg: var(--store-hero-bg);        /* Top banner      */
+  --color-store-hero-text: var(--store-hero-text);    /* Top banner text */
 }
 
 /* ----------------------------------------------------------------------------
@@ -193,6 +207,16 @@
   --store-on-primary: #FFFFFF;
   --store-accent: #1D6B47;
   --store-tint: #E4EDE9;
+
+  /* The three the compiler adds. Their defaults are what compileTheme() returns for
+     brand #1D6B47, mood light, hero soft — the platform's own inputs — so the
+     fallback and a compiled default theme agree rather than differing by a shade:
+       on-accent  white reads on #1D6B47 at 5.4:1
+       hero-bg    the tint, because hero 'soft' is the quieter default
+       hero-text  the body text, which passes on the tint */
+  --store-on-accent: #FFFFFF;
+  --store-hero-bg: #E4EDE9;
+  --store-hero-text: #17160F;
 }
 
 @layer base {

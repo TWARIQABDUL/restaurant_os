@@ -1,7 +1,7 @@
 /**
  * Runtime plumbing for the nine per-store tokens — milestone 4.
  *
- * The fixed tokens live in tokens.css and are compiled at build time. These nine
+ * The fixed tokens live in tokens.css and are compiled at build time. These twelve
  * cannot be: there is one bundle and thousands of stores, so they are CSS custom
  * properties written onto an element at runtime. This module is the only thing
  * that writes them.
@@ -22,7 +22,18 @@
  * comment there.
  */
 
-/** The nine, in the order the canvas's ThemeStudio lists them. */
+/**
+ * The twelve, in the order the theme compiler emits them.
+ *
+ * NINE OF THEM ARE WHAT THEMESTUDIO SHOWS a merchant — its own list, its own labels, and its
+ * summary reads "9 colors from your 1 pick". The last three are ones its makeTheme() also
+ * derives and its preview also uses: the text colour for a sale badge, and the two for the top
+ * banner. They arrived at milestone 13, when the compiler was transcribed from the board.
+ *
+ * They belong here rather than being worked out by a component for the reason the header gives:
+ * this file must never derive a value, and a component computing its own badge text colour is a
+ * second theme engine.
+ */
 export const STORE_TOKEN_NAMES = [
   'bg',
   'surface',
@@ -33,12 +44,15 @@ export const STORE_TOKEN_NAMES = [
   'onPrimary',
   'accent',
   'tint',
+  'onAccent',
+  'heroBg',
+  'heroText',
 ] as const;
 
 export type StoreTokenName = (typeof STORE_TOKEN_NAMES)[number];
 
 /** A complete, compiled theme. Partial themes are not a thing: a published theme
- *  always carries all nine, and half of one would render as a mix of two stores. */
+ *  always carries all twelve, and half of one would render as a mix of two stores. */
 export type StoreTheme = Readonly<Record<StoreTokenName, string>>;
 
 /** Token name to the custom property tokens.css reads. */
@@ -52,6 +66,9 @@ const CSS_VARIABLE: Readonly<Record<StoreTokenName, string>> = {
   onPrimary: '--store-on-primary',
   accent: '--store-accent',
   tint: '--store-tint',
+  onAccent: '--store-on-accent',
+  heroBg: '--store-hero-bg',
+  heroText: '--store-hero-text',
 };
 
 /** #rgb or #rrggbb. The compiler emits hex; anything else is a bug upstream, and
@@ -111,6 +128,7 @@ export function readStoreTheme(target: HTMLElement = document.documentElement): 
   const out: Record<StoreTokenName, string> = {
     bg: '', surface: '', text: '', muted: '', border: '',
     primary: '', onPrimary: '', accent: '', tint: '',
+    onAccent: '', heroBg: '', heroText: '',
   };
   for (const token of STORE_TOKEN_NAMES) {
     out[token] = computed.getPropertyValue(CSS_VARIABLE[token]).trim();
@@ -136,6 +154,7 @@ export function parseStoreTheme(value: unknown): ParseResult {
   const draft: Record<StoreTokenName, string> = {
     bg: '', surface: '', text: '', muted: '', border: '',
     primary: '', onPrimary: '', accent: '', tint: '',
+    onAccent: '', heroBg: '', heroText: '',
   };
 
   for (const token of STORE_TOKEN_NAMES) {
