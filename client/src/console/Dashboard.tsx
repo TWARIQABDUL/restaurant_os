@@ -23,6 +23,7 @@ import { ApiFailure } from '../app/api.ts';
 import { dashboard as dashboardApi } from './api.ts';
 import type { ConsoleOrder, DashboardData } from './api.ts';
 import { dateline, greeting, relativeWhen } from './lines.ts';
+import { hrefFor } from './nav.ts';
 import { useShell } from './ShellProvider.tsx';
 import { OrderStatusBadge } from '../shared/ui/index.ts';
 import type { StatusTone } from '../shared/ui/index.ts';
@@ -31,19 +32,18 @@ type Props = {
   data: DashboardData;
   /** Replaces the whole payload after the pause switch, which changes what the banner says. */
   onChanged: (next: DashboardData) => void;
+  navigate: (to: string) => void;
 };
 
-// NO `navigate` PROP YET, AND THAT IS THE POINT. Three of the board's cards link into Orders and Products, which
-// arrive at milestones 20 and 22. A link to a route that does not exist would fall through the router's catch-all
-// and land a merchant on the sign-in page, so until those screens exist the cards are cards. Each of those
-// milestones passes a navigate() down and its own card becomes a link — see StatCard.
+// PRODUCTS STILL HAS NO navigate — milestone 22 builds it. Orders' own card and rows became links the moment
+// this milestone passed a navigate() down; see StatCard.
 
 // The card and its figure at both sizes. 22px on the phone board, 30px on the desktop one — one element with a
 // breakpoint rather than two elements and a `hidden`, so the number exists once in the markup.
 const CARD = 'flex flex-col gap-0.5 rounded-card border border-line bg-surface p-3.5 lg:gap-1.5 lg:p-5';
 const FIGURE = 'font-display text-[22px] font-bold tabular-nums lg:text-[30px]';
 
-export function Dashboard({ data, onChanged }: Props): ReactNode {
+export function Dashboard({ data, onChanged, navigate }: Props): ReactNode {
   const { store, me, t, has, money } = useShell();
   const { counts, sales, week } = data;
 
@@ -165,6 +165,8 @@ export function Dashboard({ data, onChanged }: Props): ReactNode {
         <StatCard
           label="Orders today"
           figure={String(counts.ordersToday)}
+          href={hrefFor(store.slug, '/orders')}
+          navigate={navigate}
           note={
             <span className={waiting === 0 ? 'text-[13px] text-muted' : 'text-[13px] font-semibold text-status-warn-fg'}>
               {waiting === 0 ? 'Nothing waiting' : `${waiting} waiting for you →`}
@@ -198,7 +200,7 @@ export function Dashboard({ data, onChanged }: Props): ReactNode {
 
       {/* --- what needs somebody, and the week --------------------------- */}
       <div className={`grid gap-4 ${week === null ? '' : 'lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]'}`}>
-        <NeedsAttention orders={data.needsAttention} timeZone={store.timeZone} money={money} />
+        <NeedsAttention orders={data.needsAttention} timeZone={store.timeZone} money={money} navigate={navigate} />
         {week === null ? null : <SalesWeek week={week} money={money} localDate={counts.localDate} />}
       </div>
 
@@ -312,11 +314,16 @@ function NeedsAttention({
   orders,
   timeZone,
   money,
+  navigate,
 }: {
   orders: readonly ConsoleOrder[];
   timeZone: string;
   money: (value: string) => string;
+  navigate: (to: string) => void;
 }): ReactNode {
+  const { store } = useShell();
+  const ordersHref = hrefFor(store.slug, '/orders');
+
   return (
     <section className="flex flex-col rounded-card border border-line bg-surface p-3.5 lg:p-5">
       <div className="mb-2 flex items-center justify-between">
@@ -332,9 +339,11 @@ function NeedsAttention({
         </p>
       ) : (
         orders.map((order) => (
-          <div
+          <button
             key={order.id}
-            className="flex items-center gap-3 border-t border-line-subtle py-3 lg:gap-3.5"
+            type="button"
+            onClick={() => navigate(ordersHref)}
+            className="flex items-center gap-3 border-t border-line-subtle py-3 text-left lg:gap-3.5 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ink"
           >
             <span className="hidden w-[60px] font-mono text-mono lg:inline">#{order.orderNumber}</span>
             <span className="flex min-w-0 grow flex-col">
@@ -357,7 +366,7 @@ function NeedsAttention({
             >
               {order.paymentStatus === 'paid' ? 'Paid' : 'Cash on delivery'}
             </span>
-          </div>
+          </button>
         ))
       )}
     </section>

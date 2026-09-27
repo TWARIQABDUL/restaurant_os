@@ -41,11 +41,12 @@ import { ComplaintSheet } from '../src/storefront/ComplaintSheet.tsx';
 import { tileFor } from '../src/storefront/tiles.ts';
 import { ShellContext } from '../src/console/ShellProvider.tsx';
 import type { ShellContextValue } from '../src/console/ShellProvider.tsx';
-import type { DashboardData, OrderAlert as OrderAlertData } from '../src/console/api.ts';
+import type { DashboardData, OrderAlert as OrderAlertData, OrderDetail, OrderListItem } from '../src/console/api.ts';
 import { MobileTabs, Sidebar } from '../src/console/Sidebar.tsx';
 import { Dashboard } from '../src/console/Dashboard.tsx';
 import { NotificationsPanel } from '../src/console/NotificationsPanel.tsx';
 import { OrderAlert } from '../src/console/OrderAlert.tsx';
+import { columnOf, COLUMN_LABELS, Orders, statusMeta } from '../src/console/Orders.tsx';
 import { Console } from '../src/console/Console.tsx';
 import { MOBILE_TABS, NAV_GROUPS, consoleHref, hrefFor, maySee } from '../src/console/nav.ts';
 import { dateline, greeting, notificationLine, relativeWhen, toneClasses, waitingClock } from '../src/console/lines.ts';
@@ -816,16 +817,116 @@ const ALERT: OrderAlertData = {
   waitingSeconds: 7,
 };
 
+// --- Orders, milestone 20 — one fixture per column, and one detail per drawer state ------------
+function listItem(overrides: Partial<OrderListItem> & Pick<OrderListItem, 'id' | 'orderNumber' | 'status'>): OrderListItem {
+  return {
+    customer: 'Aimable Kayitare',
+    phone: '078 330 1180',
+    fulfilment: 'delivery',
+    address: 'KG 11 Ave, Kimihurura',
+    itemCount: 2,
+    itemSummary: '2 items',
+    total: '8500.00',
+    paymentMethod: 'mtn_momo',
+    paymentStatus: 'paid',
+    cashConfirmed: true,
+    riderName: null,
+    hasLiveRefund: false,
+    placedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+    ageMinutes: 5,
+    ...overrides,
+  };
+}
+
+const ORDER_LIST: OrderListItem[] = [
+  listItem({ id: 'o1', orderNumber: 1031, status: 'pending', ageMinutes: 5 }),
+  listItem({ id: 'o2', orderNumber: 1028, status: 'approved' }),
+  listItem({ id: 'o3', orderNumber: 1003, status: 'preparing', paymentMethod: 'cash', paymentStatus: 'unpaid', cashConfirmed: false }),
+  listItem({ id: 'o4', orderNumber: 1004, status: 'ready' }),
+  listItem({ id: 'o5', orderNumber: 1005, status: 'assigned', riderName: 'Eric Mugisha' }),
+  listItem({ id: 'o6', orderNumber: 1006, status: 'out', riderName: 'Olivier Nzeyimana', paymentMethod: 'cash', paymentStatus: 'unpaid', cashConfirmed: false }),
+  listItem({ id: 'o7', orderNumber: 1027, status: 'delivered', paymentMethod: 'cash', paymentStatus: 'unpaid', cashConfirmed: false }),
+  listItem({ id: 'o8', orderNumber: 1023, status: 'delivered' }),
+  listItem({ id: 'o9', orderNumber: 1000, status: 'returned' }),
+  listItem({ id: 'o10', orderNumber: 1008, status: 'collected', fulfilment: 'pickup', address: null }),
+  listItem({ id: 'o11', orderNumber: 1002, status: 'closed_return' }),
+  listItem({ id: 'o12', orderNumber: 1009, status: 'rejected' }),
+  listItem({ id: 'o13', orderNumber: 1010, status: 'cancelled', fulfilment: 'pickup', address: null }),
+];
+
+function orderDetail(item: OrderListItem, extra: Partial<OrderDetail> = {}): OrderDetail {
+  return {
+    ...item,
+    lines: [
+      { id: 'l1', productName: 'Chicken burger', variantLabel: '', optionLabels: [], quantity: 2, unitPrice: '3500.00', lineTotal: '7000.00' },
+      { id: 'l2', productName: 'Fries', variantLabel: '', optionLabels: [], quantity: 1, unitPrice: '1500.00', lineTotal: '1500.00' },
+    ],
+    subtotal: '8500.00',
+    deliveryFee: '0.00',
+    discount: '0.00',
+    cashDue: item.paymentMethod === 'cash' ? item.total : null,
+    cashReported: null,
+    riderId: item.riderName === null ? null : 'r1',
+    refundedAmount: '0.00',
+    events: [{ fromStatus: null, toStatus: 'pending', reason: null, note: 'Order placed', actorName: null, at: item.placedAt }],
+    ...extra,
+  };
+}
+
+const DETAIL_PENDING = orderDetail(ORDER_LIST[0]!);
+const DETAIL_READY_NO_RIDER = orderDetail(ORDER_LIST[3]!);
+const DETAIL_ASSIGNED = orderDetail(ORDER_LIST[4]!);
+const DETAIL_CASH_UNCONFIRMED = orderDetail(ORDER_LIST[6]!);
+const DETAIL_DELIVERED_PAID = orderDetail(ORDER_LIST[7]!);
+const DETAIL_RETURNED = orderDetail(ORDER_LIST[8]!, {
+  events: [
+    { fromStatus: null, toStatus: 'pending', reason: null, note: 'Order placed', actorName: null, at: ORDER_LIST[8]!.placedAt },
+    { fromStatus: 'out', toStatus: 'returned', reason: 'Nobody answering', note: null, actorName: 'Olivier Nzeyimana', at: ORDER_LIST[8]!.placedAt },
+  ],
+});
+
+// THE STATUS VOCABULARY AND THE COLUMN GROUPING ARE PINNED DIRECTLY, the same way notificationLine() is above —
+// a screen scraped for text would only prove today's markup, where calling the exported functions proves the
+// LOGIC a future refactor of the JSX could otherwise silently break.
+{
+  expect(statusMeta({ status: 'pending', paymentMethod: 'mtn_momo', cashConfirmed: true }).label === 'New', 'pending reads New');
+  expect(statusMeta({ status: 'ready', paymentMethod: 'mtn_momo', cashConfirmed: true }).tone === 'success', 'ready is a success tone');
+  expect(
+    statusMeta({ status: 'delivered', paymentMethod: 'cash', cashConfirmed: false }).label === 'Delivered · cash unconfirmed',
+    'an unconfirmed cash delivery reads differently from a settled one — the one case that is not a straight status → label lookup',
+  );
+  expect(
+    statusMeta({ status: 'delivered', paymentMethod: 'cash', cashConfirmed: true }).label === 'Delivered',
+    'once confirmed, the same status reads Delivered again',
+  );
+  expect(statusMeta({ status: 'delivered', paymentMethod: 'mtn_momo', cashConfirmed: false }).label === 'Delivered', 'the cash caveat never applies to an online payment');
+
+  expect(COLUMN_LABELS.length === 6, `the board draws six columns; found ${COLUMN_LABELS.length}`);
+  expect(new Set(COLUMN_LABELS).size === 6, 'no column repeats another\'s label');
+  for (const o of ORDER_LIST) {
+    const i = columnOf(o);
+    expect(i >= 0 && i < COLUMN_LABELS.length, `order #${o.orderNumber} (${o.status}) lands in a real column`);
+  }
+  expect(columnOf(ORDER_LIST[0]!) === 0, 'a pending order is in New');
+  expect(columnOf(ORDER_LIST[1]!) === 1, 'an accepted order is in Preparing, same column as one actually being prepared');
+  expect(columnOf(ORDER_LIST[2]!) === 1, 'preparing is that same column');
+  expect(columnOf(ORDER_LIST[4]!) === 3, 'assigned is With rider');
+  expect(columnOf(ORDER_LIST[5]!) === 3, 'so is out for delivery — the same column, two statuses');
+  expect(columnOf(ORDER_LIST[6]!) === 4, 'a delivered cash order still unconfirmed needs closing, not Done');
+  expect(columnOf(ORDER_LIST[7]!) === 5, 'a delivered and settled order is Done today');
+  expect(columnOf(ORDER_LIST[8]!) === 4, 'a return needs closing too');
+}
+
 
 const consoleParts: readonly (readonly [string, ReactNode])[] = [
   ['Sidebar', inConsole(<Sidebar active="dashboard" unread={7} onOpenNotifications={noop} navigate={noop} />)],
   ['DashboardMobile · bottom bar', inConsole(<MobileTabs active="dashboard" navigate={noop} />)],
-  ['Dashboard', inConsole(<Dashboard data={DASHBOARD} onChanged={noop} />)],
+  ['Dashboard', inConsole(<Dashboard data={DASHBOARD} onChanged={noop} navigate={noop} />)],
   // A manager's dashboard: no sales card, no chart, and the rest unchanged. The route omits the money rather
   // than the screen hiding it, so this is the payload a manager actually receives.
   [
     'Dashboard · a manager, with no wallet.read',
-    inConsole(<Dashboard data={{ ...DASHBOARD, sales: null, week: null }} onChanged={noop} />),
+    inConsole(<Dashboard data={{ ...DASHBOARD, sales: null, week: null }} onChanged={noop} navigate={noop} />),
   ],
   // A shop with nothing in it yet — the state a merchant sees on their first morning.
   [
@@ -842,6 +943,7 @@ const consoleParts: readonly (readonly [string, ReactNode])[] = [
           lowestStock: null,
         }}
         onChanged={noop}
+        navigate={noop}
       />,
     ),
   ],
@@ -849,7 +951,11 @@ const consoleParts: readonly (readonly [string, ReactNode])[] = [
   [
     'Dashboard · new orders paused',
     inConsole(
-      <Dashboard data={{ ...DASHBOARD, counts: { ...DASHBOARD.counts, acceptingOrders: false } }} onChanged={noop} />,
+      <Dashboard
+        data={{ ...DASHBOARD, counts: { ...DASHBOARD.counts, acceptingOrders: false } }}
+        onChanged={noop}
+        navigate={noop}
+      />,
     ),
   ],
   // The panel renders CLOSED here, which is its correct first paint: renderToStaticMarkup runs no effects, so
@@ -865,9 +971,25 @@ const consoleParts: readonly (readonly [string, ReactNode])[] = [
     'Notifications · alert with sound off for this device',
     inConsole(<OrderAlert alert={ALERT} sound={false} onSilence={noop} onAccepted={noop} navigate={noop} />),
   ],
+  // Orders — milestone 20. `initialOrders`/`initialDetail`/`initialMode` are the testing seam its own header
+  // explains: renderToStaticMarkup runs no effects, so list() never resolves here, the same reason Dashboard
+  // takes its payload as a prop rather than fetching it.
+  ['Orders · board, all six columns', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} />)],
+  ['Orders · detail, pending and waiting', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_PENDING} />)],
+  ['Orders · detail, ready with no rider yet', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_READY_NO_RIDER} />)],
+  ['Orders · detail, assigned to a rider', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_ASSIGNED} />)],
+  ['Orders · detail, delivered with cash unconfirmed', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_CASH_UNCONFIRMED} />)],
+  ['Orders · detail, delivered and paid', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_DELIVERED_PAID} />)],
+  ['Orders · detail, returned to the store', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_RETURNED} />)],
+  ['Orders · decline panel', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_PENDING} initialMode="decline" />)],
+  ['Orders · cancel panel', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={orderDetail(ORDER_LIST[1]!)} initialMode="cancel" />)],
+  ['Orders · rider picker', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_READY_NO_RIDER} initialMode="pick" />)],
+  ['Orders · cash panel', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_CASH_UNCONFIRMED} initialMode="cash" />)],
+  ['Orders · refund panel', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_DELIVERED_PAID} initialMode="refund" />)],
   // The whole console, cold. It fetches on mount, so what this proves is that the first paint — the shell's
   // loading state — renders rather than throwing.
   ['Console · first paint', <Console slug="nyama" view={{ kind: 'dashboard' }} navigate={noop} />],
+  ['Console · first paint, Orders', <Console slug="nyama" view={{ kind: 'orders' }} navigate={noop} />],
 ];
 
 for (const [name, node] of consoleParts) {

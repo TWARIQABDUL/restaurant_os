@@ -182,16 +182,23 @@ export function Checkbox({
   );
 }
 
+/**
+ * `tone` arrived at milestone 20 for the same reason `Switch`'s did at 19: the merchant console's own decline
+ * and cancel reason pickers are not the store's UI, so the selected dot must not be the store's theme colour
+ * either. Defaults to `'store'`, so every existing use — the storefront's option groups — is unchanged.
+ */
 export function Radio({
   label,
   checked,
   onChange,
   name,
+  tone = 'store',
 }: {
   label: ReactNode;
   checked: boolean;
   onChange: () => void;
   name: string;
+  tone?: 'store' | 'brand';
 }): ReactNode {
   return (
     <label className="flex items-center gap-2 text-body text-ink">
@@ -199,7 +206,7 @@ export function Radio({
       <span
         aria-hidden="true"
         className={`size-5 shrink-0 rounded-pill peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink ${
-          checked ? 'border-[6px] border-store-primary' : 'border-[1.5px] border-control-line'
+          checked ? `border-[6px] ${tone === 'brand' ? 'border-brand' : 'border-store-primary'}` : 'border-[1.5px] border-control-line'
         }`}
       />
       {label}

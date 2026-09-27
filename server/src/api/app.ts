@@ -64,6 +64,9 @@ export const REQUIRED_PERMISSIONS = [
   // orders.update, because pausing is what the person in the kitchen does and settings is not where that lives.
   'orders.read',
   'orders.update',
+  // Milestone 20. V001 seeded this for owner/admin/manager from the start — Auth's invite screen already
+  // promised a manager could "assign riders" — but nothing asked for it until the Orders board's picker did.
+  'orders.assign_rider',
 ] as const;
 
 export function createApp(): Express {
@@ -140,7 +143,8 @@ export function createApp(): Express {
   app.use('/api/stores/:storeId/shell', storeShellRoutes);
   // The pause switch lives under /dashboard/accepting rather than at its own mount, so nothing has two URLs.
   app.use('/api/stores/:storeId/dashboard', storeDashboardRoutes);
-  // One endpoint so far — accepting an order, which the new-order alert needs. Milestone 20 fills this in.
+  // Milestone 19 shipped accept() alone, for the new-order alert. Milestone 20 fills in the rest: the board, the
+  // list, declining, the rider picker, cash confirmation and returns.
   app.use('/api/stores/:storeId/orders', storeOrderRoutes);
   app.use('/api/stores/:storeId/notifications', storeNotificationRoutes);
   app.use('/api/stores/:storeId/settings', storeSettingsRoutes);

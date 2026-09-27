@@ -540,6 +540,21 @@ export const CONSOLE = {
   review: uid(0x510),
 } as const;
 
+/** Milestone 20 — one order per state the Orders board's own actions need. */
+export const ORDERS_BOARD = {
+  approvedForKitchen: uid(0x51f),
+  preparing: uid(0x520),
+  readyDelivery: uid(0x521),
+  readyPickupCash: uid(0x522),
+  assigned: uid(0x523),
+  out: uid(0x524),
+  deliveredCashUnconfirmed: uid(0x525),
+  deliveredPaid: uid(0x526),
+  returnedMomo: uid(0x527),
+  /** A separate returned order from returnedMomo's, so closing one and retrying the other cannot collide. */
+  returnedForRetry: uid(0x528),
+} as const;
+
 /**
  * Returns the complaint's id, because the fixture does not choose it.
  *
@@ -595,6 +610,54 @@ export async function seedConsole(): Promise<{ complaintId: string }> {
   const complaintId = rows[0]?.id;
   if (complaintId === undefined) throw new Error('file_complaint returned no id');
   return { complaintId };
+}
+
+/**
+ * One order per state `storeOrders.ts`'s own actions need — milestone 20. Same reasoning as `seedConsole()`:
+ * inserted directly at the status each test wants rather than walked through the machine, because these
+ * fixtures are for the READ side and for the ONE transition each test exercises through the endpoint, where
+ * the trigger is live either way.
+ */
+export async function seedOrdersBoard(): Promise<void> {
+  const base = {
+    approvedForKitchen: ['approved', 'delivery', 'mtn_momo', 'unpaid', null] as const,
+    preparing: ['preparing', 'delivery', 'mtn_momo', 'unpaid', null] as const,
+    readyDelivery: ['ready', 'delivery', 'mtn_momo', 'unpaid', null] as const,
+    readyPickupCash: ['ready', 'pickup', 'cash', 'unpaid', null] as const,
+    assigned: ['assigned', 'delivery', 'mtn_momo', 'unpaid', USER.riderA] as const,
+    out: ['out', 'delivery', 'cash', 'unpaid', USER.riderA] as const,
+    deliveredCashUnconfirmed: ['delivered', 'delivery', 'cash', 'unpaid', USER.riderA] as const,
+    deliveredPaid: ['delivered', 'delivery', 'mtn_momo', 'paid', null] as const,
+    returnedMomo: ['returned', 'delivery', 'mtn_momo', 'paid', USER.riderA] as const,
+    returnedForRetry: ['returned', 'delivery', 'cash', 'unpaid', USER.riderA] as const,
+  } as const;
+
+  let number = 9600;
+  for (const [key, [status, fulfil, method, payStatus, rider]] of Object.entries(base)) {
+    number += 1;
+    const id = ORDERS_BOARD[key as keyof typeof ORDERS_BOARD];
+    const address = fulfil === 'delivery' ? 'KG 11 Ave, Kigali' : null;
+    const paidAt = payStatus === 'paid' ? new Date() : null;
+    await withTransaction(async (tx) => {
+      await tx.query(
+        `INSERT INTO orders (id, store_id, order_number, tracking_code, idempotency_key, guest_name, guest_phone,
+                             delivery_address, fulfilment_type, status, payment_method, payment_status, paid_at,
+                             currency, subtotal_amount, rider_user_id)
+              VALUES ($1, $2, $3, $4, $5, 'A Customer', '078 000 0002',
+                      $6, $7, $8, $9, $10, $11, 'RWF', 8000, $12)`,
+        [id, STORE.a, number, `trk_board_${number}`, `idem_orders_board_${number}`, address, fulfil, status, method, payStatus, paidAt, rider],
+      );
+      await tx.query(
+        `INSERT INTO order_items (order_id, store_id, variant_id, product_name, unit_price_amount, quantity)
+              VALUES ($1, $2, $3, 'Passion Juice', 8000, 1)`,
+        [id, STORE.a, uid(0x310)],
+      );
+    });
+  }
+
+  // returnedMomo needs its escrow released to be refundable the way a real delivered-then-returned order's
+  // would be — the same fact the DB suite (db/scripts/test-orders-console.sh) sets up by hand.
+  await sql(`UPDATE orders SET settlement_status = 'released' WHERE id = $1`, [ORDERS_BOARD.returnedMomo]);
 }
 
 /** The notifications the panel reads. Written through notify(), so V010 checks the payload keys as in production. */

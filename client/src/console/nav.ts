@@ -67,7 +67,7 @@ export type NavItem = {
 export const NAV_GROUPS: readonly (readonly NavItem[])[] = [
   [{ id: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: '', built: true, milestone: 19 }],
   [
-    { id: 'orders', label: 'Orders', icon: 'orders', path: '/orders', built: false, badge: 'orders', milestone: 20 },
+    { id: 'orders', label: 'Orders', icon: 'orders', path: '/orders', built: true, badge: 'orders', milestone: 20 },
     {
       id: 'complaints',
       label: 'Complaints',
@@ -142,7 +142,7 @@ export const NAV_GROUPS: readonly (readonly NavItem[])[] = [
  */
 export const MOBILE_TABS: readonly { id: string; label: string; icon: NavIcon; path: string; built: boolean; badge?: BadgeKey }[] = [
   { id: 'dashboard', label: 'Home', icon: 'dashboard', path: '', built: true },
-  { id: 'orders', label: 'Orders', icon: 'orders', path: '/orders', built: false, badge: 'orders' },
+  { id: 'orders', label: 'Orders', icon: 'orders', path: '/orders', built: true, badge: 'orders' },
   { id: 'products', label: 'Products', icon: 'products', path: '/products', built: false },
   { id: 'store-design', label: 'Store', icon: 'store', path: '/store-design', built: false },
   { id: 'more', label: 'More', icon: 'more', path: '/more', built: false },

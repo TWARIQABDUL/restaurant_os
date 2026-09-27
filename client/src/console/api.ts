@@ -191,13 +191,153 @@ export const notifications = {
 };
 
 // ---------------------------------------------------------------------------
-// Orders — the one transition the alert needs. Milestone 20 owns the rest.
+// Orders — the board, the list, the rider picker, cash confirmation, returns
 // ---------------------------------------------------------------------------
 
+export type OrderStatus =
+  | 'pending'
+  | 'approved'
+  | 'preparing'
+  | 'ready'
+  | 'assigned'
+  | 'out'
+  | 'delivered'
+  | 'collected'
+  | 'returned'
+  | 'closed_return'
+  | 'rejected'
+  | 'cancelled';
+
+export type OrderListItem = {
+  id: string;
+  orderNumber: number;
+  status: OrderStatus;
+  customer: string;
+  phone: string | null;
+  fulfilment: 'delivery' | 'pickup';
+  address: string | null;
+  itemCount: number;
+  itemSummary: string;
+  total: string;
+  paymentMethod: string;
+  paymentStatus: 'unpaid' | 'paid' | 'refunded';
+  /** Cash only: whether confirm_cash_payment() has run. Always true for an online method. */
+  cashConfirmed: boolean;
+  riderName: string | null;
+  hasLiveRefund: boolean;
+  placedAt: string;
+  ageMinutes: number;
+};
+
+export type OrderLine = {
+  id: string;
+  productName: string;
+  variantLabel: string;
+  optionLabels: string[];
+  quantity: number;
+  unitPrice: string;
+  lineTotal: string;
+};
+
+export type OrderEvent = {
+  fromStatus: OrderStatus | null;
+  toStatus: OrderStatus;
+  reason: string | null;
+  note: string | null;
+  actorName: string | null;
+  at: string;
+};
+
+export type OrderDetail = OrderListItem & {
+  lines: OrderLine[];
+  subtotal: string;
+  deliveryFee: string;
+  discount: string;
+  cashDue: string | null;
+  cashReported: string | null;
+  riderId: string | null;
+  refundedAmount: string;
+  events: OrderEvent[];
+};
+
+export type RiderOption = {
+  id: string;
+  name: string;
+  availability: 'available' | 'off_duty';
+  activeJobs: number;
+  cashCarried: string;
+};
+
+export type RefundReasonCode = 'item_missing' | 'wrong_item' | 'quality_problem' | 'arrived_late' | 'other';
+
+/** What every transition below answers: whether it happened, and where the order stands now. */
+export type TransitionOutcome = { ok: boolean; status: OrderStatus | null };
+
+function post(storeId: string, orderId: string, action: string, body?: Record<string, unknown>): Promise<TransitionOutcome> {
+  return api.post<TransitionOutcome>(`/api/stores/${storeId}/orders/${orderId}/${action}`, body);
+}
+
 export const orders = {
+  list: (storeId: string): Promise<{ orders: OrderListItem[] }> =>
+    api.get<{ orders: OrderListItem[] }>(`/api/stores/${storeId}/orders`),
+
+  get: (storeId: string, orderId: string): Promise<{ order: OrderDetail }> =>
+    api.get<{ order: OrderDetail }>(`/api/stores/${storeId}/orders/${orderId}`),
+
+  riders: (storeId: string): Promise<{ riders: RiderOption[] }> =>
+    api.get<{ riders: RiderOption[] }>(`/api/stores/${storeId}/orders/riders`),
+
   accept: (storeId: string, orderId: string):
     Promise<{ orderNumber: number; status: string; accepted: boolean }> =>
     api.post<{ orderNumber: number; status: string; accepted: boolean }>(
       `/api/stores/${storeId}/orders/${orderId}/accept`,
+    ),
+
+  decline: (storeId: string, orderId: string, reason: string, note?: string): Promise<TransitionOutcome> =>
+    post(storeId, orderId, 'decline', { reason, note }),
+
+  cancel: (storeId: string, orderId: string, reason: string, note?: string): Promise<TransitionOutcome> =>
+    post(storeId, orderId, 'cancel', { reason, note }),
+
+  startPreparing: (storeId: string, orderId: string): Promise<TransitionOutcome> =>
+    post(storeId, orderId, 'start-preparing'),
+
+  markReady: (storeId: string, orderId: string): Promise<TransitionOutcome> => post(storeId, orderId, 'ready'),
+
+  assignRider: (storeId: string, orderId: string, riderUserId: string):
+    Promise<TransitionOutcome & { riderName: string | null }> =>
+    api.post<TransitionOutcome & { riderName: string | null }>(
+      `/api/stores/${storeId}/orders/${orderId}/assign-rider`,
+      { riderUserId },
+    ),
+
+  markPickedUp: (storeId: string, orderId: string): Promise<TransitionOutcome> =>
+    post(storeId, orderId, 'picked-up'),
+
+  markDelivered: (storeId: string, orderId: string): Promise<TransitionOutcome> =>
+    post(storeId, orderId, 'delivered'),
+
+  markCollected: (storeId: string, orderId: string): Promise<TransitionOutcome> =>
+    post(storeId, orderId, 'collected'),
+
+  confirmCash: (storeId: string, orderId: string, reportedAmount: string): Promise<TransitionOutcome> =>
+    post(storeId, orderId, 'confirm-cash', { reportedAmount }),
+
+  closeReturn: (storeId: string, orderId: string, restock: boolean): Promise<TransitionOutcome> =>
+    post(storeId, orderId, 'close-return', { restock }),
+
+  retryDelivery: (storeId: string, orderId: string): Promise<TransitionOutcome> =>
+    post(storeId, orderId, 'retry-delivery'),
+
+  requestRefund: (
+    storeId: string,
+    orderId: string,
+    amount: string,
+    reasonCode: RefundReasonCode,
+    reasonNote?: string,
+  ): Promise<{ refundId: string; refundStatus: string }> =>
+    api.post<{ refundId: string; refundStatus: string }>(
+      `/api/stores/${storeId}/orders/${orderId}/request-refund`,
+      { amount, reasonCode, reasonNote },
     ),
 };

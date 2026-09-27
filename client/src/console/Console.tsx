@@ -25,6 +25,7 @@ import type { DashboardData, OrderAlert as AlertData } from './api.ts';
 import { Dashboard } from './Dashboard.tsx';
 import { NotificationsPanel } from './NotificationsPanel.tsx';
 import { OrderAlert } from './OrderAlert.tsx';
+import { Orders } from './Orders.tsx';
 import { MobileTabs, Sidebar } from './Sidebar.tsx';
 import { ShellProvider, useShell } from './ShellProvider.tsx';
 import type { ShellState } from './ShellProvider.tsx';
@@ -34,7 +35,8 @@ import { unlockSoundOnFirstGesture } from './chime.ts';
 const ALERT_EVERY_MS = 10_000;
 const FIGURES_EVERY_MS = 60_000;
 
-export type ConsoleView = { kind: 'dashboard' };
+/** Milestone 20 adds 'orders'. Every screen from here adds one more case, not a new prop. */
+export type ConsoleView = { kind: 'dashboard' } | { kind: 'orders' };
 
 type Props = {
   slug: string;
@@ -199,7 +201,9 @@ function ConsoleFrame({ view, navigate }: { view: ConsoleView; navigate: (to: st
           </button>
         </div>
 
-        {data === null ? (
+        {view.kind === 'orders' ? (
+          <Orders navigate={navigate} />
+        ) : data === null ? (
           failure === null ? (
             <div className="flex flex-col gap-4">
               <SkeletonCard />
@@ -213,7 +217,7 @@ function ConsoleFrame({ view, navigate }: { view: ConsoleView; navigate: (to: st
             </Alert>
           )
         ) : (
-          <Dashboard data={data} onChanged={setData} />
+          <Dashboard data={data} onChanged={setData} navigate={navigate} />
         )}
       </main>
 

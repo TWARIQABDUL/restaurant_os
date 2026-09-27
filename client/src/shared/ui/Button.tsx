@@ -14,6 +14,13 @@ export type ButtonVariant = 'primary' | 'secondary' | 'text' | 'danger';
 
 type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> & {
   variant?: ButtonVariant;
+  /**
+   * Arrived at milestone 20, the same accommodation `Switch` and `Radio` got at 19 and 20: the merchant
+   * console's own primary actions (Accept, Mark ready, Confirm cash…) are not the storefront, so `primary`
+   * and `text` must not tint with whichever store happens to be open. Defaults to `'store'`, so a storefront
+   * button — the only place `primary`/`text` were used before this milestone — is unchanged.
+   */
+  tone?: 'store' | 'brand';
   /** Renders a spinner and sets aria-busy. The label is replaced by `busyLabel`. */
   busy?: boolean;
   busyLabel?: string;
@@ -22,11 +29,11 @@ type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> & {
   children: ReactNode;
 };
 
-const VARIANT: Readonly<Record<ButtonVariant, string>> = {
-  primary: 'bg-store-primary text-store-on-primary',
-  secondary: 'bg-surface text-ink border border-control-line',
-  text: 'bg-transparent text-store-primary',
-  danger: 'bg-status-danger-fg text-white',
+const VARIANT: Readonly<Record<ButtonVariant, Readonly<Record<'store' | 'brand', string>>>> = {
+  primary: { store: 'bg-store-primary text-store-on-primary', brand: 'bg-brand text-white' },
+  secondary: { store: 'bg-surface text-ink border border-control-line', brand: 'bg-surface text-ink border border-control-line' },
+  text: { store: 'bg-transparent text-store-primary', brand: 'bg-transparent text-brand' },
+  danger: { store: 'bg-status-danger-fg text-white', brand: 'bg-status-danger-fg text-white' },
 };
 
 // 44px is the board's control height throughout, and the minimum comfortable tap target.
@@ -38,6 +45,7 @@ const BASE =
 
 export function Button({
   variant = 'primary',
+  tone = 'store',
   busy = false,
   busyLabel = 'Working…',
   block = false,
@@ -54,7 +62,7 @@ export function Button({
       aria-busy={busy || undefined}
       disabled={disabled === true}
       onClick={busy ? undefined : rest.onClick}
-      className={`${BASE} ${VARIANT[variant]} ${variant === 'text' ? 'px-[14px]' : ''} ${block ? 'w-full' : ''}`}
+      className={`${BASE} ${VARIANT[variant][tone]} ${variant === 'text' ? 'px-[14px]' : ''} ${block ? 'w-full' : ''}`}
     >
       {busy ? (
         <>
