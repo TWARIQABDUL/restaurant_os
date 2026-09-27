@@ -216,6 +216,64 @@ export type CustomerOrder = {
   placedFor: string | null;
 };
 
+// --- milestone 18: the customer's account -------------------------------------
+
+export type CustomerProfile = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  /** The board's "customer since March". */
+  since: string;
+};
+
+export type SavedAddress = { id: string; label: string; address: string; isDefault: boolean };
+
+export type OrderSummary = {
+  trackingCode: string;
+  orderNumber: number;
+  status: string;
+  paymentStatus: string;
+  paymentMethod: string;
+  total: string;
+  placedAt: string;
+  /** "2× Chicken burger, 1× Fries" — composed by the server so the list is one query. */
+  summary: string;
+  itemCount: number;
+};
+
+export type CustomerComplaint = {
+  id: string;
+  /** The board's "C-044". */
+  reference: number;
+  orderNumber: number;
+  trackingCode: string;
+  reasonCode: string;
+  detail: string;
+  status: 'open' | 'escalated' | 'resolved' | 'rejected';
+  storeReply: string | null;
+  reopenedCount: number;
+  createdAt: string;
+  canReopen: boolean;
+};
+
+export type AccountPayload = {
+  customer: CustomerProfile;
+  orders: OrderSummary[];
+  nextCursor: { placedAt: string; id: string } | null;
+  complaints: CustomerComplaint[];
+  addresses: SavedAddress[];
+};
+
+/** V008's five reason codes, with the board's own five labels. */
+export const COMPLAINT_REASONS = [
+  { code: 'item_missing', label: 'Missing item' },
+  { code: 'wrong_item', label: 'Wrong item' },
+  { code: 'quality_problem', label: 'Quality' },
+  { code: 'arrived_late', label: 'Late' },
+  { code: 'other', label: 'Other' },
+] as const;
+
 export type ThemePayload = {
   store: { slug: string; name: string };
   theme: {
@@ -336,4 +394,54 @@ export const storefront = {
     code: string,
   ): Promise<{ payment: PaymentState | null; order: { paymentStatus: string } }> =>
     api.get(`/api/storefront/${enc(slug)}/orders/${enc(code)}/payment`),
+
+  // --- the account ---------------------------------------------------------
+  account: (slug: string): Promise<AccountPayload> => api.get(`/api/storefront/${enc(slug)}/account`),
+
+  register: (
+    slug: string,
+    body: { name: string; email: string; password: string; phone?: string },
+  ): Promise<{ customer: CustomerProfile; cart: CartData | null }> =>
+    api.post(`/api/storefront/${enc(slug)}/account`, body),
+
+  /** A guest keeps the order they just placed. The tracking code is the proof they hold it. */
+  claimOrder: (
+    slug: string,
+    body: { trackingCode: string; name: string; email: string; password: string; phone?: string },
+  ): Promise<{ customer: CustomerProfile; claimed: number }> =>
+    api.post(`/api/storefront/${enc(slug)}/account/claim-order`, body),
+
+  /** After signing in mid-checkout: "Your cart stays exactly as it is." */
+  claimCart: (
+    slug: string,
+  ): Promise<{ cart: CartData | null; merged: { lines: number; quantities: number } }> =>
+    api.post(`/api/storefront/${enc(slug)}/cart/claim`),
+
+  addAddress: (
+    slug: string,
+    body: { label: string; address: string },
+  ): Promise<{ address: SavedAddress; addresses: SavedAddress[] }> =>
+    api.post(`/api/storefront/${enc(slug)}/account/addresses`, body),
+
+  makeDefaultAddress: (slug: string, id: string): Promise<{ addresses: SavedAddress[] }> =>
+    api.put(`/api/storefront/${enc(slug)}/account/addresses/${enc(id)}/default`),
+
+  removeAddress: (slug: string, id: string): Promise<{ addresses: SavedAddress[] }> =>
+    api.delete(`/api/storefront/${enc(slug)}/account/addresses/${enc(id)}`),
+
+  reorder: (
+    slug: string,
+    code: string,
+  ): Promise<{ added: number; skipped: number; skippedNames: string[]; cart: CartData }> =>
+    api.post(`/api/storefront/${enc(slug)}/orders/${enc(code)}/reorder`),
+
+  fileComplaint: (
+    slug: string,
+    code: string,
+    body: { reason: string; detail: string },
+  ): Promise<{ complaints: CustomerComplaint[] }> =>
+    api.post(`/api/storefront/${enc(slug)}/orders/${enc(code)}/complaints`, body),
+
+  reopenComplaint: (slug: string, id: string, note?: string): Promise<{ complaints: CustomerComplaint[] }> =>
+    api.post(`/api/storefront/${enc(slug)}/account/complaints/${enc(id)}/reopen`, { note }),
 };

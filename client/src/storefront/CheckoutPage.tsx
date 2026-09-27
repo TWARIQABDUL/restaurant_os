@@ -21,8 +21,9 @@ import type { ReactNode } from 'react';
 import { ApiFailure } from '../app/api.ts';
 import { Alert, Button, Segmented, Spinner, StateCard, TextField } from '../shared/ui/index.ts';
 import { storefront } from './api.ts';
-import type { PlacedOrder, Quote } from './api.ts';
+import type { PlacedOrder, Quote, SavedAddress } from './api.ts';
 import { useStore } from './StoreProvider.tsx';
+import { SignInSheet } from './SignInSheet.tsx';
 
 /** How often the pending screen asks what happened. The board: "Waiting for approval. Keep this page open." */
 const POLL_MS = 2500;
@@ -38,11 +39,12 @@ type Props = {
   onBack: () => void;
   onHome: () => void;
   onTrack: (code: string) => void;
-  onSignIn: () => void;
+  /** Where a new account lands after the success screen's offer. */
+  onAccount: () => void;
 };
 
-export function CheckoutPage({ onBack, onHome, onTrack, onSignIn }: Props): ReactNode {
-  const { face, money, has, cart, refreshCart } = useStore();
+export function CheckoutPage({ onBack, onHome, onTrack, onAccount }: Props): ReactNode {
+  const { face, money, has, cart, setCart, refreshCart } = useStore();
 
   const [fulfilment, setFulfilment] = useState<'delivery' | 'pickup'>(
     has('delivery') ? 'delivery' : 'pickup',
@@ -60,6 +62,11 @@ export function CheckoutPage({ onBack, onHome, onTrack, onSignIn }: Props): Reac
   const [stage, setStage] = useState<Stage>({ kind: 'form' });
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+
+  // Milestone 18: signing in without leaving checkout, and the saved addresses that come with it.
+  const [signingIn, setSigningIn] = useState(false);
+  const [saved, setSaved] = useState<SavedAddress[] | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // ONE KEY PER VISIT TO THIS SCREEN. See the header: this is the contract with place_order().
   const idempotencyKey = useRef(newIdempotencyKey());
@@ -120,6 +127,35 @@ export function CheckoutPage({ onBack, onHome, onTrack, onSignIn }: Props): Reac
       clearInterval(timer);
     };
   }, [stage, face.store.slug]);
+
+  /**
+   * Load the account's saved details, if there is an account.
+   *
+   * FAILS SILENTLY BY DESIGN: most people at this screen are guests, and a 403 from the account endpoint is
+   * the normal answer rather than a problem to report. What it changes when it succeeds is that the form
+   * arrives filled in.
+   */
+  useEffect(() => {
+    let live = true;
+    void storefront
+      .account(face.store.slug)
+      .then((account) => {
+        if (!live) return;
+        setSaved(account.addresses);
+        setName((current) => (current === '' ? account.customer.name : current));
+        setPhone((current) => (current === '' ? (account.customer.phone ?? '') : current));
+        setEmail((current) => (current === '' ? account.customer.email : current));
+        const preferred = account.addresses.find((a) => a.isDefault) ?? account.addresses[0];
+        if (preferred !== undefined) setAddress((current) => (current === '' ? preferred.address : current));
+      })
+      .catch(() => {
+        // A guest. The form stays empty, which is what the board draws for them.
+        if (live) setSaved(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [face.store.slug, reload]);
 
   const place = useCallback(async (): Promise<void> => {
     if (quote === null || method === null) return;
@@ -203,9 +239,13 @@ export function CheckoutPage({ onBack, onHome, onTrack, onSignIn }: Props): Reac
       <SuccessScreen
         order={stage.order}
         storeName={face.store.name}
+        slug={face.store.slug}
         money={money}
+        guest={saved === null}
+        phone={phone.trim()}
         onTrack={() => onTrack(stage.order.trackingCode)}
         onHome={onHome}
+        onAccount={onAccount}
       />
     );
   }
@@ -260,16 +300,23 @@ export function CheckoutPage({ onBack, onHome, onTrack, onSignIn }: Props): Reac
       ) : (
         <>
           <div className="flex grow flex-col gap-3 p-4">
+            {notice === null ? null : (
+              <div role="status" className="rounded-control bg-status-success px-3 py-2.5 text-caption text-status-success-fg">
+                {notice}
+              </div>
+            )}
             <section className="flex flex-col gap-3 rounded-card border border-store-border bg-store-surface p-4">
               <div className="flex items-center justify-between gap-2.5">
                 <h2 className="text-title">Your details</h2>
-                <button
-                  type="button"
-                  onClick={onSignIn}
-                  className="flex min-h-8 items-center text-body font-semibold text-store-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                >
-                  Ordered before? Sign in
-                </button>
+                {saved === null ? (
+                  <button
+                    type="button"
+                    onClick={() => setSigningIn(true)}
+                    className="flex min-h-8 items-center text-body font-semibold text-store-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  >
+                    Ordered before? Sign in
+                  </button>
+                ) : null}
               </div>
               <TextField
                 label="Full name"
@@ -311,6 +358,28 @@ export function CheckoutPage({ onBack, onHome, onTrack, onSignIn }: Props): Reac
 
               {fulfilment === 'delivery' ? (
                 <>
+                  {/* "Deliver to" — the board's radio list, shown only to somebody who has saved one. */}
+                  {saved === null || saved.length === 0 ? null : (
+                    <div role="radiogroup" aria-label="Deliver to" className="flex flex-col gap-2">
+                      {saved.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={address === option.address}
+                          onClick={() => setAddress(option.address)}
+                          className={`flex flex-col items-start rounded-control border p-3 text-left text-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${
+                            address === option.address
+                              ? 'border-2 border-store-primary bg-store-tint'
+                              : 'border-control-line'
+                          }`}
+                        >
+                          <strong>{option.label}</strong>
+                          <span className="text-store-muted">{option.address}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <TextField
                     label="Delivery address"
                     autoComplete="street-address"
@@ -461,6 +530,19 @@ export function CheckoutPage({ onBack, onHome, onTrack, onSignIn }: Props): Reac
           </div>
         </>
       )}
+
+      <SignInSheet
+        open={signingIn}
+        onClose={() => setSigningIn(false)}
+        onSignedIn={(merged) => {
+          setSigningIn(false);
+          if (merged !== null) setCart(merged);
+          // Re-read the account so the form fills in, and re-quote — a discount can depend on WHO is buying,
+          // because V013 counts max_redemptions_per_customer per account.
+          setReload((n) => n + 1);
+          setNotice('Signed in. Your cart is exactly as it was.');
+        }}
+      />
     </div>
   );
 }
@@ -486,20 +568,75 @@ function PendingScreen({ amount, phone }: { amount: string; phone: string }): Re
   );
 }
 
+/**
+ * `Shop`'s success screen, plus CustomerAccount's offer to a guest.
+ *
+ * "Save your details for next time? Add a password and this order, your address and phone are saved to an
+ * account at Nyama & Co." — which is a real conversion rather than a sign-up form: V020's claim_guest_order()
+ * MOVES the order onto the new account, because `orders_has_a_customer` allows a customer or a guest and never
+ * both.
+ *
+ * THE TRACKING CODE IS WHAT PROVES THE OFFER IS THEIRS. A guest has no session, so the only thing
+ * distinguishing them from a stranger is the code they were just given — which is why the endpoint requires it
+ * rather than an order id.
+ */
 function SuccessScreen({
   order,
   storeName,
+  slug,
   money,
+  guest,
+  phone,
   onTrack,
   onHome,
+  onAccount,
 }: {
   order: PlacedOrder;
   storeName: string;
+  slug: string;
   money: (amount: string) => string;
+  /** True when nobody is signed in — the only case the offer is shown. */
+  guest: boolean;
+  phone: string;
   onTrack: () => void;
   onHome: () => void;
+  onAccount: () => void;
 }): ReactNode {
   const cash = order.paymentMethod === 'cash';
+
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  // The board's own bar for the button: at least 8 characters. The server holds all three rules and will say
+  // which one failed; this only stops the obviously-too-short from being a round trip.
+  const ready = name.trim().length >= 2 && email.trim() !== '' && password.length >= 8;
+
+  const create = (): void => {
+    if (!ready || busy) return;
+    setBusy(true);
+    setFailed(null);
+    void storefront
+      .claimOrder(slug, {
+        trackingCode: order.trackingCode,
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        ...(phone === '' ? {} : { phone }),
+      })
+      .then(() => {
+        setPassword('');
+        setSaved(true);
+      })
+      .catch((error: unknown) => {
+        setFailed(error instanceof ApiFailure ? error.message : 'Something went wrong. Please try again.');
+      })
+      .finally(() => setBusy(false));
+  };
+
   return (
     <div className="flex min-h-dvh flex-col bg-store-surface p-6">
       <div className="flex grow flex-col items-center justify-center gap-3.5 text-center">
@@ -534,11 +671,57 @@ function SuccessScreen({
             </div>
           )}
         </div>
+
+        {/* The offer. Only to a guest, and only once. */}
+        {!guest ? null : saved ? (
+          <Alert tone="success" headline="Account created.">
+            Order #{order.orderNumber} is saved to it.
+          </Alert>
+        ) : (
+          <div className="flex w-full flex-col gap-2.5 rounded-card border border-store-border p-4 text-left">
+            <strong>Save your details for next time?</strong>
+            <span className="text-body text-store-muted">
+              Add a password and this order, your address and phone are saved to an account at {storeName}.
+            </span>
+            <TextField
+              label="Name"
+              autoComplete="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <TextField
+              label="Email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+            <TextField
+              label="Choose a password"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              {...(failed === null ? {} : { error: failed })}
+            />
+            <Button variant="primary" block onClick={create} disabled={!ready} busy={busy} busyLabel="Saving…">
+              Create my account
+            </Button>
+            <span className="text-caption text-store-muted">
+              This account is only for {storeName}. Other stores on Vendlyfy ask separately.
+            </span>
+          </div>
+        )}
       </div>
       <div className="flex flex-col gap-2.5">
         <Button variant="primary" block onClick={onTrack}>
           Track order
         </Button>
+        {saved ? (
+          <Button variant="secondary" block onClick={onAccount}>
+            See my orders
+          </Button>
+        ) : null}
         <Button variant="text" block onClick={onHome}>
           Back to store
         </Button>

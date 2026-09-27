@@ -16,13 +16,15 @@ import { ProductPage } from './ProductPage.tsx';
 import { CartPage } from './CartPage.tsx';
 import { CheckoutPage } from './CheckoutPage.tsx';
 import { TrackPage } from './TrackPage.tsx';
+import { AccountPage } from './AccountPage.tsx';
 
 export type StorefrontView =
   | { kind: 'home' }
   | { kind: 'product'; productId: string }
   | { kind: 'cart' }
   | { kind: 'checkout' }
-  | { kind: 'track'; code: string };
+  | { kind: 'track'; code: string }
+  | { kind: 'account' };
 
 type Props = {
   slug: string;
@@ -119,10 +121,22 @@ export function Storefront({ slug, view, navigate }: Props): ReactNode {
           onBack={() => navigate(`/${slug}/cart`)}
           onHome={() => navigate(`/${slug}`)}
           onTrack={(code) => navigate(`/${slug}/orders/${code}`)}
+          onAccount={() => navigate(`/${slug}/account`)}
+        />
+      ) : view.kind === 'account' ? (
+        <AccountPage
+          onHome={() => navigate(`/${slug}`)}
+          onOpenOrder={(code) => navigate(`/${slug}/orders/${code}`)}
+          // Signing in is a SHEET at checkout, where losing the screen's state would matter. From the account
+          // there is nothing to lose, so /signin is the right place to go.
           onSignIn={() => navigate('/signin')}
         />
       ) : (
-        <TrackPage code={view.code} onHome={() => navigate(`/${slug}`)} />
+        <TrackPage
+          code={view.code}
+          onHome={() => navigate(`/${slug}`)}
+          onOpenCart={() => navigate(`/${slug}/cart`)}
+        />
       )}
     </StoreProvider>
   );

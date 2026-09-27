@@ -92,13 +92,15 @@ const STAFF: { id: string; name: string; email: string; store: string; role: str
 /**
  * Remove the append-only rows the fixture stores left behind, which needs table ownership.
  *
- * FOUR TABLES IN THIS SCHEMA REFUSE TO FORGET, by design and for different reasons:
+ * SIX TABLES IN THIS SCHEMA REFUSE TO FORGET, by design and for different reasons:
  *
  *   reviews         "Reviews go live straight away and stay. Vendlyfy can hide one after a report; nobody can
  *                   remove it." (V009)
  *   order_events    "A history that can be rewritten is not a history." (V004)
  *   wallet_ledger   the money's own record, whose rows chain to each other (V005)
  *   audit_log       the platform's, hash-chained (V011)
+ *   complaint_events  the argument a refund is settled from, chained per complaint (V008)
+ *   complaint_evidence what the customer photographed (V008)
  *
  * Every one of those triggers raises for EVERY role, including the table's owner — which is what makes the
  * promise real rather than a convention. So a test that places an order cannot remove it, and therefore
@@ -130,6 +132,8 @@ async function deleteAppendOnlyAsOwner(stores: readonly string[]): Promise<void>
     await owner.query('ALTER TABLE order_events DISABLE TRIGGER order_events_no_update');
     await owner.query('ALTER TABLE wallet_ledger DISABLE TRIGGER wallet_ledger_no_change');
     await owner.query('ALTER TABLE audit_log DISABLE TRIGGER audit_log_no_update');
+    await owner.query('ALTER TABLE complaint_events DISABLE TRIGGER complaint_events_no_update');
+    await owner.query('ALTER TABLE complaint_evidence DISABLE TRIGGER complaint_evidence_no_update');
 
     // Children before parents, as everywhere else: a reply and a report both reference a review.
     await owner.query(
@@ -139,9 +143,16 @@ async function deleteAppendOnlyAsOwner(stores: readonly string[]): Promise<void>
     await owner.query(`DELETE FROM review_replies WHERE store_id = ANY($1::uuid[])`, [stores]);
     await owner.query(`DELETE FROM reviews WHERE store_id = ANY($1::uuid[])`, [stores]);
     await owner.query(`DELETE FROM order_events WHERE store_id = ANY($1::uuid[])`, [stores]);
+    // A complaint is a thread: its evidence and its events go before it, and it goes before the order it is
+    // about — `complaints_order_id_store_id_fkey` is what says so.
+    await owner.query(`DELETE FROM complaint_evidence WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await owner.query(`DELETE FROM complaint_events WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await owner.query(`DELETE FROM complaints WHERE store_id = ANY($1::uuid[])`, [stores]);
     await owner.query(`DELETE FROM wallet_ledger WHERE store_id = ANY($1::uuid[])`, [stores]);
     await owner.query(`DELETE FROM audit_log WHERE store_id = ANY($1::uuid[])`, [stores]);
 
+    await owner.query('ALTER TABLE complaint_evidence ENABLE TRIGGER complaint_evidence_no_update');
+    await owner.query('ALTER TABLE complaint_events ENABLE TRIGGER complaint_events_no_update');
     await owner.query('ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_update');
     await owner.query('ALTER TABLE wallet_ledger ENABLE TRIGGER wallet_ledger_no_change');
     await owner.query('ALTER TABLE order_events ENABLE TRIGGER order_events_no_update');
@@ -180,6 +191,11 @@ export async function cleanup(): Promise<void> {
     await tx.query(`DELETE FROM order_items WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM momo_transactions WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM refunds WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM notifications WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(
+      `DELETE FROM customer_addresses WHERE user_id IN (SELECT id FROM users WHERE store_id = ANY($1::uuid[]))`,
+      [stores],
+    );
     await tx.query(`DELETE FROM order_discounts WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM orders WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM store_order_counters WHERE store_id = ANY($1::uuid[])`, [stores]);

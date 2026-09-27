@@ -21,7 +21,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ApiFailure } from '../app/api.ts';
-import { Button, Skeleton, StateCard } from '../shared/ui/index.ts';
+import { Button, Skeleton, StateCard, Toast } from '../shared/ui/index.ts';
+import { ComplaintSheet } from './ComplaintSheet.tsx';
 import { storefront } from './api.ts';
 import type { CustomerOrder, PaymentState } from './api.ts';
 import { useStore } from './StoreProvider.tsx';
@@ -105,14 +106,29 @@ export function customerSteps(
   ];
 }
 
-type Props = { code: string; onHome: () => void };
+type Props = {
+  code: string;
+  onHome: () => void;
+  /** After reordering, so the shopper lands on the cart they just filled. */
+  onOpenCart?: () => void;
+};
 
-export function TrackPage({ code, onHome }: Props): ReactNode {
+export function TrackPage({ code, onHome, onOpenCart }: Props): ReactNode {
   const { face, money, orderSteps, currency } = useStore();
   const [order, setOrder] = useState<CustomerOrder | null>(null);
   const [payment, setPayment] = useState<PaymentState | null>(null);
   const [error, setError] = useState<ApiFailure | null>(null);
   const [reload, setReload] = useState(0);
+  // "Order this again" and "Something wrong? Tell the store" — CustomerAccount's ORDER screen, which is this
+  // screen with two more buttons rather than a second page showing the same order.
+  const [busy, setBusy] = useState(false);
+  const [complaining, setComplaining] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const flash = useCallback((message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 4000);
+  }, []);
 
   const load = useCallback(async (): Promise<void> => {
     try {
@@ -137,6 +153,30 @@ export function TrackPage({ code, onHome }: Props): ReactNode {
     const timer = setInterval(() => void load(), POLL_MS);
     return () => clearInterval(timer);
   }, [order, load]);
+
+  const reorder = useCallback((): void => {
+    setBusy(true);
+    void storefront
+      .reorder(face.store.slug, code)
+      .then((result) => {
+        // The board's own two sentences, and which one depends on whether anything was left behind:
+        // "Added 2 items from #0951 to your cart at today's prices." / "Added 1 of 2 items. Fries are sold
+        // out today."
+        const total = result.added + result.skipped;
+        flash(
+          result.skipped === 0
+            ? `Added ${result.added} ${result.added === 1 ? 'item' : 'items'} to your cart at today’s prices.`
+            : `Added ${result.added} of ${total} items. ${result.skippedNames.join(', ')} ${
+                result.skippedNames.length === 1 ? 'is' : 'are'
+              } sold out today.`,
+        );
+        if (result.added > 0 && onOpenCart !== undefined) setTimeout(onOpenCart, 1200);
+      })
+      .catch((failure: unknown) => {
+        if (failure instanceof ApiFailure) flash(failure.message);
+      })
+      .finally(() => setBusy(false));
+  }, [face.store.slug, code, flash, onOpenCart]);
 
   if (error !== null) {
     return (
@@ -339,11 +379,36 @@ export function TrackPage({ code, onHome }: Props): ReactNode {
           </a>
         )}
 
+        {/* CustomerAccount's ORDER screen: the same order, with the two things a customer does next. */}
+        <Button variant="primary" block onClick={reorder} busy={busy} busyLabel="Adding…">
+          Order this again
+        </Button>
+        <Button variant="secondary" block onClick={() => setComplaining(true)}>
+          Something wrong? Tell the store
+        </Button>
+
         <Button variant="text" block onClick={onHome}>
           Back to {face.store.name}
         </Button>
         <span className="sr-only">Prices in {currency.code}.</span>
       </div>
+
+      <ComplaintSheet
+        open={complaining}
+        onClose={() => setComplaining(false)}
+        orderNumber={order.orderNumber}
+        trackingCode={order.trackingCode}
+        onFiled={() => {
+          setComplaining(false);
+          flash(`Sent to ${face.store.name}. You’ll get an SMS when they reply.`);
+        }}
+      />
+
+      {toast === null ? null : (
+        <div className="pointer-events-none fixed inset-x-4 bottom-8 z-20 flex justify-center">
+          <Toast message={toast} />
+        </div>
+      )}
     </div>
   );
 }

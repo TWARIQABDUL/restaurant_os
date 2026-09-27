@@ -42,7 +42,9 @@ function StoreRoute({ view }: { view: StorefrontView['kind'] }): ReactNode {
           ? { kind: 'cart' }
           : view === 'checkout'
             ? { kind: 'checkout' }
-            : { kind: 'home' };
+            : view === 'account'
+              ? { kind: 'account' }
+              : { kind: 'home' };
 
   return <Storefront slug={slug} view={resolved} navigate={(to) => navigate(to)} />;
 }
@@ -59,6 +61,7 @@ export function AppRoutes(): ReactNode {
         <Route path="/:store/p/:productId" element={<StoreRoute view="product" />} />
         <Route path="/:store/cart" element={<StoreRoute view="cart" />} />
         <Route path="/:store/checkout" element={<StoreRoute view="checkout" />} />
+        <Route path="/:store/account" element={<StoreRoute view="account" />} />
         {/* The tracking code is the credential, so this route is openable cold from an SMS link. */}
         <Route path="/:store/orders/:code" element={<StoreRoute view="track" />} />
 

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:app": "VENDLYFY_APP=1 vite",
     "build": "vite build",
     "ui:check": "vite build --ssr check/render.tsx --outDir dist-check --emptyOutDir && node dist-check/render.js",
     "lint": "oxlint",

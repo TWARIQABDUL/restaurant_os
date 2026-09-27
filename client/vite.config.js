@@ -3,8 +3,47 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
+/**
+ * Serve the NEW app for every unknown path, instead of the legacy one.
+ *
+ * WHY THIS NEEDS A SWITCH AT ALL. The two apps claim the same URLs on purpose: legacy App.jsx routes
+ * `/:tenantSlug`, `/:tenantSlug/cart` and `/:tenantSlug/checkout`, and the new app routes `/:store`,
+ * `/:store/cart` and `/:store/checkout` — because at cutover app.html REPLACES index.html and takes those
+ * paths over. So a dev server cannot decide between them by looking at the path; something has to say which
+ * app is being worked on.
+ *
+ * Vite's default SPA fallback points at index.html, which is the legacy app, so without this a cold load of
+ * /nyama lands on the old storefront. `npm run dev:app` flips the fallback; `npm run dev` is untouched and
+ * still serves the legacy app exactly as it did.
+ *
+ * DEV ONLY. It disappears at cutover along with index.html, and it is not part of any build.
+ */
+function serveNewApp() {
+  return {
+    name: 'vendlyfy-serve-new-app',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const url = req.url ?? '/';
+        // Anything with an extension is a real file; /api, /backend and /socket.io are proxied; /@vite and
+        // /src are Vite's own. Everything else is a route, and routes belong to the new app now.
+        const isRoute =
+          !/\.[a-z0-9]+(\?|$)/i.test(url) &&
+          !url.startsWith('/api') &&
+          !url.startsWith('/backend') &&
+          !url.startsWith('/socket.io') &&
+          !url.startsWith('/@') &&
+          !url.startsWith('/src') &&
+          !url.startsWith('/node_modules');
+        if (isRoute) req.url = '/app.html';
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), ...(process.env.VENDLYFY_APP === '1' ? [serveNewApp()] : [])],
 
   // Two entries, deliberately.
   //

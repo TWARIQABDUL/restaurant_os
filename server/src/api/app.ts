@@ -38,6 +38,7 @@ import { payoutsRouter, walletRouter } from '../routes/storeWallet.ts';
 import healthRoutes from '../routes/health.ts';
 import momoWebhookRoutes from '../routes/momoWebhook.ts';
 import storefrontCheckoutRoutes from '../routes/storefrontCheckout.ts';
+import storefrontAccountRoutes from '../routes/storefrontAccount.ts';
 import { publicInvitesRouter, storeInvitesRouter } from '../routes/invites.ts';
 import { passwordRouter, staffPasswordRouter } from '../routes/password.ts';
 
@@ -150,6 +151,7 @@ export function createApp(): Express {
   app.use('/api/storefront', storefrontReviewRoutes);
   app.use('/api/storefront', storefrontCartRoutes);
   app.use('/api/storefront', storefrontCheckoutRoutes);
+  app.use('/api/storefront', storefrontAccountRoutes);
   // Last of the six, because '/:slug' is the least specific pattern among them. Express matches by
   // pattern rather than by order for these, but a reader should not have to know that to be sure.
   app.use('/api/storefront', storefrontStoreRoutes);

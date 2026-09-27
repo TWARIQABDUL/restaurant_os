@@ -35,6 +35,9 @@ import { ratingLine, relativeDay } from '../src/storefront/ProductPage.tsx';
 import { CartPage } from '../src/storefront/CartPage.tsx';
 import { CheckoutPage } from '../src/storefront/CheckoutPage.tsx';
 import { TrackPage, customerSteps, isStopped, stepIndexFor } from '../src/storefront/TrackPage.tsx';
+import { AccountPage, complaintBadge, orderBadge } from '../src/storefront/AccountPage.tsx';
+import { SignInSheet } from '../src/storefront/SignInSheet.tsx';
+import { ComplaintSheet } from '../src/storefront/ComplaintSheet.tsx';
 import { tileFor } from '../src/storefront/tiles.ts';
 import { formatMoney } from '../src/app/core.ts';
 
@@ -490,13 +493,77 @@ expect(customerSteps([], true).length === 0, 'a template with no steps produces 
 
 const checkoutParts: readonly (readonly [string, ReactNode])[] = [
   ['Shop · cart', inStore(<CartPage onBack={noop} onCheckout={noop} />)],
-  ['Shop · checkout', inStore(<CheckoutPage onBack={noop} onHome={noop} onTrack={noop} onSignIn={noop} />)],
+  ['Shop · checkout', inStore(<CheckoutPage onBack={noop} onHome={noop} onTrack={noop} onAccount={noop} />)],
   // The tracking page renders its loading state here: it fetches on mount, and renderToStaticMarkup runs no
   // effects. That IS the first paint, and getting it right is what this gate is for.
   ['Shop · tracking', inStore(<TrackPage code={'a'.repeat(32)} onHome={noop} />)],
 ];
 
-for (const [name, node] of checkoutParts) {
+// --- milestone 18: the account ------------------------------------------------
+//
+// The badge rules are what is worth asserting: "Reopened" rather than "Sent to the store" once a complaint has
+// been round the loop, which is the difference V008's reopened_count exists to record.
+{
+  const base = {
+    id: 'c1',
+    reference: 44,
+    orderNumber: 990,
+    trackingCode: 'trk_000000000001',
+    reasonCode: 'arrived_late',
+    detail: 'It was an hour late.',
+    storeReply: null,
+    reopenedCount: 0,
+    createdAt: new Date().toISOString(),
+    canReopen: false,
+  };
+
+  expect(
+    complaintBadge({ ...base, status: 'open' }).label === 'Sent to the store',
+    'a fresh complaint reads as sent',
+  );
+  expect(
+    complaintBadge({ ...base, status: 'open', reopenedCount: 1 }).label === 'Reopened',
+    'and the SAME status reads as Reopened once it has been round the loop — reopened_count is why',
+  );
+  expect(complaintBadge({ ...base, status: 'resolved' }).label === 'Resolved', 'resolved');
+  expect(
+    complaintBadge({ ...base, status: 'escalated' }).label === 'With Vendlyfy',
+    'escalated is named for who has it, because that is what the customer needs to know',
+  );
+  expect(complaintBadge({ ...base, status: 'rejected' }).label === 'Not accepted', 'rejected');
+}
+
+{
+  const order = {
+    trackingCode: 'trk_000000000001',
+    orderNumber: 1026,
+    paymentStatus: 'unpaid',
+    paymentMethod: 'cash',
+    total: '12000.00',
+    placedAt: new Date().toISOString(),
+    summary: '2× Chicken burger',
+    itemCount: 2,
+  };
+  expect(orderBadge({ ...order, status: 'out' }).tone === 'progress',
+    'an order on its way uses Main\'s sixth status tone, which milestone 14 added for exactly this');
+  expect(orderBadge({ ...order, status: 'delivered' }).label === 'Delivered', 'delivered');
+  expect(orderBadge({ ...order, status: 'collected' }).label === 'Delivered',
+    'and a collected order says the same thing to a customer who has it');
+  expect(orderBadge({ ...order, status: 'pending' }).label === 'In progress',
+    'every step before it leaves is "in progress" — a customer does not need the merchant\'s state machine');
+  expect(orderBadge({ ...order, status: 'cancelled' }).tone === 'danger', 'cancelled');
+}
+
+const accountParts: readonly (readonly [string, ReactNode])[] = [
+  ['CustomerAccount · account', inStore(<AccountPage onHome={noop} onOpenOrder={noop} onSignIn={noop} />)],
+  ['CustomerAccount · sign-in sheet', inStore(<SignInSheet open onClose={noop} onSignedIn={noop} />)],
+  [
+    'CustomerAccount · report a problem',
+    inStore(<ComplaintSheet open onClose={noop} orderNumber={990} trackingCode={'a'.repeat(32)} onFiled={noop} />),
+  ],
+];
+
+for (const [name, node] of [...checkoutParts, ...accountParts]) {
   const html = render(name, node);
   allHtml += html;
   kitHtml += html;
@@ -549,6 +616,15 @@ for (const phrase of [
   'We text your receipt and delivery updates here.',
   'Secure payment · SMS receipt after you pay',
   'Ordered before? Sign in',
+  // CustomerAccount's own wording, milestone 18.
+  //
+  // Chosen from what the gate can actually REACH. renderToStaticMarkup runs no effects, so a screen that
+  // fetches on mount renders its loading state — which is the correct first paint and is what is asserted
+  // above. And `visibleText` strips tags, so a placeholder is not visible text however visible it looks.
+  // Phrases from those two places would pass or fail for reasons that have nothing to do with the wording.
+  'Your cart (3 items) stays exactly as it is.',
+  'If you can’t agree, the store can ask Vendlyfy to decide.',
+  'Send to the store',
 ]) {
   expect(visibleText.includes(phrase), `the boards' wording is missing: ${phrase}`);
 }

@@ -35,8 +35,19 @@ import { isConfigured } from '../payments/momo.ts';
 
 const router = Router();
 
-/** The tracking code place_order() generates: 32 hex characters. */
-const TRACKING_CODE = /^[0-9a-f]{32}$/;
+/**
+ * The shape a tracking code may have.
+ *
+ * MATCHING V004'S COLUMN, not place_order()'s output, and the difference is the point. place_order() generates
+ * 32 hex characters, but `orders_tracking_code_format` allows 12 to 64 — and the seeded orders use
+ * `trk_…`, as will every order the ETL brings across at milestone 29 from a system with its own format.
+ * Validating the generator's shape here made every order that predates V019 unreachable through the
+ * storefront, which a test on a delivered seeded order found immediately.
+ *
+ * It is still worth checking: the code goes into a URL and a database lookup, and a bounded character set is
+ * one less thing for either to be surprised by. It is not what makes the code safe — 32 random characters is.
+ */
+const TRACKING_CODE = /^[A-Za-z0-9_-]{12,64}$/;
 
 async function cartOf(req: Request, storeId: string): Promise<string | null> {
   const customerId = await currentCustomer(req, storeId);

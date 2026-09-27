@@ -131,3 +131,47 @@ export async function insertPlatformUser(
   }
   return created;
 }
+
+/**
+ * A customer of one store, by email — milestone 18.
+ *
+ * SCOPED TO THE STORE, and that is the whole difference from findPlatformByEmail(). V001's
+ * `users_store_email_key` is unique on (store_id, lower(email)) WHERE scope = 'store', so the same address
+ * can hold a customer account at three shops and a staff identity besides. "This account is only for Nyama &
+ * Co. Other stores on Vendlyfy ask separately" is that index, read out loud.
+ */
+export async function findCustomerByEmail(
+  storeId: string,
+  email: string,
+  on: Queryable = db,
+): Promise<UserIdentity | null> {
+  const { rows } = await on.query<UserIdentity>(
+    `SELECT ${IDENTITY_COLUMNS}
+       FROM users
+      WHERE scope = 'store' AND store_id = $1 AND lower(email) = lower($2)`,
+    [storeId, email],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Create a customer account at one store.
+ *
+ * The hash is made here rather than by the caller, so BCRYPT_COST has one home — the same reason
+ * setPassword() takes a hash and hashPassword() is the only thing that produces one.
+ */
+export async function createCustomer(
+  storeId: string,
+  input: { name: string; email: string; phone: string | null; password: string },
+  tx: Queryable,
+): Promise<UserIdentity> {
+  const { rows } = await tx.query<UserIdentity>(
+    `INSERT INTO users (scope, store_id, email, name, phone, password_hash)
+          VALUES ('store', $1, $2, $3, $4, $5)
+       RETURNING ${IDENTITY_COLUMNS}`,
+    [storeId, input.email, input.name, input.phone, await hashPassword(input.password)],
+  );
+  const created = rows[0];
+  if (created === undefined) throw new Error('INSERT INTO users returned no row');
+  return created;
+}
