@@ -13,8 +13,16 @@ import { StoreProvider } from './StoreProvider.tsx';
 import type { LoadState } from './StoreProvider.tsx';
 import { ShopHome } from './ShopHome.tsx';
 import { ProductPage } from './ProductPage.tsx';
+import { CartPage } from './CartPage.tsx';
+import { CheckoutPage } from './CheckoutPage.tsx';
+import { TrackPage } from './TrackPage.tsx';
 
-export type StorefrontView = { kind: 'home' } | { kind: 'product'; productId: string };
+export type StorefrontView =
+  | { kind: 'home' }
+  | { kind: 'product'; productId: string }
+  | { kind: 'cart' }
+  | { kind: 'checkout' }
+  | { kind: 'track'; code: string };
 
 type Props = {
   slug: string;
@@ -95,18 +103,26 @@ export function Storefront({ slug, view, navigate }: Props): ReactNode {
       {view.kind === 'home' ? (
         <ShopHome
           onOpenProduct={(productId) => navigate(`/${slug}/p/${productId}`)}
-          // The cart SCREEN is milestone 17's. Until it exists this is where it will go, and the button
-          // that leads there is already drawn on both boards — so it navigates to the path that route will
-          // claim rather than pretending the button is not there.
           onOpenCart={() => navigate(`/${slug}/cart`)}
         />
-      ) : (
+      ) : view.kind === 'product' ? (
         <ProductPage
           productId={view.productId}
           onBack={() => navigate(`/${slug}`)}
           onOpenCart={() => navigate(`/${slug}/cart`)}
           onSignIn={() => navigate('/signin')}
         />
+      ) : view.kind === 'cart' ? (
+        <CartPage onBack={() => navigate(`/${slug}`)} onCheckout={() => navigate(`/${slug}/checkout`)} />
+      ) : view.kind === 'checkout' ? (
+        <CheckoutPage
+          onBack={() => navigate(`/${slug}/cart`)}
+          onHome={() => navigate(`/${slug}`)}
+          onTrack={(code) => navigate(`/${slug}/orders/${code}`)}
+          onSignIn={() => navigate('/signin')}
+        />
+      ) : (
+        <TrackPage code={view.code} onHome={() => navigate(`/${slug}`)} />
       )}
     </StoreProvider>
   );

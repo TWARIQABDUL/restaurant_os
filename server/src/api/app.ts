@@ -36,6 +36,8 @@ import membersRoutes from '../routes/members.ts';
 import storeSettingsRoutes from '../routes/storeSettings.ts';
 import { payoutsRouter, walletRouter } from '../routes/storeWallet.ts';
 import healthRoutes from '../routes/health.ts';
+import momoWebhookRoutes from '../routes/momoWebhook.ts';
+import storefrontCheckoutRoutes from '../routes/storefrontCheckout.ts';
 import { publicInvitesRouter, storeInvitesRouter } from '../routes/invites.ts';
 import { passwordRouter, staffPasswordRouter } from '../routes/password.ts';
 
@@ -94,6 +96,12 @@ export function createApp(): Express {
   // nothing.
   app.use('/api/health', healthRoutes);
 
+  // THE PAYMENT WEBHOOK, also outside the CSRF layer, which is the exception the note below anticipates.
+  // MTN cannot echo a double-submit cookie. It is safe because the callback GRANTS NOTHING: the body is
+  // ignored and the real status is re-read from MoMo's authenticated endpoint, so a forged call only makes
+  // the server ask a question it already knew the answer to. See routes/momoWebhook.ts.
+  app.use('/api/momo', momoWebhookRoutes);
+
   // CSRF. §2.5: "Cookie-borne credentials are sent automatically, so every state-changing request needs
   // a token or a strict same-origin check."
   //
@@ -141,6 +149,7 @@ export function createApp(): Express {
   app.use('/api/storefront', storefrontCatalogueRoutes);
   app.use('/api/storefront', storefrontReviewRoutes);
   app.use('/api/storefront', storefrontCartRoutes);
+  app.use('/api/storefront', storefrontCheckoutRoutes);
   // Last of the six, because '/:slug' is the least specific pattern among them. Express matches by
   // pattern rather than by order for these, but a reader should not have to know that to be sure.
   app.use('/api/storefront', storefrontStoreRoutes);

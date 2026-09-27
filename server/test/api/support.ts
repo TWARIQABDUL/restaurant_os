@@ -58,6 +58,11 @@ export const CATALOGUE = {
   plate: uid(0x116),
   /** In BOTH sections, which is what makes product_categories a join. */
   water: uid(0x117),
+  /**
+   * Priced at 8,017 — AdminCurrencies' own example, so the cash-rounding rule is exercised against the
+   * figure the board shows rather than against a total that happens to be a multiple of 50 already.
+   */
+  setMenu: uid(0x118),
 
   size: uid(0x120),
   colour: uid(0x121),
@@ -85,28 +90,35 @@ const STAFF: { id: string; name: string; email: string; store: string; role: str
 ];
 
 /**
- * Remove the fixture stores' reviews, which needs table ownership.
+ * Remove the append-only rows the fixture stores left behind, which needs table ownership.
  *
- * V009'S PROMISE IS ABSOLUTE, and this function is the proof. `reviews_immutable` raises on DELETE for
- * every role — "Reviews go live straight away and stay. Vendlyfy can hide one after a report; nobody can
- * remove it." The application role cannot delete a review, the OWNER cannot delete a review, and neither
- * can a test. So teardown turns that one trigger off for the length of one transaction, which is a thing
- * only the table's owner may do.
+ * FOUR TABLES IN THIS SCHEMA REFUSE TO FORGET, by design and for different reasons:
  *
- * THIS IS TEARDOWN, NOT A FIXTURE, and the distinction is what keeps support.ts's rule intact: every row
- * a test reads was written through the app role, so no test asserts on a state the application could not
- * produce. Removing rows afterwards is housekeeping, and it is the only thing this connection does.
+ *   reviews         "Reviews go live straight away and stay. Vendlyfy can hide one after a report; nobody can
+ *                   remove it." (V009)
+ *   order_events    "A history that can be rewritten is not a history." (V004)
+ *   wallet_ledger   the money's own record, whose rows chain to each other (V005)
+ *   audit_log       the platform's, hash-chained (V011)
  *
- * ALTER TABLE ... DISABLE TRIGGER is transactional and takes an ACCESS EXCLUSIVE lock, so the window
- * where reviews are mutable is one transaction long on a local test database, and a rollback puts the
+ * Every one of those triggers raises for EVERY role, including the table's owner — which is what makes the
+ * promise real rather than a convention. So a test that places an order cannot remove it, and therefore
+ * cannot remove the store it belongs to either.
+ *
+ * TEARDOWN IS NOT A FIXTURE, and that distinction is what keeps support.ts's rule intact: every row a test
+ * READS was written through the app role, so no test asserts on a state the application could not produce.
+ * Removing rows afterwards is housekeeping, and it is the only thing this connection does.
+ *
+ * ALTER TABLE ... DISABLE TRIGGER is transactional and takes an ACCESS EXCLUSIVE lock, so the window where
+ * these tables are mutable is one transaction long on a local test database, and a rollback puts every
  * trigger back without anybody's help.
  */
-async function deleteReviewsAsOwner(stores: readonly string[]): Promise<void> {
+async function deleteAppendOnlyAsOwner(stores: readonly string[]): Promise<void> {
   const url = process.env['OWNER_DATABASE_URL'];
   if (url === undefined || url === '') {
     throw new Error(
-      'OWNER_DATABASE_URL is not set, so the fixture reviews cannot be removed — a review is undeletable ' +
-        'by design (V009) and teardown needs to disable that trigger. Run the suite through npm run api:test.',
+      'OWNER_DATABASE_URL is not set, so the append-only fixture rows cannot be removed — reviews, order ' +
+        'events, the ledger and the audit log are undeletable by design, and teardown needs to disable those ' +
+        'triggers. Run the suite through npm run api:test.',
     );
   }
 
@@ -115,13 +127,24 @@ async function deleteReviewsAsOwner(stores: readonly string[]): Promise<void> {
   try {
     await owner.query('BEGIN');
     await owner.query('ALTER TABLE reviews DISABLE TRIGGER reviews_immutable');
-    // The children first: a reply and a report both reference the review.
+    await owner.query('ALTER TABLE order_events DISABLE TRIGGER order_events_no_update');
+    await owner.query('ALTER TABLE wallet_ledger DISABLE TRIGGER wallet_ledger_no_change');
+    await owner.query('ALTER TABLE audit_log DISABLE TRIGGER audit_log_no_update');
+
+    // Children before parents, as everywhere else: a reply and a report both reference a review.
     await owner.query(
       `DELETE FROM review_reports WHERE review_id IN (SELECT id FROM reviews WHERE store_id = ANY($1::uuid[]))`,
       [stores],
     );
     await owner.query(`DELETE FROM review_replies WHERE store_id = ANY($1::uuid[])`, [stores]);
     await owner.query(`DELETE FROM reviews WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await owner.query(`DELETE FROM order_events WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await owner.query(`DELETE FROM wallet_ledger WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await owner.query(`DELETE FROM audit_log WHERE store_id = ANY($1::uuid[])`, [stores]);
+
+    await owner.query('ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_update');
+    await owner.query('ALTER TABLE wallet_ledger ENABLE TRIGGER wallet_ledger_no_change');
+    await owner.query('ALTER TABLE order_events ENABLE TRIGGER order_events_no_update');
     await owner.query('ALTER TABLE reviews ENABLE TRIGGER reviews_immutable');
     await owner.query('COMMIT');
   } catch (error) {
@@ -136,8 +159,9 @@ export async function cleanup(): Promise<void> {
   const stores = [STORE.a, STORE.b];
   const like = `%@${EMAIL_DOMAIN}`;
 
-  // Reviews first, and through the owner: see deleteReviewsAsOwner(). Everything below is the app role.
-  await deleteReviewsAsOwner(stores);
+  // The append-only rows first, through the owner: see deleteAppendOnlyAsOwner(). Everything below is the
+  // app role, as every fixture is.
+  await deleteAppendOnlyAsOwner(stores);
 
   // ONE TRANSACTION for every delete, and this is not tidiness either. Several of these tables carry
   // DEFERRABLE constraint triggers that check a SET of rows — a variant must name one value per group, an
@@ -154,7 +178,8 @@ export async function cleanup(): Promise<void> {
     await tx.query(`DELETE FROM carts WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM order_item_option_values WHERE order_item_id IN (SELECT id FROM order_items WHERE store_id = ANY($1::uuid[]))`, [stores]);
     await tx.query(`DELETE FROM order_items WHERE store_id = ANY($1::uuid[])`, [stores]);
-    await tx.query(`DELETE FROM order_events WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM momo_transactions WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM refunds WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM order_discounts WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM orders WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM store_order_counters WHERE store_id = ANY($1::uuid[])`, [stores]);
@@ -335,6 +360,7 @@ export async function seedStorefront(): Promise<void> {
     [CATALOGUE.secret, 'Unreleased Special', 9000, null, false, 0, 'draft', 6],
     [CATALOGUE.plate, 'Brochette Plate', 5000, 6000, false, 0, 'active', 7],
     [CATALOGUE.water, 'Still Water', 500, null, false, 0, 'active', 8],
+    [CATALOGUE.setMenu, 'Set Menu', 8017, null, false, 0, 'active', 9],
   ];
   for (const [id, name, price, compareAt, tracked, threshold, status, position] of products) {
     await sql(
@@ -352,11 +378,12 @@ export async function seedStorefront(): Promise<void> {
        ($5, $9, $11, 5), ($6, $9, $11, 6), ($7, $9, $11, 7),
        ($8, $10, $11, 1),
        -- Still Water is in BOTH, at a different position in each.
-       ($8, $9, $11, 8)`,
+       ($8, $9, $11, 8),
+       ($12, $9, $11, 9)`,
     [
       CATALOGUE.juice, CATALOGUE.tee, CATALOGUE.burger, CATALOGUE.wrap, CATALOGUE.cap,
       CATALOGUE.secret, CATALOGUE.plate, CATALOGUE.water,
-      CATALOGUE.mains, CATALOGUE.drinks, STORE.a,
+      CATALOGUE.mains, CATALOGUE.drinks, STORE.a, CATALOGUE.setMenu,
     ],
   );
 
@@ -429,6 +456,7 @@ export async function seedStorefront(): Promise<void> {
     [uid(0x314), CATALOGUE.secret, null, true],
     [uid(0x315), CATALOGUE.plate, null, true],
     [uid(0x316), CATALOGUE.water, null, true],
+    [uid(0x317), CATALOGUE.setMenu, null, true],
   ];
   for (const [variant, product, stock, available] of singles) {
     await sql(

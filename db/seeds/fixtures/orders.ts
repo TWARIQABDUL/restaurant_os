@@ -283,6 +283,10 @@ export async function seedOrders(ctx: Ctx): Promise<void> {
         )
       : 0;
 
+    // cash_due_amount is NOT set here, and that is the point of V019: the database derives it from the
+    // total, and re-derives it when the discounts applied later change that total. The seed setting it
+    // would be the seed asserting a figure it computed before the discount existed — which is exactly the
+    // bug that turned the column from checked into derived.
     await ctx.sql(
       `INSERT INTO orders (id, store_id, order_number, tracking_code, idempotency_key,
                            customer_user_id, guest_name, guest_phone,

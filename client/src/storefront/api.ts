@@ -127,6 +127,95 @@ export type CartData = {
   expiresAt: string | null;
 };
 
+// --- milestone 17: checkout ---------------------------------------------------
+
+export type DeliveryOption = {
+  zoneId: string;
+  name: string;
+  fee: string;
+  etaMinMinutes: number;
+  etaMaxMinutes: number;
+  areas: string[];
+};
+
+export type PaymentOption = {
+  key: string;
+  label: string;
+  hint: string;
+  kind: 'offline' | 'online';
+  minAmount: string | null;
+  maxAmount: string | null;
+  /** False when this total is outside the provider's range. Shown, but not choosable. */
+  usableForTotal: boolean;
+};
+
+export type PromoState = { code: string; applies: boolean; reason: string | null; amount: string };
+
+export type Quote = {
+  itemCount: number;
+  subtotal: string;
+  deliveryFee: string;
+  discount: string;
+  total: string;
+  /** What the rider collects, for cash. Null for every other method. */
+  cashDue: string | null;
+  promo: PromoState | null;
+  fulfilment: 'delivery' | 'pickup';
+  zone: DeliveryOption | null;
+  paymentMethods: PaymentOption[];
+  unavailable: { productName: string; reason: 'sold_out' | 'withdrawn' }[];
+};
+
+export type PlacedOrder = {
+  orderNumber: number;
+  trackingCode: string;
+  total: string;
+  cashDue: string | null;
+  paymentMethod: string;
+};
+
+export type PaymentState = {
+  status: 'pending' | 'successful' | 'failed';
+  message?: string | null;
+  phone?: string;
+  amount?: string;
+  reference?: string;
+};
+
+export type OrderLine = {
+  id: string;
+  productName: string;
+  variantLabel: string;
+  optionLabels: string[];
+  quantity: number;
+  unitPrice: string;
+  lineTotal: string;
+};
+
+export type CustomerOrder = {
+  id: string;
+  orderNumber: number;
+  trackingCode: string;
+  status: string;
+  paymentStatus: 'unpaid' | 'paid' | 'refunded';
+  paymentMethod: string;
+  fulfilment: 'delivery' | 'pickup';
+  deliveryAddress: string | null;
+  subtotal: string;
+  deliveryFee: string;
+  discount: string;
+  total: string;
+  cashDue: string | null;
+  placedAt: string;
+  paidAt: string | null;
+  lines: OrderLine[];
+  events: { status: string; at: string; note: string | null }[];
+  store: { slug: string; name: string; phone: string | null };
+  pickup: { address: string; readyMinutes: number; instructions: string | null } | null;
+  delivery: { etaMinMinutes: number; etaMaxMinutes: number } | null;
+  placedFor: string | null;
+};
+
 export type ThemePayload = {
   store: { slug: string; name: string };
   theme: {
@@ -197,4 +286,54 @@ export const storefront = {
     body: { variantId: string; optionValueIds?: string[]; quantity?: number },
   ): Promise<{ line: { id: string; quantity: number; created: boolean }; cart: CartData }> =>
     api.post(`/api/storefront/${enc(slug)}/cart/items`, body),
+
+  setQuantity: (slug: string, lineId: string, quantity: number): Promise<{ cart: CartData }> =>
+    api.patch(`/api/storefront/${enc(slug)}/cart/items/${enc(lineId)}`, { quantity }),
+
+  removeLine: (slug: string, lineId: string): Promise<{ cart: CartData }> =>
+    api.delete(`/api/storefront/${enc(slug)}/cart/items/${enc(lineId)}`),
+
+  setPromo: (slug: string, code: string | null): Promise<{ promo: PromoState | null; cart: CartData }> =>
+    api.put(`/api/storefront/${enc(slug)}/cart/promo`, { code }),
+
+  checkout: (
+    slug: string,
+    options: { fulfilment: 'delivery' | 'pickup'; zone?: string | null },
+  ): Promise<{ quote: Quote; deliveryOptions: DeliveryOption[] }> => {
+    const params = new URLSearchParams({ fulfilment: options.fulfilment });
+    if (options.zone != null && options.zone !== '') params.set('zone', options.zone);
+    return api.get(`/api/storefront/${enc(slug)}/checkout?${params.toString()}`);
+  },
+
+  placeOrder: (
+    slug: string,
+    body: {
+      idempotencyKey: string;
+      fulfilment: 'delivery' | 'pickup';
+      paymentMethod: string;
+      expectedTotal: string;
+      name?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      zone?: string;
+    },
+  ): Promise<{ order: PlacedOrder; created: boolean; needsPayment: boolean }> =>
+    api.post(`/api/storefront/${enc(slug)}/orders`, body),
+
+  order: (slug: string, code: string): Promise<{ order: CustomerOrder; payment: PaymentState | null }> =>
+    api.get(`/api/storefront/${enc(slug)}/orders/${enc(code)}`),
+
+  startPayment: (
+    slug: string,
+    code: string,
+    phone: string,
+  ): Promise<{ payment: PaymentState; started?: boolean; alreadyPaid?: boolean; warning?: string }> =>
+    api.post(`/api/storefront/${enc(slug)}/orders/${enc(code)}/payment`, { phone }),
+
+  paymentStatus: (
+    slug: string,
+    code: string,
+  ): Promise<{ payment: PaymentState | null; order: { paymentStatus: string } }> =>
+    api.get(`/api/storefront/${enc(slug)}/orders/${enc(code)}/payment`),
 };

@@ -96,9 +96,9 @@ describe('the store itself', () => {
     const names = categories.map((c) => c.name);
     assert.deepEqual(names, ['Mains', 'Drinks']);
 
-    // Mains holds seven ACTIVE products plus the draft plus Still Water: the draft does not count.
+    // Mains holds eight ACTIVE products plus the draft: the draft does not count.
     const mains = categories.find((c) => c.name === 'Mains');
-    assert.equal(mains?.productCount, 7, 'the draft product is not counted');
+    assert.equal(mains?.productCount, 8, 'the draft product is not counted');
 
     // Hide the section and it leaves the rail entirely.
     await sql(`UPDATE categories SET is_visible = false WHERE id = $1`, [CATALOGUE.drinks]);
@@ -143,7 +143,17 @@ describe('browsing the catalogue', () => {
 
     assert.deepEqual(
       products.map((p) => p.name),
-      ['Passion Juice', 'Linen Tee', 'Chicken Burger', 'Veggie Wrap', 'Cotton Cap', 'Brochette Plate', 'Still Water'],
+      [
+        'Passion Juice',
+        'Linen Tee',
+        'Chicken Burger',
+        'Veggie Wrap',
+        'Cotton Cap',
+        'Brochette Plate',
+        'Still Water',
+        // Priced at 8,017 for milestone 17's cash-rounding test — AdminCurrencies' own example.
+        'Set Menu',
+      ],
     );
     assert.equal(
       products.some((p) => p.id === CATALOGUE.secret),
@@ -220,7 +230,7 @@ describe('browsing the catalogue', () => {
     // is what makes product_categories a join rather than a column.
     const mains = await call(api, 'GET', `/api/storefront/${SLUG}/products?category=${CATALOGUE.mains}&limit=50`);
     const names = (mains.body['products'] as { name: string }[]).map((p) => p.name);
-    assert.equal(names[names.length - 1], 'Still Water');
+    assert.equal(names.indexOf('Still Water'), names.length - 2, 'Still Water sits at position 8 of Mains');
   });
 
   it('pages by keyset, without repeating or dropping a product', async () => {
@@ -237,8 +247,8 @@ describe('browsing the catalogue', () => {
       if (cursor === null) break;
     }
 
-    assert.equal(seen.length, 7, 'every active product, once');
-    assert.equal(new Set(seen).size, 7, 'no product appeared on two pages');
+    assert.equal(seen.length, 8, 'every active product, once');
+    assert.equal(new Set(seen).size, 8, 'no product appeared on two pages');
   });
 
   it('refuses half a cursor', async () => {
@@ -292,7 +302,7 @@ describe('search', () => {
   it('a search of nothing but punctuation is not a search', async () => {
     // Every word is stripped, so this is a plain browse rather than a search for the empty string.
     const reply = await call(api, 'GET', `/api/storefront/${SLUG}/products?q=${encodeURIComponent('...')}&limit=50`);
-    assert.equal((reply.body['products'] as unknown[]).length, 7);
+    assert.equal((reply.body['products'] as unknown[]).length, 8);
   });
 
   it('refuses a term longer than a search', async () => {

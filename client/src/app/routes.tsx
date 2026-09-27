@@ -21,23 +21,30 @@ import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from '
 import type { ReactNode } from 'react';
 import { AuthPage } from '../auth/AuthPage.tsx';
 import { Storefront } from '../storefront/Storefront.tsx';
+import type { StorefrontView } from '../storefront/Storefront.tsx';
 
-/** `/:store` and `/:store/p/:productId`, both rendered by the same shell. */
-function StoreRoute({ view }: { view: 'home' | 'product' }): ReactNode {
+/** Every storefront path, rendered by the same shell — which is what loads the store once for all of them. */
+function StoreRoute({ view }: { view: StorefrontView['kind'] }): ReactNode {
   const params = useParams();
   const navigate = useNavigate();
   const slug = params['store'];
   const productId = params['productId'];
+  const code = params['code'];
 
   if (typeof slug !== 'string' || slug === '') return <Navigate to="/signin" replace />;
 
-  return (
-    <Storefront
-      slug={slug}
-      view={view === 'product' && typeof productId === 'string' ? { kind: 'product', productId } : { kind: 'home' }}
-      navigate={(to) => navigate(to)}
-    />
-  );
+  const resolved: StorefrontView =
+    view === 'product' && typeof productId === 'string'
+      ? { kind: 'product', productId }
+      : view === 'track' && typeof code === 'string'
+        ? { kind: 'track', code }
+        : view === 'cart'
+          ? { kind: 'cart' }
+          : view === 'checkout'
+            ? { kind: 'checkout' }
+            : { kind: 'home' };
+
+  return <Storefront slug={slug} view={resolved} navigate={(to) => navigate(to)} />;
 }
 
 export function AppRoutes(): ReactNode {
@@ -50,6 +57,10 @@ export function AppRoutes(): ReactNode {
 
         <Route path="/:store" element={<StoreRoute view="home" />} />
         <Route path="/:store/p/:productId" element={<StoreRoute view="product" />} />
+        <Route path="/:store/cart" element={<StoreRoute view="cart" />} />
+        <Route path="/:store/checkout" element={<StoreRoute view="checkout" />} />
+        {/* The tracking code is the credential, so this route is openable cold from an SMS link. */}
+        <Route path="/:store/orders/:code" element={<StoreRoute view="track" />} />
 
         {/* Nothing at the root yet: the platform's own marketing page is not part of this rewrite, and a
             shopper always arrives at a store. Sign-in is the one thing here that is always somewhere. */}

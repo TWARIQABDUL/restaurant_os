@@ -231,3 +231,67 @@ export async function read(cartId: string, on: Queryable = db): Promise<Cart | n
     expiresAt: head.expires_at,
   };
 }
+
+/**
+ * Change a line's quantity. Returns false when the line is not in this cart.
+ *
+ * THE SIGNATURE IS UNTOUCHED, because the options did not change — which is why this is a plain UPDATE and
+ * not a remove-and-re-add. Re-adding would merge with whatever else matched and lose the distinction the
+ * signature exists to keep.
+ *
+ * The bound is V018's `cart_items_quantity_bounded`; this refuses politely before the CHECK has to.
+ */
+export async function setQuantity(
+  cartId: string,
+  cartItemId: string,
+  quantity: number,
+  on: Queryable = db,
+): Promise<boolean> {
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) {
+    throw new Error(`quantity must be a whole number between 1 and 999, got ${quantity}`);
+  }
+  const { rowCount } = await on.query(
+    `UPDATE cart_items SET quantity = $3 WHERE cart_id = $1 AND id = $2`,
+    [cartId, cartItemId, quantity],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+/** Remove a line. Its option rows cascade, and the signature trigger has nothing left to check. */
+export async function removeLine(
+  cartId: string,
+  cartItemId: string,
+  on: Queryable = db,
+): Promise<boolean> {
+  const { rowCount } = await on.query(`DELETE FROM cart_items WHERE cart_id = $1 AND id = $2`, [
+    cartId,
+    cartItemId,
+  ]);
+  return (rowCount ?? 0) > 0;
+}
+
+/**
+ * Hold a promo code on the cart, or clear it.
+ *
+ * THE CODE, NOT WHAT IT IS WORTH. V019's column comment says why: the value depends on the lines, the time
+ * of day and the caps, and apply_promo_code() decides it at placement against the order. Storing an amount
+ * here would be a price quoted by a table that cannot see any of that.
+ */
+export async function setPromoCode(
+  cartId: string,
+  code: string | null,
+  on: Queryable = db,
+): Promise<void> {
+  await on.query(`UPDATE carts SET promo_code = $2 WHERE id = $1`, [
+    cartId,
+    code === null ? null : code.trim().toUpperCase(),
+  ]);
+}
+
+export async function promoCodeOf(cartId: string, on: Queryable = db): Promise<string | null> {
+  const { rows } = await on.query<{ promo_code: string | null }>(
+    `SELECT promo_code FROM carts WHERE id = $1`,
+    [cartId],
+  );
+  return rows[0]?.promo_code ?? null;
+}

@@ -25,7 +25,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { ApiFailure, api } from '../app/api.ts';
 import { bindConfig, formatMoney } from '../app/core.ts';
-import type { CurrencyFormat, EffectiveConfig, FeatureGate, MoneyInput, Vocabulary } from '../app/core.ts';
+import type {
+  CurrencyFormat,
+  EffectiveConfig,
+  FeatureGate,
+  MoneyInput,
+  OrderStep,
+  Vocabulary,
+} from '../app/core.ts';
 import { applyStoreTheme, parseStoreTheme } from '../styles/store-theme.ts';
 import { storefront } from './api.ts';
 import type { CartData, StoreFace } from './api.ts';
@@ -46,6 +53,11 @@ export type StoreContextValue = {
   /** The config engine's two primitives. A component never branches on an industry name. */
   t: Vocabulary;
   has: FeatureGate;
+  /**
+   * The industry's own order steps, in order. Food's third is "Ready" and fashion's is "Out for delivery" —
+   * the tracking timeline renders THESE rather than words of its own.
+   */
+  orderSteps: readonly OrderStep[];
   money: (amount: MoneyInput) => string;
   cart: CartData;
   /** Replaces the cart with what the server says it is — called after every write. */
@@ -171,6 +183,7 @@ export function StoreProvider({ slug, children, fallback }: Props): ReactNode {
       currency,
       t: bound.t,
       has: bound.has,
+      orderSteps: config.orderSteps,
       money: (amount: MoneyInput) => formatMoney(amount, currency),
       cart,
       setCart,

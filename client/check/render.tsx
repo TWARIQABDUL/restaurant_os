@@ -32,6 +32,9 @@ import { CategoryNav, PromoBanner, SearchField, StoreHeader, StoreInfo, fulfilme
 import { OptionSheet, availableValues, matchVariant, unitPriceOf } from '../src/storefront/OptionSheet.tsx';
 import { CartSummary, StickyCartBar } from '../src/storefront/CartViews.tsx';
 import { ratingLine, relativeDay } from '../src/storefront/ProductPage.tsx';
+import { CartPage } from '../src/storefront/CartPage.tsx';
+import { CheckoutPage } from '../src/storefront/CheckoutPage.tsx';
+import { TrackPage, customerSteps, isStopped, stepIndexFor } from '../src/storefront/TrackPage.tsx';
 import { tileFor } from '../src/storefront/tiles.ts';
 import { formatMoney } from '../src/app/core.ts';
 
@@ -350,6 +353,13 @@ const STORE_VALUE: StoreContextValue = {
   // The real vocabulary and gates come from the config engine; the gate only needs them to answer.
   t: ((key: string, form?: string) => (form === 'one' ? key : `${key}s`)) as StoreContextValue['t'],
   has: () => true,
+  // Food's steps, from V002's own template — which is what the tracking timeline renders.
+  orderSteps: [
+    { key: 'new', label: 'New' },
+    { key: 'preparing', label: 'Preparing' },
+    { key: 'ready', label: 'Ready' },
+    { key: 'delivered', label: 'Delivered' },
+  ],
   money: (amount) => formatMoney(amount, CURRENCY),
   cart: {
     id: 'cart',
@@ -414,6 +424,85 @@ for (const [name, node] of storefrontParts) {
 
 expect(storefrontParts.length >= 9, `the storefront has ${storefrontParts.length} parts rendered`);
 
+// --- milestone 17: checkout ----------------------------------------------------
+//
+// The timeline is the piece worth asserting rather than eyeballing: it is the one place a customer is told
+// where their order is, and the mapping from V004's twelve statuses to a template's four steps is an ANSWER
+// to a Part 9 question rather than something the boards settled.
+
+/** V002's own two, which differ in their third step — which is the whole point of reading them from config. */
+const FOOD_STEPS = [
+  { key: 'new', label: 'New' },
+  { key: 'preparing', label: 'Preparing' },
+  { key: 'ready', label: 'Ready' },
+  { key: 'delivered', label: 'Delivered' },
+];
+const FASHION_STEPS = [
+  { key: 'new', label: 'New' },
+  { key: 'packed', label: 'Packed' },
+  { key: 'out_for_delivery', label: 'Out for delivery' },
+  { key: 'delivered', label: 'Delivered' },
+];
+
+// A customer is not shown that a merchant pressed Accept.
+expect(stepIndexFor('pending') === 0, 'a new order is at the first step');
+expect(stepIndexFor('approved') === 0, 'accepted is still the first step to a customer');
+expect(stepIndexFor('preparing') === 1, 'preparing is the second');
+expect(stepIndexFor('ready') === 2 && stepIndexFor('assigned') === 2 && stepIndexFor('out') === 2,
+  'ready, assigned and out are all the third step — the shop is done with it');
+expect(stepIndexFor('delivered') === 3 && stepIndexFor('collected') === 3, 'both endings are the last step');
+for (const stopped of ['rejected', 'cancelled', 'returned', 'closed_return']) {
+  expect(stepIndexFor(stopped) === null, `${stopped} has no step on the timeline`);
+  expect(isStopped(stopped), `${stopped} ends the order`);
+}
+expect(!isStopped('out'), 'an order on its way has not stopped');
+
+// The payment step is inserted second, and ONLY for an order paid online.
+{
+  const online = customerSteps(FOOD_STEPS, true);
+  expect(online.length === 5, 'an online order has the template four plus Payment confirmed');
+  expect(online[1]?.key === 'payment_confirmed', 'and it goes second, where the board draws it');
+  expect(online[1]?.isPayment === true, 'it is marked as the payment step, not a status step');
+  expect(online[1]?.fromStatus === null, 'because no status advances it — payment_status does');
+
+  const cash = customerSteps(FOOD_STEPS, false);
+  expect(cash.length === 4, 'a cash order has no payment step: the money arrives at the door');
+  expect(cash.every((step) => !step.isPayment), 'and nothing on its timeline sits unticked all journey');
+}
+
+// The LABELS are the template's, which is the claim Industries makes.
+expect(
+  customerSteps(FASHION_STEPS, false).map((s) => s.label).join(' → ') ===
+    'New → Packed → Out for delivery → Delivered',
+  'a fashion store gets its own words',
+);
+expect(
+  customerSteps(FOOD_STEPS, false).map((s) => s.label).join(' → ') === 'New → Preparing → Ready → Delivered',
+  'and a restaurant gets its own',
+);
+// Same component, same mapping, different words — with no branch on an industry anywhere.
+expect(
+  customerSteps(FOOD_STEPS, false).map((s) => s.fromStatus).join(',') ===
+    customerSteps(FASHION_STEPS, false).map((s) => s.fromStatus).join(','),
+  'the positions are identical across industries; only the labels differ',
+);
+expect(customerSteps([], true).length === 0, 'a template with no steps produces no timeline');
+
+const checkoutParts: readonly (readonly [string, ReactNode])[] = [
+  ['Shop · cart', inStore(<CartPage onBack={noop} onCheckout={noop} />)],
+  ['Shop · checkout', inStore(<CheckoutPage onBack={noop} onHome={noop} onTrack={noop} onSignIn={noop} />)],
+  // The tracking page renders its loading state here: it fetches on mount, and renderToStaticMarkup runs no
+  // effects. That IS the first paint, and getting it right is what this gate is for.
+  ['Shop · tracking', inStore(<TrackPage code={'a'.repeat(32)} onHome={noop} />)],
+];
+
+for (const [name, node] of checkoutParts) {
+  const html = render(name, node);
+  allHtml += html;
+  kitHtml += html;
+}
+
+
 /**
  * The rendered text, with tags removed and the entities React escapes decoded.
  *
@@ -454,6 +543,12 @@ for (const phrase of [
   'Delivery 25–35 min · from 1,000 RWF',
   'Sold out while you were choosing',
   'The total is confirmed before you pay.',
+  // Checkout's own wording, milestone 17.
+  'Your cart is empty',
+  'Add something you like and it will show up here.',
+  'We text your receipt and delivery updates here.',
+  'Secure payment · SMS receipt after you pay',
+  'Ordered before? Sign in',
 ]) {
   expect(visibleText.includes(phrase), `the boards' wording is missing: ${phrase}`);
 }
