@@ -19,10 +19,13 @@ import type {
 /** What every screen needs to render a store's identity. */
 export type StoreSummary = Pick<
   StoresRow,
-  'id' | 'slug' | 'name' | 'status' | 'country' | 'selling_currency' | 'plan_key'
+  'id' | 'slug' | 'name' | 'status' | 'country' | 'selling_currency' | 'plan_key' | 'time_zone'
 >;
 
-const SUMMARY_COLUMNS = 'id, slug, name, status, country, selling_currency, plan_key';
+// time_zone joined the summary at milestone 19. Every console screen that prints a time needs it: V021 made
+// the store's own zone the answer to "what does today mean", and a screen formatting a timestamp in the
+// BROWSER's zone would put a merchant's evening orders on tomorrow's date the moment they travelled.
+const SUMMARY_COLUMNS = 'id, slug, name, status, country, selling_currency, plan_key, time_zone';
 
 export async function findById(storeId: string, on: Queryable = db): Promise<StoreSummary | null> {
   const { rows } = await on.query<StoreSummary>(

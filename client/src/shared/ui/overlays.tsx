@@ -22,7 +22,16 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Button } from './Button.tsx';
 
-function useDialog(open: boolean): React.RefObject<HTMLDialogElement | null> {
+/**
+ * Opens and closes a <dialog> from a boolean.
+ *
+ * EXPORTED AT MILESTONE 19 for the merchant console's notifications panel, which is none of the three
+ * components below: `Notifications` draws a popover anchored under the bell, not a sheet, a drawer or a
+ * confirmation. What it does need is everything <dialog> gives — the focus trap, Escape, the inert background —
+ * so it borrows the mechanism rather than re-deciding it. Keeping this in the kit is what stops a second idea
+ * of "how a dialog opens" appearing in another folder.
+ */
+export function useDialog(open: boolean): React.RefObject<HTMLDialogElement | null> {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {

@@ -307,6 +307,33 @@ export type StoreCurrency = {
  * §3: "one formatter driven by the currency table". This is the read that drives it, so no screen
  * has to carry its own idea of how RWF is written.
  */
+/**
+ * The same, by store id — for the merchant console, which knows the uuid.
+ *
+ * A SECOND FUNCTION RATHER THAN A SECOND BRANCH, which is the rule config.ts already follows for
+ * inputsBySlug/inputsByStoreId. One function taking "either a slug or an id" has to decide which it was
+ * given, and a uuid that happens to be a valid slug is exactly the input that decides wrong.
+ */
+export async function findCurrencyByStoreId(
+  storeId: string,
+  on: Queryable = db,
+): Promise<StoreCurrency | null> {
+  const { rows } = await on.query<StoreCurrency>(
+    // The cast on cash_rounding is load-bearing for the same reason as below.
+    `SELECT c.code,
+            c.symbol,
+            c.symbol_position      AS "symbolPosition",
+            c.decimals,
+            c.thousands_separator  AS "thousandsSeparator",
+            c.cash_rounding::int   AS "cashRounding"
+       FROM stores s
+       JOIN currencies c ON c.code = s.selling_currency
+      WHERE s.id = $1`,
+    [storeId],
+  );
+  return rows[0] ?? null;
+}
+
 export async function findCurrencyBySlug(
   slug: string,
   on: Queryable = db,

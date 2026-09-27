@@ -207,33 +207,60 @@ export function Radio({
   );
 }
 
-/** A switch — "Track stock", "Show on store". Toggles immediately; there is no Save beside it. */
+/**
+ * A switch — "Track stock", "Show on store". Toggles immediately; there is no Save beside it.
+ *
+ * TWO PROPS ARRIVED AT MILESTONE 19, both because the merchant console draws the same switch differently and
+ * the alternative was a second switch.
+ *
+ *   `labelPosition` — `Notifications` puts its footer label on the left and the switch hard right, where
+ *     `AddProduct` puts the switch first and the label after it. Same control, two rows.
+ *   `tone` — a store's switch is the store's primary colour; the console's is Vendlyfy's green, because the
+ *     console chrome is not themed by the store it happens to be showing (see tokens.css on --color-brand).
+ *
+ * Both default to what the kit already did, so every existing use is unchanged.
+ */
 export function Switch({
   label,
   checked,
   onChange,
   disabled = false,
+  labelPosition = 'after',
+  tone = 'store',
 }: {
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
+  labelPosition?: 'before' | 'after';
+  tone?: 'store' | 'brand';
 }): ReactNode {
-  return (
+  const control = (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`flex h-[26px] w-11 shrink-0 rounded-pill p-[3px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${
+        checked
+          ? `justify-end ${tone === 'brand' ? 'bg-brand' : 'bg-store-primary'}`
+          : 'justify-start bg-control-line'
+      } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+    >
+      <span aria-hidden="true" className="size-5 rounded-pill bg-white" />
+    </button>
+  );
+
+  return labelPosition === 'before' ? (
+    <span className="flex w-full items-center justify-between gap-2 text-body text-ink">
+      <span>{label}</span>
+      {control}
+    </span>
+  ) : (
     <span className="flex items-center gap-2 text-body text-ink">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={`flex h-[26px] w-11 shrink-0 rounded-pill p-[3px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${
-          checked ? 'justify-end bg-store-primary' : 'justify-start bg-control-line'
-        } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
-      >
-        <span aria-hidden="true" className="size-5 rounded-pill bg-white" />
-      </button>
+      {control}
       {label}
     </span>
   );

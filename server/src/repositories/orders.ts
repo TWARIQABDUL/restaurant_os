@@ -213,3 +213,60 @@ export async function findByTrackingCode(
     placedFor: row.guest_name ?? row.customer_name,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Accepting an order — milestone 19, for the new-order alert
+// ---------------------------------------------------------------------------
+//
+// WHY THIS IS HERE AND NOT IN MILESTONE 20. `Notifications` gives the new-order alert three actions — "Accept",
+// "Open in Orders", "Silence" — and an alert whose primary action does nothing is not a shipped alert. So the
+// one transition the alert needs lands with the alert. Everything else the `Orders` board does — declining with
+// a reason, the rider picker, cash confirmation, returns — is milestone 20's, and it extends this file.
+//
+// WHAT ACCEPTING IS, EXACTLY: pending → approved, plus the event that records who did it. It moves no money and
+// reserves no stock, because `place_order()` already did both when the customer placed it — which is what makes
+// this a safe thing to ship on its own rather than half of a larger operation.
+//
+// IDEMPOTENT BY THE ROW LOCK, and the reason is the one the alert creates: the same order is on every signed-in
+// screen at the store, so two people pressing Accept within the same second is the expected case, not an edge
+// one. The lock serialises them; the second finds the order already approved and is told it worked, because it
+// did — somebody accepted the order, which is what the person asked for. What is NOT idempotent is accepting
+// something already declined or cancelled: that is a different answer to the same question, and saying "done"
+// would tell a merchant an order is coming that nobody is making.
+
+export type AcceptOutcome = {
+  status: OrderStatus;
+  /** False when somebody else got there first. The screen says "already accepted" rather than "accepted". */
+  changed: boolean;
+  orderNumber: number;
+};
+
+export async function accept(
+  storeId: string,
+  orderId: string,
+  actor: { userId: string; role: string | null },
+  tx: Queryable,
+): Promise<AcceptOutcome | null> {
+  // The store id is in the WHERE clause, not checked afterwards: an order id from another store must look
+  // exactly like an order id that does not exist.
+  const { rows } = await tx.query<{ status: OrderStatus; order_number: number }>(
+    `SELECT status, order_number FROM orders WHERE id = $1 AND store_id = $2 FOR UPDATE`,
+    [orderId, storeId],
+  );
+  const found = rows[0];
+  if (found === undefined) return null;
+
+  if (found.status !== 'pending') {
+    return { status: found.status, changed: false, orderNumber: found.order_number };
+  }
+
+  await tx.query(`UPDATE orders SET status = 'approved' WHERE id = $1`, [orderId]);
+  // V004's order_events is append-only and IS the order's history; the trigger on orders refuses an illegal
+  // move, so this row can only ever describe one that happened.
+  await tx.query(
+    `INSERT INTO order_events (order_id, store_id, from_status, to_status, actor_id, actor_role, note)
+          VALUES ($1, $2, 'pending', 'approved', $3, $4, $5)`,
+    [orderId, storeId, actor.userId, actor.role, 'Accepted from the new-order alert'],
+  );
+  return { status: 'approved', changed: true, orderNumber: found.order_number };
+}

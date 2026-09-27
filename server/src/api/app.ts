@@ -39,6 +39,10 @@ import healthRoutes from '../routes/health.ts';
 import momoWebhookRoutes from '../routes/momoWebhook.ts';
 import storefrontCheckoutRoutes from '../routes/storefrontCheckout.ts';
 import storefrontAccountRoutes from '../routes/storefrontAccount.ts';
+import storeDashboardRoutes from '../routes/storeDashboard.ts';
+import storeOrderRoutes from '../routes/storeOrders.ts';
+import storeShellRoutes from '../routes/storeShell.ts';
+import storeNotificationRoutes from '../routes/storeNotifications.ts';
 import { publicInvitesRouter, storeInvitesRouter } from '../routes/invites.ts';
 import { passwordRouter, staffPasswordRouter } from '../routes/password.ts';
 
@@ -56,6 +60,10 @@ export const REQUIRED_PERMISSIONS = [
   'wallet.read',
   'payouts.request',
   'settings.write',
+  // Milestone 19. The dashboard and the notification panel ask for orders.read; the pause switch asks for
+  // orders.update, because pausing is what the person in the kitchen does and settings is not where that lives.
+  'orders.read',
+  'orders.update',
 ] as const;
 
 export function createApp(): Express {
@@ -126,6 +134,15 @@ export function createApp(): Express {
   app.use('/api/stores/:storeId/invites', storeInvitesRouter);
   app.use('/api/stores/:storeId/wallet', walletRouter);
   app.use('/api/stores/:storeId/payouts', payoutsRouter);
+  // The console's frame, loaded once per session: the store, the currency, the config, the published theme and
+  // the sidebar's badges. Every console screen reads it, so it is guarded by the lowest permission any console
+  // role holds — see the route's header.
+  app.use('/api/stores/:storeId/shell', storeShellRoutes);
+  // The pause switch lives under /dashboard/accepting rather than at its own mount, so nothing has two URLs.
+  app.use('/api/stores/:storeId/dashboard', storeDashboardRoutes);
+  // One endpoint so far — accepting an order, which the new-order alert needs. Milestone 20 fills this in.
+  app.use('/api/stores/:storeId/orders', storeOrderRoutes);
+  app.use('/api/stores/:storeId/notifications', storeNotificationRoutes);
   app.use('/api/stores/:storeId/settings', storeSettingsRoutes);
   app.use('/api/stores/:storeId/config', storeConfigRoutes);
   app.use('/api/stores/:storeId/theme', storeThemeRoutes);

@@ -45,6 +45,25 @@ export interface AuditLogRow {
   created_at: Date;
 }
 
+/** `auth_codes.purpose`, from its CHECK constraint. */
+export type AuthCodesPurpose =
+  | 'platform_two_step'
+  | 'password_reset';
+
+/**
+ * A short code sent out of band: the Vendlyfy team's 2-step code, and a password reset. Hashed at rest and good once, with attempts bounded at the column so no endpoint can forget to bound them.
+ */
+export interface AuthCodesRow {
+  id: string;
+  user_id: string;
+  purpose: AuthCodesPurpose;
+  code_hash: Uint8Array;
+  attempts: number;
+  created_at: Date;
+  expires_at: Date;
+  consumed_at: Date | null;
+}
+
 /**
  * The "pick several" choices on one line — Cheese and Extra sauce. The single-select choices are already the variant, so they are not repeated here.
  */
@@ -65,6 +84,8 @@ export interface CartItemsRow {
   quantity: number;
   created_at: Date;
   updated_at: Date;
+  /** The line's "pick several" option value ids, sorted and comma-joined; empty for a line with none. Denormalised from cart_item_option_values so that "same product, same options" is a unique key the database can enforce, and held to it by cart_items_signature_agrees. */
+  option_signature: string;
 }
 
 /**
@@ -79,6 +100,8 @@ export interface CartsRow {
   expires_at: Date;
   created_at: Date;
   updated_at: Date;
+  /** A code the customer typed and the cart is holding. What it is WORTH is decided by apply_promo_code() at placement, against the order — never stored here. */
+  promo_code: string | null;
 }
 
 /**
@@ -236,6 +259,8 @@ export interface CountriesRow {
   default_currency_code: string;
   is_enabled: boolean;
   created_at: Date;
+  /** The IANA zone a new store in this country starts with. A default, not a constraint: a country can span zones and a merchant may correct it. */
+  default_time_zone: string;
 }
 
 /** `currencies.rate_source`, from its CHECK constraint. */
@@ -272,6 +297,19 @@ export interface CurrenciesRow {
   /** Display conversion only: "≈ $2.40" beside the real price. The charge is always in the store's own currency. */
   usd_rate: string | null;
   rate_updated_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * A customer's saved delivery addresses. No store_id: V001 makes a customer belong to exactly one store, so an address's store is its owner's.
+ */
+export interface CustomerAddressesRow {
+  id: string;
+  user_id: string;
+  label: string;
+  address: string;
+  is_default: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -808,6 +846,8 @@ export interface OrdersRow {
   updated_at: Date;
   /** Derived, never passed in: rider when there is a rider, NULL otherwise. It exists only to carry the composite FK that makes assigning a manager or a customer as the rider unrepresentable. */
   rider_member_role: string | null;
+  /** What the rider collects for a cash order: total_amount rounded to the currency's cash step. NULL for anything not paid in cash. MAINTAINED BY orders_cash_due_derive — no writer sets it. rider_cash_settlements reconciles against THIS, never against total_amount. */
+  cash_due_amount: string | null;
 }
 
 /**
@@ -1004,6 +1044,8 @@ export interface ProductsRow {
   position: number;
   created_at: Date;
   updated_at: Date;
+  /** At or below this many in stock, the storefront badges the product "Few left". Zero means never. Only meaningful when track_stock is true. */
+  low_stock_threshold: number;
 }
 
 /** `promotions.discount_type`, from its CHECK constraint. */
@@ -1242,6 +1284,44 @@ export interface RolePermissionsRow {
   permission: string;
 }
 
+/** `staff_invites.role`, from its CHECK constraint. */
+export type StaffInvitesRole =
+  | 'admin'
+  | 'manager'
+  | 'rider';
+
+/**
+ * An offer of a store membership, accepted by the invitee. The consent that makes adding somebody to a store safe — see milestone 11's POST /members, which refuses to do it without one.
+ */
+export interface StaffInvitesRow {
+  id: string;
+  store_id: string;
+  /** Not a foreign key to users: the ordinary case is inviting somebody with no account yet. */
+  email: string;
+  role: StaffInvitesRole;
+  invitee_name: string;
+  token_hash: Uint8Array;
+  invited_by: string | null;
+  created_at: Date;
+  expires_at: Date;
+  accepted_at: Date | null;
+  accepted_user_id: string | null;
+  revoked_at: Date | null;
+}
+
+/**
+ * When a store is open, one row per open day. A day with no row is closed. closes_at <= opens_at means it closes after midnight — see store_open_state().
+ */
+export interface StoreHoursRow {
+  store_id: string;
+  day_of_week: number;
+  opens_at: string;
+  /** Earlier than or equal to opens_at means the next day: 18:00-01:00 is a Monday row that closes on Tuesday. */
+  closes_at: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
 /** `store_members.role`, from its CHECK constraint. */
 export type StoreMembersRole =
   | 'owner'
@@ -1421,6 +1501,12 @@ export interface StoresRow {
   config_overrides: unknown;
   /** Every store is on a plan. Defaults to the Starter plan rather than being nullable, because "no plan" is not a state the billing or entitlement code can read. */
   plan_key: string;
+  /** The number shown on the storefront, as a tel: link. The shop's, not a person's — users.phone is that. */
+  public_phone: string | null;
+  /** The store's own clock, as an IANA name. Every "today", every opening hour and every closing time is read in it. Filled from the store's country when a writer does not give one. */
+  time_zone: string;
+  /** False while a merchant has paused new orders from the dashboard. Distinct from status, which is the platform's: pausing is a busy kitchen, suspension is a compliance decision. */
+  accepting_orders: boolean;
 }
 
 /** `users.scope`, from its CHECK constraint. */
@@ -1442,6 +1528,8 @@ export interface UsersRow {
   name: string;
   created_at: Date;
   updated_at: Date;
+  /** Bumped to sign out every device. A session token carries the version it was issued at and the guard compares; a password change therefore invalidates every other session, which is what Auth promises. */
+  session_version: number;
 }
 
 /** `wallet_ledger.entry_type`, from its CHECK constraint. */
@@ -1528,6 +1616,7 @@ export interface WithdrawalsRow {
 /** Every table, for a repository layer that is generic over one. */
 export interface Database {
   audit_log: AuditLogRow;
+  auth_codes: AuthCodesRow;
   cart_item_option_values: CartItemOptionValuesRow;
   cart_items: CartItemsRow;
   carts: CartsRow;
@@ -1538,6 +1627,7 @@ export interface Database {
   complaints: ComplaintsRow;
   countries: CountriesRow;
   currencies: CurrenciesRow;
+  customer_addresses: CustomerAddressesRow;
   delivery_zone_areas: DeliveryZoneAreasRow;
   delivery_zones: DeliveryZonesRow;
   industry_template_version_modules: IndustryTemplateVersionModulesRow;
@@ -1587,6 +1677,8 @@ export interface Database {
   rider_cash_settlements: RiderCashSettlementsRow;
   rider_profiles: RiderProfilesRow;
   role_permissions: RolePermissionsRow;
+  staff_invites: StaffInvitesRow;
+  store_hours: StoreHoursRow;
   store_members: StoreMembersRow;
   store_order_counters: StoreOrderCountersRow;
   store_payment_methods: StorePaymentMethodsRow;
@@ -1603,6 +1695,7 @@ export interface Database {
 /** Table names as a value, so a runtime check can be exhaustive. */
 export const TABLE_NAMES = [
   'audit_log',
+  'auth_codes',
   'cart_item_option_values',
   'cart_items',
   'carts',
@@ -1613,6 +1706,7 @@ export const TABLE_NAMES = [
   'complaints',
   'countries',
   'currencies',
+  'customer_addresses',
   'delivery_zone_areas',
   'delivery_zones',
   'industry_template_version_modules',
@@ -1662,6 +1756,8 @@ export const TABLE_NAMES = [
   'rider_cash_settlements',
   'rider_profiles',
   'role_permissions',
+  'staff_invites',
+  'store_hours',
   'store_members',
   'store_order_counters',
   'store_payment_methods',

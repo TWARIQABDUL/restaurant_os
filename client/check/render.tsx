@@ -39,6 +39,16 @@ import { AccountPage, complaintBadge, orderBadge } from '../src/storefront/Accou
 import { SignInSheet } from '../src/storefront/SignInSheet.tsx';
 import { ComplaintSheet } from '../src/storefront/ComplaintSheet.tsx';
 import { tileFor } from '../src/storefront/tiles.ts';
+import { ShellContext } from '../src/console/ShellProvider.tsx';
+import type { ShellContextValue } from '../src/console/ShellProvider.tsx';
+import type { DashboardData, OrderAlert as OrderAlertData } from '../src/console/api.ts';
+import { MobileTabs, Sidebar } from '../src/console/Sidebar.tsx';
+import { Dashboard } from '../src/console/Dashboard.tsx';
+import { NotificationsPanel } from '../src/console/NotificationsPanel.tsx';
+import { OrderAlert } from '../src/console/OrderAlert.tsx';
+import { Console } from '../src/console/Console.tsx';
+import { MOBILE_TABS, NAV_GROUPS, consoleHref, hrefFor, maySee } from '../src/console/nav.ts';
+import { dateline, greeting, notificationLine, relativeWhen, toneClasses, waitingClock } from '../src/console/lines.ts';
 import { formatMoney } from '../src/app/core.ts';
 
 const problems: string[] = [];
@@ -570,6 +580,304 @@ for (const [name, node] of [...checkoutParts, ...accountParts]) {
 }
 
 
+// --- milestone 19: the merchant console ---------------------------------------
+//
+// THE SENTENCES ARE THE THING WORTH ASSERTING HERE. V010 stores a notification's VALUES and never its words, so
+// lines.ts writes every sentence in the console's inbox — which makes it the one place where a wrong key or a
+// missing branch shows up as a blank row in front of a merchant. All eight seeded types are checked, and so is
+// the ninth case: a type this build has never heard of.
+{
+  const line = (type: string, payload: Record<string, unknown>) =>
+    notificationLine(
+      {
+        id: 'n',
+        type,
+        tone: 'info',
+        route: '/app/orders',
+        payload,
+        orderId: null,
+        complaintId: null,
+        reviewId: null,
+        withdrawalId: null,
+        unread: true,
+        createdAt: new Date().toISOString(),
+      },
+      CURRENCY,
+    );
+
+  const placed = line('order_placed', { order_number: 1031, total_amount: '8500', customer_name: 'Aimable K.' });
+  expect(placed.title === 'New order #1031 · 8,500 RWF', `the new-order line is the board's: ${placed.title}`);
+  expect(
+    placed.sub === 'Aimable K. · waiting for you to accept',
+    `and so is its second line: ${placed.sub}`,
+  );
+
+  // The board writes "Eric picked up #1026" where the payload holds a full name.
+  expect(
+    line('order_picked_up', { order_number: 1026, rider_name: 'Claude Habineza' }).title === 'Claude picked up #1026',
+    'a rider is named by their first name, as the board does',
+  );
+
+  expect(line('order_delivered', { order_number: 1024, customer_name: 'Sandrine K.' }).title === '#1024 delivered', 'delivered');
+  expect(
+    line('order_declined', { order_number: 1022, actor_name: 'Patrick Mukama', reason: 'An item is out of stock' })
+      .title === '#1022 declined by Patrick',
+    'a decline names who did it',
+  );
+
+  // The reason arrives as V008's code and is shown in the words the customer picked from.
+  expect(
+    line('complaint_filed', { order_number: 1023, reason: 'item_missing', customer_name: 'Pacifique I.' }).sub ===
+      'Missing item · Pacifique I.',
+    'a complaint reason is a code in the database and a phrase on the screen',
+  );
+
+  expect(
+    line('review_posted', { rating: 2, product_name: 'Grilled chicken' }).title === 'New 2★ review on Grilled chicken',
+    'the review line carries the stars',
+  );
+  expect(
+    line('review_posted', { rating: 2, product_name: 'Grilled chicken' }).sub === 'No comment, just a rating.',
+    'and a rating with no words says so rather than quoting nothing — `comment` is not a required key',
+  );
+  expect(
+    line('review_posted', { rating: 5, product_name: 'Fries', comment: 'Perfect' }).sub === '“Perfect”',
+    'a review with words is quoted',
+  );
+
+  expect(
+    line('payout_sent', { amount: '212000', destination: 'MTN MoMo 078 ••• 4412' }).title ===
+      'Payout sent · 212,000 RWF',
+    'a payout is money, formatted by the store\'s own currency',
+  );
+  expect(line('identity_verified', {}).sub === 'Payouts are unlocked', 'identity verified');
+
+  // A payload written with a thousands separator in it. parseDecimal() throws on that, and one bad row must not
+  // take the panel down — see the money helper in lines.ts.
+  expect(line('payout_sent', { amount: '212,000', destination: 'x' }).title !== '', 'a malformed amount still renders');
+
+  const unknown = line('order_returned', { order_number: 9 });
+  expect(unknown.title === 'Order returned', `an unknown type is still a readable line: ${unknown.title}`);
+
+  // V010's five tones are the kit's five status pairs, so the panel carries no colour of its own.
+  expect(toneClasses('good').includes('status-success'), 'good is the success pair');
+  expect(toneClasses('attention').includes('status-warn'), 'attention is the warn pair');
+  expect(toneClasses('progress').includes('status-progress'), "progress is Main's sixth tone");
+}
+
+// The clocks. Each one is a rule about which zone the answer belongs to.
+{
+  const now = new Date('2026-09-27T09:30:00Z');
+  const ago = (minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString();
+
+  expect(relativeWhen(ago(0), 'Africa/Kigali', now) === 'Just now', 'under a minute is "Just now"');
+  expect(relativeWhen(ago(2), 'Africa/Kigali', now) === '2 min ago', 'minutes');
+  expect(relativeWhen(ago(120), 'Africa/Kigali', now) === '2 h ago', 'hours');
+  // Kigali is UTC+2, so 09:30Z is 11:30 local and eight hours earlier is 03:30 the SAME local day.
+  expect(
+    relativeWhen(ago(480), 'Africa/Kigali', now).startsWith('Today '),
+    `beyond six hours it gives the clock time: ${relativeWhen(ago(480), 'Africa/Kigali', now)}`,
+  );
+  expect(relativeWhen(ago(60 * 26), 'Africa/Kigali', now) === 'Yesterday', 'yesterday');
+  expect(relativeWhen('not a date', 'Africa/Kigali', now) === '', 'a value that is not a timestamp renders nothing');
+
+  // THE ZONE DECIDES WHAT "TODAY" MEANS, which is the bug V021 was written to fix. 23:00 in Kigali is 21:00 UTC
+  // on the same date, but 23:00 in Honolulu is the next date in UTC — so the same instant is a different day.
+  expect(
+    relativeWhen('2026-09-26T23:00:00Z', 'Pacific/Honolulu', now) !== relativeWhen('2026-09-26T23:00:00Z', 'Africa/Kigali', now),
+    'the same instant reads as a different day in two zones, which is why the store\'s zone is carried',
+  );
+
+  expect(greeting('Africa/Kigali', new Date('2026-09-27T06:00:00Z')) === 'Good morning', '08:00 in Kigali is morning');
+  expect(greeting('Africa/Kigali', new Date('2026-09-27T12:00:00Z')) === 'Good afternoon', '14:00 is afternoon');
+  expect(greeting('Africa/Kigali', new Date('2026-09-27T18:00:00Z')) === 'Good evening', '20:00 is evening');
+
+  expect(dateline('2026-09-27', 'Africa/Kigali') === 'Sunday, 27 September', `the dateline: ${dateline('2026-09-27', 'Africa/Kigali')}`);
+  expect(waitingClock(7) === '0:07', 'the alert counts 0:07');
+  expect(waitingClock(605) === '10:05', 'and past ten minutes');
+}
+
+// The navigation table. What is asserted is its RULES, not its contents — a milestone that adds a screen changes
+// the data, and a test that listed the labels would fail for the right change.
+{
+  const ids = NAV_GROUPS.flat().map((item) => item.id);
+  expect(new Set(ids).size === ids.length, 'no nav id appears twice');
+  expect(NAV_GROUPS.length === 5, `the board draws five groups, separated by rules: ${NAV_GROUPS.length}`);
+  expect(MOBILE_TABS.length === 5, 'the phone bar has five items');
+  expect(
+    NAV_GROUPS.flat().filter((item) => item.built).length >= 1,
+    'at least the dashboard is built, or the console has no screen',
+  );
+  expect(
+    NAV_GROUPS.flat().every((item) => item.built || item.milestone > 19),
+    'every unbuilt item names the milestone that builds it',
+  );
+
+  // A manager holds neither wallet.read nor settings.write, and Auth promised them so in as many words.
+  const managerPermissions = ['orders.read', 'orders.update', 'orders.assign_rider', 'products.write', 'stock.write'];
+  const visible = NAV_GROUPS.flat().filter((item) => maySee(item, managerPermissions)).map((i) => i.id);
+  expect(!visible.includes('money'), 'a manager does not see Money');
+  expect(!visible.includes('settings'), 'nor Settings');
+  expect(visible.includes('orders'), 'but does see Orders');
+  expect(visible.includes('riders'), 'and Riders & cash, which is the job they do');
+
+  expect(hrefFor('nyama', '/orders') === '/app/nyama/orders', 'the console path carries the slug');
+  expect(hrefFor('nyama', '') === '/app/nyama', 'and the dashboard is the bare path');
+  // V010 stores '/app/orders' with the store left out; the panel puts it back.
+  expect(consoleHref('nyama', '/app/orders') === '/app/nyama/orders', "a notification's route gains the store");
+  expect(consoleHref('nyama', '/app/money') === '/app/nyama/money', 'and so does a payout\'s');
+}
+
+// --- and every console component renders --------------------------------------
+const CONSOLE_SHELL: ShellContextValue = {
+  store: {
+    id: 's1',
+    slug: 'nyama',
+    name: 'Nyama & Co.',
+    status: 'active',
+    country: 'RW',
+    timeZone: 'Africa/Kigali',
+    currency: CURRENCY,
+  },
+  me: {
+    id: 'u1',
+    name: 'Aline Uwase',
+    role: 'owner',
+    permissions: ['orders.read', 'orders.update', 'wallet.read', 'settings.write', 'products.write'],
+  },
+  stores: [
+    { storeId: 's1', slug: 'nyama', name: 'Nyama & Co.', role: 'owner' },
+    { storeId: 's2', slug: 'inzu', name: 'Inzu Threads', role: 'admin' },
+  ],
+  t: ((key: string, form?: string) => (form === 'one' ? key : `${key}s`)) as ShellContextValue['t'],
+  has: () => true,
+  currency: CURRENCY,
+  money: (amount) => formatMoney(amount, CURRENCY),
+  badges: { orders: 3, complaints: 2, reviews: 1, notifications: 7 },
+  may: () => true,
+  refreshBadges: noop,
+  setBadges: noop,
+};
+
+function inConsole(node: ReactNode): ReactNode {
+  return <ShellContext.Provider value={CONSOLE_SHELL}>{node}</ShellContext.Provider>;
+}
+
+const CONSOLE_ORDER = {
+  id: 'o1',
+  orderNumber: 1026,
+  trackingCode: 'a'.repeat(32),
+  customer: 'Grace Mukamana',
+  fulfilment: 'delivery' as const,
+  itemCount: 3,
+  total: '10200.00',
+  paymentMethod: 'mtn_momo',
+  paymentStatus: 'paid',
+  placedAt: new Date(Date.now() - 2 * 60_000).toISOString(),
+};
+
+const DASHBOARD: DashboardData = {
+  me: { name: 'Aline Uwase', role: 'owner' },
+  counts: {
+    ordersToday: 24,
+    ordersWaiting: 3,
+    productsActive: 182,
+    productsDraft: 4,
+    lowStockVariants: 7,
+    isOpen: true,
+    closesAt: '22:00',
+    acceptingOrders: true,
+    localDate: '2026-09-27',
+  },
+  sales: { salesToday: '125000.00', salesSameDayLastWeek: '111000.00', changePercent: 12 },
+  week: [1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => ({
+    day: `2026-09-2${dayOfWeek}`,
+    dayOfWeek,
+    sales: String(60_000 + dayOfWeek * 9_000),
+    orders: dayOfWeek,
+  })),
+  needsAttention: [CONSOLE_ORDER],
+  recent: [{ ...CONSOLE_ORDER, status: 'preparing' }],
+  lowestStock: { productName: 'Passion Juice', variantLabel: null, left: 4 },
+  unreadNotifications: 7,
+};
+
+const ALERT: OrderAlertData = {
+  orderId: 'o9',
+  orderNumber: 1034,
+  trackingCode: 'b'.repeat(32),
+  customer: 'Aimable K.',
+  total: '8500.00',
+  fulfilment: 'delivery',
+  paymentMethod: 'mtn_momo',
+  paymentStatus: 'paid',
+  deliveryAddress: 'Kimihurura',
+  placedAt: new Date().toISOString(),
+  waitingSeconds: 7,
+};
+
+
+const consoleParts: readonly (readonly [string, ReactNode])[] = [
+  ['Sidebar', inConsole(<Sidebar active="dashboard" unread={7} onOpenNotifications={noop} navigate={noop} />)],
+  ['DashboardMobile · bottom bar', inConsole(<MobileTabs active="dashboard" navigate={noop} />)],
+  ['Dashboard', inConsole(<Dashboard data={DASHBOARD} onChanged={noop} />)],
+  // A manager's dashboard: no sales card, no chart, and the rest unchanged. The route omits the money rather
+  // than the screen hiding it, so this is the payload a manager actually receives.
+  [
+    'Dashboard · a manager, with no wallet.read',
+    inConsole(<Dashboard data={{ ...DASHBOARD, sales: null, week: null }} onChanged={noop} />),
+  ],
+  // A shop with nothing in it yet — the state a merchant sees on their first morning.
+  [
+    'Dashboard · a store with no orders yet',
+    inConsole(
+      <Dashboard
+        data={{
+          ...DASHBOARD,
+          counts: { ...DASHBOARD.counts, ordersToday: 0, ordersWaiting: 0, lowStockVariants: 0, productsDraft: 0 },
+          sales: { salesToday: '0', salesSameDayLastWeek: '0', changePercent: null },
+          week: DASHBOARD.week?.map((d) => ({ ...d, sales: '0', orders: 0 })) ?? null,
+          needsAttention: [],
+          recent: [],
+          lowestStock: null,
+        }}
+        onChanged={noop}
+      />,
+    ),
+  ],
+  // Paused, which is a different sentence from closed: the shop is open and the kitchen has stopped.
+  [
+    'Dashboard · new orders paused',
+    inConsole(
+      <Dashboard data={{ ...DASHBOARD, counts: { ...DASHBOARD.counts, acceptingOrders: false } }} onChanged={noop} />,
+    ),
+  ],
+  // The panel renders CLOSED here, which is its correct first paint: renderToStaticMarkup runs no effects, so
+  // the <dialog> has not been opened and the list has not been fetched.
+  [
+    'Notifications · panel',
+    inConsole(
+      <NotificationsPanel open onClose={noop} sound onSoundChange={noop} navigate={noop} onUnreadChange={noop} />,
+    ),
+  ],
+  ['Notifications · new-order alert', inConsole(<OrderAlert alert={ALERT} sound onSilence={noop} onAccepted={noop} navigate={noop} />)],
+  [
+    'Notifications · alert with sound off for this device',
+    inConsole(<OrderAlert alert={ALERT} sound={false} onSilence={noop} onAccepted={noop} navigate={noop} />),
+  ],
+  // The whole console, cold. It fetches on mount, so what this proves is that the first paint — the shell's
+  // loading state — renders rather than throwing.
+  ['Console · first paint', <Console slug="nyama" view={{ kind: 'dashboard' }} navigate={noop} />],
+];
+
+for (const [name, node] of consoleParts) {
+  const html = render(name, node);
+  allHtml += html;
+  kitHtml += html;
+}
+
+expect(consoleParts.length >= 10, `the console has ${consoleParts.length} parts rendered`);
+
 /**
  * The rendered text, with tags removed and the entities React escapes decoded.
  *
@@ -625,6 +933,22 @@ for (const phrase of [
   'Your cart (3 items) stays exactly as it is.',
   'If you can’t agree, the store can ask Vendlyfy to decide.',
   'Send to the store',
+  // The console's, milestone 19. The alert's long sentence is the specification for how the alert works, so it
+  // is the one most worth pinning: it says the chime repeats, and that it shows everywhere.
+  'Chime repeats every 20 seconds until someone accepts or opens it. Shows on every signed-in screen at this store.',
+  'Sound is off for this device. The alert still shows on screen.',
+  'Sound for new orders',
+  'Mark all as read',
+  'Your store is open',
+  'Pause new orders',
+  'New orders are paused',
+  'Needs your attention',
+  'Sales this week',
+  'Recent orders',
+  'Restock before tonight →',
+  '3 waiting for you →',
+  'View your store',
+  'Nothing waiting. New orders appear here the moment they arrive.',
 ]) {
   expect(visibleText.includes(phrase), `the boards' wording is missing: ${phrase}`);
 }

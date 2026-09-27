@@ -513,6 +513,124 @@ export async function seedStorefront(): Promise<void> {
   });
 }
 
+/**
+ * The merchant console's fixtures — milestone 19.
+ *
+ * WHAT THE DASHBOARD AND THE ALERT NEED IS ORDERS WITH DIFFERENT AGES AND STATUSES, because almost every figure
+ * on the screen is a question about which of those it counts. Two pending orders rather than one, and the older
+ * one placed half an hour ago: the alert is specified as "the order that has been waiting longest, not the newest
+ * one", and with a single pending order that assertion cannot fail.
+ *
+ * EVERY ORDER IS WRITTEN IN ITS OWN TRANSACTION for the reason seedStorefront() gives above — V004 requires an
+ * order to have at least one line and enforces it with a deferred constraint trigger, so an order written by
+ * itself is refused at its own commit.
+ *
+ * `placed_at` IS SET EXPLICITLY AND `status` IS WRITTEN DIRECTLY. Walking each order through
+ * order_status_transitions would be truer to production and is what db/seeds does, but these fixtures exist to
+ * fix the READ side: the dashboard's counts, the alert's choice and the badges. The one transition this milestone
+ * writes — pending → approved — is tested through the endpoint, where the trigger is live.
+ */
+export const CONSOLE = {
+  /** Pending, 30 minutes old. The alert must choose this one. */
+  oldestPending: uid(0x500),
+  /** Pending, 2 minutes old. */
+  newestPending: uid(0x501),
+  /** Already accepted, so it counts in "orders today" and not in "waiting". */
+  accepted: uid(0x502),
+  review: uid(0x510),
+} as const;
+
+/**
+ * Returns the complaint's id, because the fixture does not choose it.
+ *
+ * A COMPLAINT IS FILED THROUGH file_complaint(), not written row by row. V008 requires a complaint to have at
+ * least one event and enforces it with a deferred constraint, so an INSERT on its own is refused at commit —
+ * and the function is what the storefront's own route calls, so the fixture and production build the same thing.
+ */
+export async function seedConsole(): Promise<{ complaintId: string }> {
+  const orders: [string, number, string, number, string][] = [
+    [CONSOLE.oldestPending, 9002, 'pending', 30, '10500'],
+    [CONSOLE.newestPending, 9003, 'pending', 2, '4000'],
+    [CONSOLE.accepted, 9004, 'approved', 45, '7300'],
+  ];
+
+  for (const [id, number, status, minutesAgo, subtotal] of orders) {
+    await withTransaction(async (tx) => {
+      await tx.query(
+        // paid_at IS NOT DECORATION: V004's orders_paid_at_agrees makes "paid" and "when" the same fact, so a
+        // paid order without a timestamp is refused. The alert prints "paid by MoMo", so these are paid.
+        `INSERT INTO orders (id, store_id, order_number, tracking_code, idempotency_key, guest_name, guest_phone,
+                             delivery_address, fulfilment_type, status, payment_method, payment_status, currency,
+                             subtotal_amount, placed_at, paid_at)
+              VALUES ($1, $2, $3, $4, $5, 'Aimable Kayitare', '078 000 0001',
+                      'KG 11 Ave, Kigali', 'delivery', $6, 'mtn_momo', 'paid', 'RWF', $7,
+                      now() - make_interval(mins => $8), now() - make_interval(mins => $8))`,
+        [id, STORE.a, number, `trk_console_${number}`, `idem_console_${number}`, status, subtotal, minutesAgo],
+      );
+      await tx.query(
+        `INSERT INTO order_items (order_id, store_id, variant_id, product_name, unit_price_amount, quantity)
+              VALUES ($1, $2, $3, 'Passion Juice', $4, 1)`,
+        [id, STORE.a, uid(0x310), subtotal],
+      );
+    });
+  }
+
+  // A review with no reply — which is what the sidebar's Reviews badge counts. The suite adds the reply itself
+  // and watches the badge clear, because "unanswered" is the rule worth testing rather than the number.
+  await sql(
+    `INSERT INTO reviews (id, store_id, product_id, order_id, order_item_id, customer_user_id, rating, body)
+       SELECT $1, $2, $3, $4, i.id, $5, 4, 'Good, would order again.'
+         FROM order_items i WHERE i.order_id = $4 LIMIT 1`,
+    [CONSOLE.review, STORE.a, CATALOGUE.juice, CATALOGUE.order, USER.customerA],
+  );
+
+  // An open complaint, for the Complaints badge. The delivered order is the only one that can carry one, and
+  // the customer comes from the order rather than from the caller — which is the function's own rule.
+  const { rows } = await sql<{ id: string }>(`SELECT file_complaint($1, $2, $3, $4) AS id`, [
+    CATALOGUE.order,
+    'item_missing',
+    'The juice was not in the bag.',
+    USER.customerA,
+  ]);
+  const complaintId = rows[0]?.id;
+  if (complaintId === undefined) throw new Error('file_complaint returned no id');
+  return { complaintId };
+}
+
+/** The notifications the panel reads. Written through notify(), so V010 checks the payload keys as in production. */
+export async function seedNotifications(complaintId: string): Promise<void> {
+  await sql(
+    `SELECT notify($1, 'order_placed', $2, $3::jsonb, NULL, $4, NULL, NULL)`,
+    [
+      STORE.a,
+      `order_placed:${CONSOLE.oldestPending}`,
+      JSON.stringify({ order_number: 9002, total_amount: '10500', customer_name: 'Aimable K.' }),
+      CONSOLE.oldestPending,
+    ],
+  );
+  await sql(
+    `SELECT notify($1, 'complaint_filed', $2, $3::jsonb, NULL, NULL, $4, NULL)`,
+    [
+      STORE.a,
+      `complaint:${complaintId}`,
+      JSON.stringify({ order_number: 9001, reason: 'item_missing', customer_name: 'Customer A' }),
+      complaintId,
+    ],
+  );
+  // THE ONE A MANAGER MUST NOT SEE. §5.4: "can't see payouts, the wallet or store settings", and V010 enforces it
+  // with visible_to_roles rather than with a filter in an endpoint — which is what the suite proves.
+  //
+  // `identity_verified` RATHER THAN `payout_sent`, and the reason is the schema again: a payout notification's
+  // subject is a withdrawal, and V010 refuses one without it — "a payout_sent notification is about a withdrawal,
+  // and none was given". Minting a real withdrawal means KYC, a verified store and a wallet with money in it,
+  // which is three milestones' worth of fixture for a rule that both types share: both are visible to
+  // {owner, admin} only, and this one needs no subject at all.
+  await sql(
+    `SELECT notify($1, 'identity_verified', $2, '{}'::jsonb, NULL, NULL, NULL, NULL, NULL)`,
+    [STORE.a, `kyc:${STORE.a}`],
+  );
+}
+
 /** How many reviews exist for a product, hidden ones included. */
 export async function countReviews(productId: string): Promise<number> {
   const { rows } = await db.query<{ n: string }>(

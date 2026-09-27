@@ -117,6 +117,43 @@
   --color-status-progress: #EDE9F6;
   --color-status-progress-fg: #4B3A83;
 
+  /* --- The platform's own brand -----------------------------------------
+     ADDED AT MILESTONE 19, when the merchant console arrived and needed them.
+
+     THESE ARE NOT A STORE'S COLOURS, and the Sidebar board proves it: its
+     component takes the store as a prop, and switching from Nyama (green) to
+     Inzu Threads (blue) changes ONLY the store mark. The active nav pill, the
+     badges, the links and the notification switch stay green in both. So the
+     console wears Vendlyfy's colour while showing you your own store's mark —
+     which is right: it is our software, and you are looking at your shop
+     through it.
+
+     They are fixed tokens rather than theme inputs for the same structural
+     reason the status palette is: the theme engine cannot reach them, so no
+     store can repaint the console it shares with every other merchant.
+
+     From the boards: #1D6B47 is `a{color}`, the badges, the switch's on state
+     and the alert's Accept; #14502F is `a:hover` and the active item's text;
+     #E6F0EA is the active item's pill; #F4F8F5 is an unread notification row;
+     #CFE0D6 is a quiet bar in the week chart, beside the current day's solid
+     one. */
+  --color-brand: #1D6B47;
+  --color-brand-strong: #14502F;
+  --color-brand-muted: #CFE0D6;
+  --color-brand-tint: #E6F0EA;
+  --color-brand-wash: #F4F8F5;
+
+  /* --- On ink --------------------------------------------------------------
+     The new-order alert is a dark card — "#17160F" with white text — and three
+     of its parts are not white: a raised secondary button, dimmed supporting
+     text, and the waiting timer, which is amber because it is counting how long
+     a customer has been waiting. Named for where they are used rather than for
+     their hue, because "amber on ink" is the only place this value is correct;
+     on the ground it would fail contrast. */
+  --color-ink-raised: #2C2B24;
+  --color-on-ink-muted: #C9C5B9;
+  --color-on-ink-timer: #F2C94C;
+
   /* Kept because utilities reference them and the design uses both literally. */
   --color-white: #FFFFFF;
   --color-black: #000000;

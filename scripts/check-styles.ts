@@ -23,8 +23,26 @@ const CLIENT = path.join(REPO, 'client');
 const LEGACY_CSS = path.join(CLIENT, 'src', 'index.css');
 
 /** Directories holding NEW front-end code. Stage D adds storefront, merchant,
- *  admin and shared/ui; add them here as they land. */
-const NEW_TREE = ['src/styles', 'src/gallery'];
+ *  admin and shared/ui; add them here as they land.
+ *
+ *  THE SIX THAT HAD LANDED WERE NOT LISTED. This said "add them here as they
+ *  land" from milestone 4 and nobody did, so from milestone 14 to 18 the kit, the
+ *  auth screens and the whole storefront were outside the one check that keeps the
+ *  legacy stylesheet out of new code. Caught at milestone 19 while adding the
+ *  console. Nothing had actually drifted — the assertion below passes for every
+ *  one of them — but that was luck rather than the gate. */
+const NEW_TREE = [
+  'src/styles',
+  'src/gallery',
+  'src/shared',
+  'src/auth',
+  'src/app',
+  'src/storefront',
+  'src/console',
+  // The render gate imports from all of the above, so it must not reach for the
+  // legacy sheet either.
+  'check',
+];
 
 const failures: string[] = [];
 const notes: string[] = [];

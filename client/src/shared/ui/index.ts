@@ -26,6 +26,6 @@ export {
 } from './fields.tsx';
 export { OptionGroup } from './OptionGroup.tsx';
 export type { OptionValue } from './OptionGroup.tsx';
-export { BottomSheet, ConfirmModal, Drawer } from './overlays.tsx';
+export { BottomSheet, ConfirmModal, Drawer, useDialog } from './overlays.tsx';
 export { ProductCard } from './ProductCard.tsx';
 export { SetupChecklist, StateCard } from './StateCard.tsx';

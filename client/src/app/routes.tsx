@@ -20,6 +20,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { AuthPage } from '../auth/AuthPage.tsx';
+import { Console } from '../console/Console.tsx';
 import { Storefront } from '../storefront/Storefront.tsx';
 import type { StorefrontView } from '../storefront/Storefront.tsx';
 
@@ -49,6 +50,26 @@ function StoreRoute({ view }: { view: StorefrontView['kind'] }): ReactNode {
   return <Storefront slug={slug} view={resolved} navigate={(to) => navigate(to)} />;
 }
 
+/**
+ * The merchant console — milestone 19.
+ *
+ * `/app/:store`, and the slug is in the path for the same reason the storefront's is: §2.5's "the store comes
+ * from the URL, never from a remembered slug". Milestone 15's Auth already lands here, sending an owner to
+ * `/app/<slug>` and a manager to `/app/<slug>/orders`, so this path was settled before this screen existed.
+ *
+ * V010 stores a notification's destination as `/app/orders` — the store left out, because a notification belongs
+ * to a store the reader is already inside. nav.ts's consoleHref() puts the slug back.
+ */
+function ConsoleRoute(): ReactNode {
+  const params = useParams();
+  const navigate = useNavigate();
+  const slug = params['store'];
+
+  if (typeof slug !== 'string' || slug === '') return <Navigate to="/signin" replace />;
+
+  return <Console slug={slug} view={{ kind: 'dashboard' }} navigate={(to) => navigate(to)} />;
+}
+
 export function AppRoutes(): ReactNode {
   return (
     <BrowserRouter>
@@ -56,6 +77,10 @@ export function AppRoutes(): ReactNode {
         {/* Auth keeps its own path handling for the invite token, which it reads from the URL itself. */}
         <Route path="/signin" element={<AuthPage />} />
         <Route path="/invite/:token" element={<AuthPage />} />
+
+        {/* The console, BEFORE the storefront's /:store — react-router prefers the more specific path either
+            way, and V001 refuses `app` as a slug at the column, so the two cannot collide. */}
+        <Route path="/app/:store" element={<ConsoleRoute />} />
 
         <Route path="/:store" element={<StoreRoute view="home" />} />
         <Route path="/:store/p/:productId" element={<StoreRoute view="product" />} />
