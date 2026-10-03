@@ -285,6 +285,7 @@ export function ShopHome({ onOpenProduct, onOpenCart }: Props): ReactNode {
                       initial={product.name.trim().charAt(0).toUpperCase()}
                       tileBackground={tile.background}
                       tileForeground={tile.foreground}
+                      {...(product.coverImageUrl === null ? {} : { imageUrl: product.coverImageUrl })}
                       soldOut={product.stock.soldOut}
                       onOpen={() => onOpenProduct(product.id)}
                       {...(product.stock.soldOut

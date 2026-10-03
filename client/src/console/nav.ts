@@ -77,9 +77,9 @@ export const NAV_GROUPS: readonly (readonly NavItem[])[] = [
       badge: 'complaints',
       milestone: 24,
     },
-    { id: 'products', label: 'Products', icon: 'products', path: '/products', built: false, milestone: 22 },
+    { id: 'products', label: 'Products', icon: 'products', path: '/products', built: true, milestone: 22 },
     { id: 'reviews', label: 'Reviews', icon: 'reviews', path: '/reviews', built: false, badge: 'reviews', milestone: 24 },
-    { id: 'categories', label: 'Categories', icon: 'categories', path: '/categories', built: false, milestone: 22 },
+    { id: 'categories', label: 'Categories', icon: 'categories', path: '/categories', built: true, milestone: 22 },
     // The board points Inventory at the same screen as Products, because it is a view of it rather than a
     // place of its own. `Products`'s inline stock edit is one of the boards still outstanding (Part 9), so
     // this stays plain until there is a design to build.
@@ -143,7 +143,7 @@ export const NAV_GROUPS: readonly (readonly NavItem[])[] = [
 export const MOBILE_TABS: readonly { id: string; label: string; icon: NavIcon; path: string; built: boolean; badge?: BadgeKey }[] = [
   { id: 'dashboard', label: 'Home', icon: 'dashboard', path: '', built: true },
   { id: 'orders', label: 'Orders', icon: 'orders', path: '/orders', built: true, badge: 'orders' },
-  { id: 'products', label: 'Products', icon: 'products', path: '/products', built: false },
+  { id: 'products', label: 'Products', icon: 'products', path: '/products', built: true },
   { id: 'store-design', label: 'Store', icon: 'store', path: '/store-design', built: false },
   { id: 'more', label: 'More', icon: 'more', path: '/more', built: false },
 ];

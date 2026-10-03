@@ -90,6 +90,11 @@ export async function request<T>(
     throw new ApiFailure({ status: 0, code: 'OFFLINE', message: 'You’re offline.' });
   }
 
+  return readResponse<T>(res);
+}
+
+/** Reads a response the same way for every kind of request, so an error has ONE shape however it was sent. */
+async function readResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   let payload: Record<string, unknown> = {};
   if (text !== '') {
@@ -112,6 +117,25 @@ export async function request<T>(
   }
 
   return payload as T;
+}
+
+/**
+ * One file as the raw request body — the photo upload. Not `request()`, which is JSON by construction, but the
+ * same credentials, the same CSRF echo and the same error shape, because a failed upload has to read like any
+ * other failure to the screen that called it.
+ */
+export async function upload<T>(path: string, file: Blob): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
+  const token = csrfToken();
+  if (token !== null) headers['X-CSRF-Token'] = token;
+
+  let res: Response;
+  try {
+    res = await fetch(path, { method: 'POST', headers, credentials: 'include', body: file });
+  } catch {
+    throw new ApiFailure({ status: 0, code: 'OFFLINE', message: 'You’re offline.' });
+  }
+  return readResponse<T>(res);
 }
 
 export const api = {

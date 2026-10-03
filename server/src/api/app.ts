@@ -40,7 +40,10 @@ import momoWebhookRoutes from '../routes/momoWebhook.ts';
 import storefrontCheckoutRoutes from '../routes/storefrontCheckout.ts';
 import storefrontAccountRoutes from '../routes/storefrontAccount.ts';
 import storeDashboardRoutes from '../routes/storeDashboard.ts';
+import storeCategoriesRoutes from '../routes/storeCategories.ts';
 import storeOrderRoutes from '../routes/storeOrders.ts';
+import storeProductsRoutes from '../routes/storeProducts.ts';
+import { mediaRouter, uploadRouter } from '../routes/storeUploads.ts';
 import riderAppRoutes from '../routes/riderApp.ts';
 import storeRidersRoutes from '../routes/storeRiders.ts';
 import storeShellRoutes from '../routes/storeShell.ts';
@@ -73,6 +76,8 @@ export const REQUIRED_PERMISSIONS = [
   // and nothing asked for them until the rider's own app did — the same gap orders.assign_rider closed.
   'deliveries.own_read',
   'deliveries.own_update',
+  // Milestone 22: the catalogue's admin. V001 seeded it for owner/admin/manager at the start.
+  'products.write',
 ] as const;
 
 export function createApp(): Express {
@@ -158,10 +163,18 @@ export function createApp(): Express {
   app.use('/api/stores/:storeId/rider', riderAppRoutes);
   // The merchant's own "Riders & cash" — the roster and the end-of-day settlement.
   app.use('/api/stores/:storeId/riders', storeRidersRoutes);
+  // Milestone 22: the catalogue's admin. One permission, products.write — see storeProducts.ts.
+  app.use('/api/stores/:storeId/products', storeProductsRoutes);
+  app.use('/api/stores/:storeId/categories', storeCategoriesRoutes);
+  app.use('/api/stores/:storeId/uploads', uploadRouter);
   app.use('/api/stores/:storeId/notifications', storeNotificationRoutes);
   app.use('/api/stores/:storeId/settings', storeSettingsRoutes);
   app.use('/api/stores/:storeId/config', storeConfigRoutes);
   app.use('/api/stores/:storeId/theme', storeThemeRoutes);
+
+  // Product photos, served from whichever ImageStore is configured. PUBLIC and GET-only: a storefront <img>
+  // carries no session, and the name is 128 random bits.
+  app.use('/api/media', mediaRouter);
 
   // PUBLIC, and keyed by SLUG rather than by store id. A slug is already in the storefront's
   // URL; a store uuid is not, and milestone 11 deliberately made store existence unobservable

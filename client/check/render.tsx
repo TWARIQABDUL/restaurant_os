@@ -41,13 +41,17 @@ import { ComplaintSheet } from '../src/storefront/ComplaintSheet.tsx';
 import { tileFor } from '../src/storefront/tiles.ts';
 import { ShellContext } from '../src/console/ShellProvider.tsx';
 import type { ShellContextValue } from '../src/console/ShellProvider.tsx';
-import type { DashboardData, OrderAlert as OrderAlertData, OrderDetail, OrderListItem } from '../src/console/api.ts';
+import type { CategoryRow, DashboardData, OrderAlert as OrderAlertData, OrderDetail, OrderListItem, ProductList, ProductSaved } from '../src/console/api.ts';
 import { MobileTabs, Sidebar } from '../src/console/Sidebar.tsx';
 import { Dashboard } from '../src/console/Dashboard.tsx';
 import { NotificationsPanel } from '../src/console/NotificationsPanel.tsx';
 import { OrderAlert } from '../src/console/OrderAlert.tsx';
 import { columnOf, COLUMN_LABELS, Orders, statusMeta } from '../src/console/Orders.tsx';
 import { CashReport } from '../src/console/CashReport.tsx';
+import { Categories, pageTitle, productsMeta, sectionState } from '../src/console/Categories.tsx';
+import { ProductEditor } from '../src/console/ProductEditor.tsx';
+import { Products, statusChip, stockCell } from '../src/console/Products.tsx';
+import { EMPTY_STATE, cleanAmount, problems as editorProblems, previewMeta, stateFrom, suggestSku, toDoc, variantRows } from '../src/console/catalogue.ts';
 import { RiderApp } from '../src/rider/Rider.tsx';
 import type { RiderHome } from '../src/rider/api.ts';
 import { Console } from '../src/console/Console.tsx';
@@ -753,8 +757,25 @@ const CONSOLE_SHELL: ShellContextValue = {
     { storeId: 's1', slug: 'nyama', name: 'Nyama & Co.', role: 'owner' },
     { storeId: 's2', slug: 'inzu', name: 'Inzu Threads', role: 'admin' },
   ],
-  t: ((key: string, form?: string) => (form === 'one' ? key : `${key}s`)) as ShellContextValue['t'],
+  // The Food & drinks template's own four words (V002), because Products and Categories now ask t() for
+  // their headings. A stub that returned `${key}s` would make "categorys" the thing the gate agrees with.
+  t: ((key: string, form?: string) => {
+    const words: Record<string, [string, string]> = {
+      product: ['Menu item', 'Menu items'],
+      catalog: ['Menu', 'Menu'],
+      category: ['Section', 'Sections'],
+      option: ['Extra', 'Extras'],
+    };
+    const [one, many] = words[key] ?? [key, key];
+    return form === 'one' ? one : many;
+  }) as ShellContextValue['t'],
   has: () => true,
+  attributes: [
+    { name: 'Spice level', pick: 'one' },
+    { name: 'Extras', pick: 'several', priced: true },
+    { name: 'Portion size', pick: 'one' },
+  ],
+  templateName: 'Food & drinks',
   currency: CURRENCY,
   money: (amount) => formatMoney(amount, CURRENCY),
   badges: { orders: 3, complaints: 2, reviews: 1, notifications: 7 },
@@ -967,6 +988,123 @@ const RIDER_HOME: RiderHome = {
 };
 
 
+
+// --- the catalogue — milestone 22 ----------------------------------------------------------------
+const PRODUCT_LIST: ProductList = {
+  rows: [
+    { id: '5555a001-0000-4000-8000-000000000001', name: 'Chicken Burger', sub: '2 option groups · SKU NY-001', categories: ['Burgers'], price: '3500.00', trackStock: true, stock: 42, state: 'ok', status: 'active', coverImageUrl: null },
+    { id: '5555a001-0000-4000-8000-000000000002', name: 'Goat Brochette Plate', sub: 'SKU NY-010', categories: ['Grills'], price: '5000.00', trackStock: true, stock: 6, state: 'low', status: 'active', coverImageUrl: null },
+    { id: '5555a001-0000-4000-8000-000000000003', name: 'Veggie Wrap', sub: 'SKU NY-021', categories: ['Sides', 'Lunch'], price: '3000.00', trackStock: true, stock: 0, state: 'out', status: 'active', coverImageUrl: null },
+    { id: '5555a001-0000-4000-8000-000000000004', name: 'Passion Juice', sub: '500 ml', categories: [], price: '1200.00', trackStock: false, stock: null, state: 'ok', status: 'active', coverImageUrl: '/api/media/s1/0123456789abcdef0123456789abcdef.png' },
+    { id: '5555a001-0000-4000-8000-000000000005', name: 'Chapati', sub: 'Not visible to customers', categories: ['Sides'], price: '500.00', trackStock: true, stock: 50, state: 'draft', status: 'draft', coverImageUrl: null },
+  ],
+  total: 182,
+  page: 1,
+  pageSize: 25,
+  counts: { all: 182, active: 176, draft: 4, low: 7, out: 2 },
+};
+
+const SECTIONS: CategoryRow[] = [
+  { id: 'c1', name: 'Burgers', isVisible: true, productCount: 6, activeCount: 6 },
+  { id: 'c2', name: 'Grills', isVisible: true, productCount: 5, activeCount: 5 },
+  { id: 'c3', name: 'Breakfast', isVisible: false, productCount: 3, activeCount: 3 },
+  { id: 'c4', name: 'Christmas specials', isVisible: true, productCount: 0, activeCount: 0 },
+  { id: 'c5', name: 'Seasonal', isVisible: true, productCount: 2, activeCount: 0 },
+];
+
+// AddProduct's own clothing preset: Size S/M/L/XL x Color Black/White, one pick-several group besides.
+const TSHIRT: ProductSaved = {
+  id: '5555a001-0000-4000-8000-0000000000aa',
+  name: 'Everyday T-Shirt',
+  description: '',
+  price: '15000.00',
+  compareAtPrice: null,
+  status: 'active',
+  categoryIds: ['c1'],
+  images: [],
+  trackStock: true,
+  sku: null,
+  stock: null,
+  groups: [
+    { id: 'gs', shared: false, name: 'Size', mode: 'one', values: ['S', 'M', 'L', 'XL'].map((l) => ({ key: `v${l}`, label: l, priceDelta: l === 'XL' ? '1000.00' : '0.00' })) },
+    { id: 'gc', shared: false, name: 'Color', mode: 'one', values: ['Black', 'White'].map((l) => ({ key: `v${l}`, label: l, priceDelta: '0.00' })) },
+    { id: 'ge', shared: false, name: 'Gift wrap', mode: 'several', values: [{ key: 'vw', label: 'Wrapped', priceDelta: '500.00' }] },
+  ],
+  variants: [
+    { combo: ['vS', 'vBlack'], sku: 'TS-S-BLA', stock: 4, available: true },
+    { combo: ['vM', 'vBlack'], sku: null, stock: 0, available: true },
+  ],
+  sold: false,
+};
+const TSHIRT_STATE = stateFrom(TSHIRT);
+
+{
+  // The matrix is the cartesian product of the pick-ONE groups only — AddProduct's `attrs.filter(a => a.mode === 'one')`.
+  const rows = variantRows(TSHIRT_STATE);
+  expect(rows.length === 8, `4 sizes x 2 colours is 8 variants; found ${rows.length}`);
+  expect(rows[0]!.label === 'S / Black', 'the first group varies slowest, so the first row is S / Black');
+  expect(rows[1]!.label === 'S / White', 'and the second group varies fastest');
+  expect(!rows.some((r) => r.label.includes('Wrapped')), 'a pick-several group is priced on the line, never a row');
+  expect(rows.find((r) => r.label === 'XL / Black')!.price === '16000', 'XL carries its +1,000: 15,000 + 1,000');
+  expect(rows.find((r) => r.label === 'S / Black')!.price === '15000', 'and S does not');
+
+  // A group with no values yet is not a dimension: the board filters on `a.values.length`.
+  const withEmpty = { ...TSHIRT_STATE, groups: [...TSHIRT_STATE.groups, { uid: 'x', id: null, shared: false, name: 'Fit', mode: 'one' as const, values: [], draft: '', draftPrice: '' }] };
+  expect(variantRows(withEmpty).length === 8, 'an option with no values yet does not zero the matrix');
+  expect(variantRows({ ...TSHIRT_STATE, hasOptions: false }).length === 0, 'switching options off removes every variant');
+
+  // Decimal prices add as decimals, not floats: 0.1 + 0.2 has to be 0.3.
+  const cents = { ...TSHIRT_STATE, price: '0.1', groups: [{ ...TSHIRT_STATE.groups[0]!, values: [{ key: 'a', label: 'A', priceDelta: '0.2' }] }] };
+  expect(variantRows(cents)[0]!.price === '0.3', `0.1 + 0.2 is exactly 0.3; got ${variantRows(cents)[0]!.price}`);
+
+  // The saved edits come back against the right combination.
+  expect(TSHIRT_STATE.variantEdits['vS|vBlack']?.sku === 'TS-S-BLA', 'a saved SKU lands on its combination');
+  expect(TSHIRT_STATE.variantEdits['vM|vBlack']?.stock === '0', 'and a saved count of zero stays a zero, not blank');
+
+  const doc = toDoc(TSHIRT_STATE, 'active');
+  expect(doc.variants.length === 8, 'the document carries every combination, not only the edited ones');
+  expect(doc.variants.find((v) => v.combo.join('|') === 'vM|vBlack')!.stock === 0, 'a combination never counted is saved as 0 when stock is tracked');
+  expect(doc.variants.find((v) => v.combo.join('|') === 'vS|vBlack')!.sku === 'TS-S-BLA', 'a SKU survives the round trip');
+  expect(doc.sku === null && doc.stock === null, 'a product with variants keeps its SKU and count on the variants');
+  expect(doc.price === '15000', 'the price is the string the merchant sees, never a float');
+  expect(doc.groups.length === 3 && doc.groups[2]!.mode === 'several', 'every group travels, in order');
+
+  const untracked = toDoc({ ...TSHIRT_STATE, trackStock: false }, 'draft');
+  expect(untracked.status === 'draft', 'Save draft sends draft whatever the radio says');
+  expect(untracked.variants.every((v) => v.stock === null), 'a product that does not track stock sends no counts');
+
+  const plain = toDoc({ ...EMPTY_STATE, name: ' Fries ', price: '1500', trackStock: true, sku: 'NY-020', stock: '120' }, 'active');
+  expect(plain.name === 'Fries', 'the name is trimmed');
+  expect(plain.sku === 'NY-020' && plain.stock === 120 && plain.variants.length === 0, 'with no options, the SKU and count are the product\'s own');
+  expect(toDoc({ ...EMPTY_STATE, name: 'x', price: '1', compareAt: '' }, 'active').compareAtPrice === null, 'a blank compare-at is null, not "0"');
+
+  expect(editorProblems(EMPTY_STATE) === 'Give the product a name.', 'no name is the first thing said');
+  expect(editorProblems({ ...EMPTY_STATE, name: 'x' }) === 'Enter a price.', 'then the price');
+  expect(editorProblems({ ...EMPTY_STATE, name: 'x', price: '100', compareAt: '100' }) !== null, 'a compare-at that is not higher is refused');
+  expect(editorProblems({ ...TSHIRT_STATE, groups: [...TSHIRT_STATE.groups, { uid: 'x', id: null, shared: false, name: 'size', mode: 'one', values: [{ key: 'q', label: 'Q', priceDelta: '0' }], draft: '', draftPrice: '' }] })?.includes('two options') === true, 'two options with the same name are caught in any case');
+  expect(editorProblems({ ...TSHIRT_STATE, groups: [{ ...TSHIRT_STATE.groups[0]!, values: [] }] })?.includes('Add at least one value') === true, 'an option with no values is named');
+  expect(editorProblems(TSHIRT_STATE) === null, 'a complete product passes');
+
+  expect(cleanAmount('12a.5.6') === '12.56', 'a price box keeps digits and the first dot only');
+  expect(suggestSku('Everyday T-Shirt', rows[0]!) === 'EV-S-BLA', 'the SKU suggestion is the name\'s letters then each value\'s');
+  expect(previewMeta(TSHIRT_STATE) === 'Size: S · M · L · XL', 'the preview line names the first pick-one group, as the board does');
+  expect(previewMeta(EMPTY_STATE) === 'No options', 'and says so when there are none');
+
+  // Products' status chips and the section rules.
+  expect(statusChip({ state: 'draft' }).label === 'Draft' && statusChip({ state: 'out' }).label === 'Out of stock', 'the board\'s status chips');
+  expect(statusChip({ state: 'low' }).label === 'Active', 'low stock is still Active: it is the STOCK that turns red');
+  expect(stockCell({ stock: 6, state: 'low' }).text === '6 · low' && stockCell({ stock: 6, state: 'low' }).alarming, 'low stock reads "6 · low" in red');
+  expect(stockCell({ stock: null, state: 'ok' }).text === '—', 'a product that does not track stock shows a dash, not a zero');
+  expect(sectionState(SECTIONS[0]!).label === 'Shown', 'a visible section with live products is Shown');
+  expect(sectionState(SECTIONS[2]!).label === 'Hidden', 'a switched-off one is Hidden, whatever is in it');
+  expect(sectionState(SECTIONS[3]!).label === 'Empty · not shown', 'an empty one is not shown');
+  expect(sectionState(SECTIONS[4]!).label === 'Drafts only · not shown', 'one holding only drafts is not shown either: the storefront needs a LIVE product');
+  expect(pageTitle('Menu', 'Sections') === 'Menu sections', 'Food & drinks reads "Menu sections", as the board does');
+  expect(pageTitle('Aisles', 'Aisles') === 'Aisles', 'a template whose two words are the same reads once');
+  expect(productsMeta({ productCount: 0 }, 'Menu item', 'Menu items') === 'No menu items yet', 'an empty section says so');
+  expect(productsMeta({ productCount: 1 }, 'Menu item', 'Menu items') === '1 menu item', 'and a single one is singular');
+}
+
 const consoleParts: readonly (readonly [string, ReactNode])[] = [
   ['Sidebar', inConsole(<Sidebar active="dashboard" unread={7} onOpenNotifications={noop} navigate={noop} />)],
   ['DashboardMobile · bottom bar', inConsole(<MobileTabs active="dashboard" navigate={noop} />)],
@@ -1040,6 +1178,21 @@ const consoleParts: readonly (readonly [string, ReactNode])[] = [
   ['Console · first paint', <Console slug="nyama" view={{ kind: 'dashboard' }} navigate={noop} />],
   ['Console · first paint, Orders', <Console slug="nyama" view={{ kind: 'orders' }} navigate={noop} />],
   ['Console · first paint, Riders & cash', <Console slug="nyama" view={{ kind: 'riders' }} navigate={noop} />],
+  ['Console · first paint, Products', <Console slug="nyama" view={{ kind: 'products' }} navigate={noop} />],
+  ['Console · first paint, AddProduct', <Console slug="nyama" view={{ kind: 'product', productId: null }} navigate={noop} />],
+  ['Console · first paint, Categories', <Console slug="nyama" view={{ kind: 'categories' }} navigate={noop} />],
+
+  // The catalogue — milestone 22. Same testing seam as Orders and CashReport.
+  ['Products · a page of the list', inConsole(<Products navigate={noop} initialList={PRODUCT_LIST} initialCategories={SECTIONS} />)],
+  ['Products · nothing matches the search', inConsole(<Products navigate={noop} initialList={{ ...PRODUCT_LIST, rows: [], total: 0 }} initialCategories={SECTIONS} />)],
+  ['Products · a brand-new store', inConsole(<Products navigate={noop} initialList={{ ...PRODUCT_LIST, rows: [], total: 0, counts: { all: 0, active: 0, draft: 0, low: 0, out: 0 } }} initialCategories={[]} />)],
+  ['AddProduct · new', inConsole(<ProductEditor navigate={noop} productId={null} initialState={EMPTY_STATE} initialCategories={SECTIONS} />)],
+  ['AddProduct · a t-shirt with its 8-variant matrix', inConsole(<ProductEditor navigate={noop} productId={TSHIRT.id} initialState={TSHIRT_STATE} initialCategories={SECTIONS} />)],
+  ['AddProduct · a product that has been ordered', inConsole(<ProductEditor navigate={noop} productId={TSHIRT.id} initialState={TSHIRT_STATE} initialSold initialCategories={SECTIONS} />)],
+  ['AddProduct · a simple product with its own stock', inConsole(<ProductEditor navigate={noop} productId={null} initialState={{ ...EMPTY_STATE, name: 'Fries', price: '1500', trackStock: true, stock: '120', sku: 'NY-020' }} initialCategories={SECTIONS} />)],
+  ['Categories · sections in every state', inConsole(<Categories initialRows={SECTIONS} />)],
+  ['Categories · deleting a section that has products', inConsole(<Categories initialRows={SECTIONS} initialDoomed="c1" />)],
+  ['Categories · none yet', inConsole(<Categories initialRows={[]} />)],
 
   // CashReport — milestone 21. Same testing seam as Orders.tsx: no effects run in SSR.
   ['CashReport · roster, cards and a carried-over debt', inConsole(<CashReport initialRoster={ROSTER} initialCards={CASH_CARDS} initialCarriedOver={CARRIED_OVER} />)],
@@ -1134,6 +1287,21 @@ for (const phrase of [
   '3 waiting for you →',
   'View your store',
   'Nothing waiting. New orders appear here the moment they arrive.',
+  // The catalogue's, milestone 22. Chosen from visible text rather than placeholders, for the reason the
+  // CustomerAccount phrases explain.
+  'Showing 1–5 of 182',
+  'Try another word or clear the filters.',
+  'Add your first menu item and it can be ordered straight away.',
+  'Square photos on a plain background look best. The first photo is the cover.',
+  'Anything the customer chooses: size, color, spice level, extras, storage.',
+  'Track stock to stop selling when you run out.',
+  '8 variants · set stock for each',
+  'Variants at 0 show as sold out.',
+  'This is how the product card looks in your store.',
+  'This product has been ordered, so its option groups are fixed.',
+  'Called “Sections” in your Food & drinks template. Order here is the order on your store.',
+  'Hidden sections and empty ones don’t appear. Menu items can sit in more than one section.',
+  'Its 6 menu items stay in your catalog.',
 ]) {
   expect(visibleText.includes(phrase), `the boards' wording is missing: ${phrase}`);
 }

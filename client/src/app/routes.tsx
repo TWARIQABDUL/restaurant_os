@@ -69,7 +69,12 @@ function ConsoleRoute({ view }: { view: ConsoleView['kind'] }): ReactNode {
 
   if (typeof slug !== 'string' || slug === '') return <Navigate to="/signin" replace />;
 
-  return <Console slug={slug} view={{ kind: view }} navigate={(to) => navigate(to)} />;
+  // AddProduct is the one console screen that carries an id; `/products/new` has none, which is "New product".
+  const productId = params['productId'];
+  const resolved: ConsoleView =
+    view === 'product' ? { kind: 'product', productId: typeof productId === 'string' ? productId : null } : { kind: view };
+
+  return <Console slug={slug} view={resolved} navigate={(to) => navigate(to)} />;
 }
 
 /**
@@ -101,6 +106,11 @@ export function AppRoutes(): ReactNode {
         <Route path="/app/:store" element={<ConsoleRoute view="dashboard" />} />
         <Route path="/app/:store/orders" element={<ConsoleRoute view="orders" />} />
         <Route path="/app/:store/riders" element={<ConsoleRoute view="riders" />} />
+        <Route path="/app/:store/products" element={<ConsoleRoute view="products" />} />
+        {/* "new" is matched before :productId because react-router ranks a literal segment above a param. */}
+        <Route path="/app/:store/products/new" element={<ConsoleRoute view="product" />} />
+        <Route path="/app/:store/products/:productId" element={<ConsoleRoute view="product" />} />
+        <Route path="/app/:store/categories" element={<ConsoleRoute view="categories" />} />
 
         {/* Same reasoning: 'rider' is reserved (V023), so this cannot collide with a storefront. */}
         <Route path="/rider/:store" element={<RiderRoute />} />

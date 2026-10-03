@@ -683,6 +683,8 @@ export interface OptionGroupsRow {
   position: number;
   created_at: Date;
   updated_at: Date;
+  /** NULL: shared by the store, attachable to any of its products. Set: private to that product, created by AddProduct's editor and deleted with it. */
+  product_id: string | null;
 }
 
 /**
@@ -973,6 +975,18 @@ export interface ProductFlagsRow {
   key: string;
   label: string;
   description: string;
+  created_at: Date;
+}
+
+/**
+ * A product's photos in order. The first is the cover — products.cover_image_url is kept equal to it by a trigger.
+ */
+export interface ProductImagesRow {
+  id: string;
+  product_id: string;
+  store_id: string;
+  url: string;
+  position: number;
   created_at: Date;
 }
 
@@ -1507,6 +1521,8 @@ export interface StoresRow {
   time_zone: string;
   /** False while a merchant has paused new orders from the dashboard. Distinct from status, which is the platform's: pausing is a busy kitchen, suspension is a compliance decision. */
   accepting_orders: boolean;
+  /** Where the store itself is — what a rider collects from. Not store_pickup_settings.address, which exists only for stores that let a CUSTOMER collect and is absent otherwise. */
+  address: string | null;
 }
 
 /** `users.scope`, from its CHECK constraint. */
@@ -1663,6 +1679,7 @@ export interface Database {
   platform_members: PlatformMembersRow;
   product_categories: ProductCategoriesRow;
   product_flags: ProductFlagsRow;
+  product_images: ProductImagesRow;
   product_option_groups: ProductOptionGroupsRow;
   product_product_flags: ProductProductFlagsRow;
   product_variant_values: ProductVariantValuesRow;
@@ -1742,6 +1759,7 @@ export const TABLE_NAMES = [
   'platform_members',
   'product_categories',
   'product_flags',
+  'product_images',
   'product_option_groups',
   'product_product_flags',
   'product_variant_values',

@@ -23,10 +23,13 @@ import { Alert, Button, SkeletonCard, Toast } from '../shared/ui/index.ts';
 import { dashboard as dashboardApi, notifications as notificationsApi } from './api.ts';
 import type { DashboardData, OrderAlert as AlertData } from './api.ts';
 import { CashReport } from './CashReport.tsx';
+import { Categories } from './Categories.tsx';
 import { Dashboard } from './Dashboard.tsx';
 import { NotificationsPanel } from './NotificationsPanel.tsx';
 import { OrderAlert } from './OrderAlert.tsx';
 import { Orders } from './Orders.tsx';
+import { ProductEditor } from './ProductEditor.tsx';
+import { Products } from './Products.tsx';
 import { MobileTabs, Sidebar } from './Sidebar.tsx';
 import { ShellProvider, useShell } from './ShellProvider.tsx';
 import type { ShellState } from './ShellProvider.tsx';
@@ -36,8 +39,24 @@ import { unlockSoundOnFirstGesture } from './chime.ts';
 const ALERT_EVERY_MS = 10_000;
 const FIGURES_EVERY_MS = 60_000;
 
-/** Milestone 20 added 'orders'; milestone 21 adds 'riders'. Every screen from here adds one more case. */
-export type ConsoleView = { kind: 'dashboard' } | { kind: 'orders' } | { kind: 'riders' };
+/**
+ * Milestone 20 added 'orders'; 21 'riders'; 22 adds the catalogue's three. Every screen from here adds one more case.
+ *
+ * `product` is AddProduct: `productId` null is "New product", a uuid is editing that one. It is a different KIND
+ * from `products` (the list) and highlights the same sidebar item — see `activeItem()`.
+ */
+export type ConsoleView =
+  | { kind: 'dashboard' }
+  | { kind: 'orders' }
+  | { kind: 'riders' }
+  | { kind: 'products' }
+  | { kind: 'product'; productId: string | null }
+  | { kind: 'categories' };
+
+/** The sidebar highlights the list while its editor is open: the editor is Products, one level down. */
+export function activeItem(view: ConsoleView): string {
+  return view.kind === 'product' ? 'products' : view.kind;
+}
 
 type Props = {
   slug: string;
@@ -175,7 +194,7 @@ function ConsoleFrame({ view, navigate }: { view: ConsoleView; navigate: (to: st
   return (
     <div className="flex min-h-dvh">
       <Sidebar
-        active={view.kind}
+        active={activeItem(view)}
         unread={unread}
         onOpenNotifications={() => setPanelOpen(true)}
         navigate={navigate}
@@ -206,6 +225,14 @@ function ConsoleFrame({ view, navigate }: { view: ConsoleView; navigate: (to: st
           <Orders navigate={navigate} />
         ) : view.kind === 'riders' ? (
           <CashReport />
+        ) : view.kind === 'products' ? (
+          <Products navigate={navigate} />
+        ) : view.kind === 'product' ? (
+          // Keyed by the product, so moving from one to another (or from "new" to a saved one) starts a fresh editor
+          // rather than carrying the last one's half-typed state across.
+          <ProductEditor key={view.productId ?? 'new'} navigate={navigate} productId={view.productId} />
+        ) : view.kind === 'categories' ? (
+          <Categories />
         ) : data === null ? (
           failure === null ? (
             <div className="flex flex-col gap-4">
@@ -224,7 +251,7 @@ function ConsoleFrame({ view, navigate }: { view: ConsoleView; navigate: (to: st
         )}
       </main>
 
-      <MobileTabs active={view.kind} navigate={navigate} />
+      <MobileTabs active={activeItem(view)} navigate={navigate} />
 
       <NotificationsPanel
         open={panelOpen}

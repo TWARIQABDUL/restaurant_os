@@ -10,7 +10,7 @@
 // membership for that id and "a caller naming a store they do not work at gets 403 from the store they
 // named". GET /api/session is what turns one into the other, and it is the only place that does.
 
-import { api } from '../app/api.ts';
+import { api, upload } from '../app/api.ts';
 import type { CompiledColors, CurrencyFormat, EffectiveConfig } from '../app/core.ts';
 
 // ---------------------------------------------------------------------------
@@ -431,4 +431,128 @@ export const ridersApi = {
 
   receiveCarriedOver: (storeId: string, settlementId: string): Promise<{ ok: boolean }> =>
     api.post<{ ok: boolean }>(`/api/stores/${storeId}/riders/settlements/${settlementId}/receive`),
+};
+
+// ---------------------------------------------------------------------------
+// The catalogue — milestone 22
+// ---------------------------------------------------------------------------
+
+export type ListTab = 'all' | 'active' | 'draft' | 'low' | 'out';
+export type ListSort = 'best' | 'newest' | 'price' | 'stock';
+export type StockState = 'ok' | 'low' | 'out' | 'draft';
+
+export type ProductRow = {
+  id: string;
+  name: string;
+  sub: string;
+  categories: string[];
+  price: string;
+  trackStock: boolean;
+  stock: number | null;
+  state: StockState;
+  status: 'active' | 'draft';
+  coverImageUrl: string | null;
+};
+
+export type ProductList = {
+  rows: ProductRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  counts: Record<ListTab, number>;
+};
+
+export type ProductQuery = { tab: ListTab; q: string; category: string; sort: ListSort; page: number };
+
+export type EditorValue = { key: string; label: string; priceDelta: string };
+
+export type EditorGroup = {
+  id: string | null;
+  shared: boolean;
+  name: string;
+  mode: 'one' | 'several';
+  values: EditorValue[];
+};
+
+export type EditorVariant = { combo: string[]; label?: string; sku: string | null; stock: number | null; available: boolean };
+
+/** What the server returns for one product, and exactly what the editor sends back. */
+export type ProductDoc = {
+  id?: string;
+  name: string;
+  description: string;
+  price: string;
+  compareAtPrice: string | null;
+  status: 'active' | 'draft';
+  categoryIds: string[];
+  images: string[];
+  trackStock: boolean;
+  sku: string | null;
+  stock: number | null;
+  groups: EditorGroup[];
+  variants: EditorVariant[];
+};
+
+export type ProductSaved = Omit<ProductDoc, 'images'> & { id: string; images: { id: string; url: string }[]; sold: boolean };
+
+export type BulkAction = 'activate' | 'draft' | 'delete' | 'category';
+
+export const productsApi = {
+  list: (storeId: string, q: ProductQuery): Promise<ProductList> => {
+    const params = new URLSearchParams({ tab: q.tab, sort: q.sort, page: String(q.page) });
+    if (q.q !== '') params.set('q', q.q);
+    if (q.category !== '') params.set('category', q.category);
+    return api.get<ProductList>(`/api/stores/${storeId}/products?${params.toString()}`);
+  },
+
+  get: (storeId: string, id: string): Promise<{ product: ProductSaved }> =>
+    api.get<{ product: ProductSaved }>(`/api/stores/${storeId}/products/${id}`),
+
+  create: (storeId: string, doc: ProductDoc): Promise<{ product: ProductSaved }> =>
+    api.post<{ product: ProductSaved }>(`/api/stores/${storeId}/products`, doc),
+
+  save: (storeId: string, id: string, doc: ProductDoc): Promise<{ product: ProductSaved }> =>
+    api.put<{ product: ProductSaved }>(`/api/stores/${storeId}/products/${id}`, doc),
+
+  bulk: (
+    storeId: string,
+    ids: string[],
+    action: BulkAction,
+    categoryId?: string,
+  ): Promise<{ changed: number; kept: { id: string; name: string }[] }> =>
+    api.post<{ changed: number; kept: { id: string; name: string }[] }>(`/api/stores/${storeId}/products/bulk`, {
+      ids,
+      action,
+      categoryId,
+    }),
+
+  /** One photo. Resolves to the path a product keeps. */
+  uploadPhoto: (storeId: string, file: Blob): Promise<{ url: string }> =>
+    upload<{ url: string }>(`/api/stores/${storeId}/uploads`, file),
+};
+
+export type CategoryRow = {
+  id: string;
+  name: string;
+  isVisible: boolean;
+  productCount: number;
+  activeCount: number;
+};
+
+type CategoryList = { categories: CategoryRow[] };
+
+export const categoriesApi = {
+  list: (storeId: string): Promise<CategoryList> => api.get<CategoryList>(`/api/stores/${storeId}/categories`),
+
+  create: (storeId: string, name: string): Promise<CategoryList> =>
+    api.post<CategoryList>(`/api/stores/${storeId}/categories`, { name }),
+
+  update: (storeId: string, id: string, patch: { name?: string; isVisible?: boolean }): Promise<CategoryList> =>
+    api.patch<CategoryList>(`/api/stores/${storeId}/categories/${id}`, patch),
+
+  reorder: (storeId: string, ids: string[]): Promise<CategoryList> =>
+    api.put<CategoryList>(`/api/stores/${storeId}/categories/order`, { ids }),
+
+  remove: (storeId: string, id: string): Promise<CategoryList & { detached: number }> =>
+    api.delete<CategoryList & { detached: number }>(`/api/stores/${storeId}/categories/${id}`),
 };

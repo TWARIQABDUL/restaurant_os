@@ -151,6 +151,7 @@ const SEED_TABLES = [
   'option_values',
   'option_groups',
   'product_product_flags',
+  'product_images',
   'product_categories',
   'products',
   'categories',

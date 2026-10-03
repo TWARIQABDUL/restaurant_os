@@ -21,7 +21,7 @@ import type { ReactNode } from 'react';
 import { ApiFailure, api } from '../app/api.ts';
 import type { Membership, SessionResult } from '../app/api.ts';
 import { bindConfig, formatMoney } from '../app/core.ts';
-import type { CurrencyFormat, FeatureGate, MoneyInput, Vocabulary } from '../app/core.ts';
+import type { Attribute, CurrencyFormat, FeatureGate, MoneyInput, Vocabulary } from '../app/core.ts';
 import { applyStoreTheme, parseStoreTheme } from '../styles/store-theme.ts';
 import { shell } from './api.ts';
 import type { ConsoleMe, ConsoleStore, ShellBadges, ShellData } from './api.ts';
@@ -37,6 +37,13 @@ export type ShellContextValue = {
   /** The config engine's two primitives. A component never branches on an industry name. */
   t: Vocabulary;
   has: FeatureGate;
+  /**
+   * The template's suggested option groups — AddProduct's "Suggested: Material · Fit" chips. Data, like the
+   * words: the Food template suggests Spice level and Extras, Fashion suggests Size and Colour.
+   */
+  attributes: readonly Attribute[];
+  /** "Food & drinks" — what Categories' subtitle says its word is called in. Null for a store with no template yet. */
+  templateName: string | null;
   currency: CurrencyFormat;
   money: (amount: MoneyInput) => string;
   badges: ShellBadges;
@@ -157,6 +164,8 @@ export function ShellProvider({ slug, children, fallback }: Props): ReactNode {
       stores: memberships,
       t: bound.t,
       has: bound.has,
+      attributes: data.config.attributes,
+      templateName: data.config.template?.name ?? null,
       currency,
       money: (amount: MoneyInput) => formatMoney(amount, currency),
       badges,

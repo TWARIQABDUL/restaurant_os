@@ -43,6 +43,11 @@ type Props = {
   initial: string;
   tileBackground: string;
   tileForeground: string;
+  /**
+   * The product's cover photo, from milestone 22. When there is one it fills the tile; the initial and tint
+   * remain as the fallback the boards draw, which is still the common case for a merchant's first ten items.
+   */
+  imageUrl?: string;
   soldOut?: boolean;
   /** The action. Absent for a card that is not orderable. */
   onAdd?: () => void;
@@ -66,6 +71,7 @@ export function ProductCard({
   initial,
   tileBackground,
   tileForeground,
+  imageUrl,
   soldOut = false,
   onAdd,
   onOpen,
@@ -78,9 +84,13 @@ export function ProductCard({
   // clickable is the version of this that keyboard users cannot use.
   const tile = (
     <>
-      <span aria-hidden="true" className={roomy ? 'font-display text-[44px]' : 'font-display text-[34px]'}>
-        {initial}
-      </span>
+      {imageUrl === undefined ? (
+        <span aria-hidden="true" className={roomy ? 'font-display text-[44px]' : 'font-display text-[34px]'}>
+          {initial}
+        </span>
+      ) : (
+        <img src={imageUrl} alt="" loading="lazy" className={`absolute inset-0 size-full object-cover ${soldOut ? 'opacity-50' : ''}`} />
+      )}
       {badge === undefined ? null : <CardBadge label={badge.label} tone={badge.tone} />}
     </>
   );
