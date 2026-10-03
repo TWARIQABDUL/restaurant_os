@@ -22,6 +22,7 @@ import type { ReactNode } from 'react';
 import { AuthPage } from '../auth/AuthPage.tsx';
 import { Console } from '../console/Console.tsx';
 import type { ConsoleView } from '../console/Console.tsx';
+import { Rider } from '../rider/Rider.tsx';
 import { Storefront } from '../storefront/Storefront.tsx';
 import type { StorefrontView } from '../storefront/Storefront.tsx';
 
@@ -71,6 +72,22 @@ function ConsoleRoute({ view }: { view: ConsoleView['kind'] }): ReactNode {
   return <Console slug={slug} view={{ kind: view }} navigate={(to) => navigate(to)} />;
 }
 
+/**
+ * The rider's own app — milestone 21, Auth's own destination for a rider written at milestone 15
+ * before this screen existed. `/rider/:store`, same reasoning as the console's `/app/:store`: the
+ * store comes from the URL. 'rider' joined V001's reserved slugs at milestone 21 for the same reason
+ * 'app' already was.
+ */
+function RiderRoute(): ReactNode {
+  const params = useParams();
+  const navigate = useNavigate();
+  const slug = params['store'];
+
+  if (typeof slug !== 'string' || slug === '') return <Navigate to="/signin" replace />;
+
+  return <Rider slug={slug} navigate={(to) => navigate(to)} />;
+}
+
 export function AppRoutes(): ReactNode {
   return (
     <BrowserRouter>
@@ -83,6 +100,10 @@ export function AppRoutes(): ReactNode {
             way, and V001 refuses `app` as a slug at the column, so the two cannot collide. */}
         <Route path="/app/:store" element={<ConsoleRoute view="dashboard" />} />
         <Route path="/app/:store/orders" element={<ConsoleRoute view="orders" />} />
+        <Route path="/app/:store/riders" element={<ConsoleRoute view="riders" />} />
+
+        {/* Same reasoning: 'rider' is reserved (V023), so this cannot collide with a storefront. */}
+        <Route path="/rider/:store" element={<RiderRoute />} />
 
         <Route path="/:store" element={<StoreRoute view="home" />} />
         <Route path="/:store/p/:productId" element={<StoreRoute view="product" />} />

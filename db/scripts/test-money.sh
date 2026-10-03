@@ -14,10 +14,13 @@
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_DB="vendlyfy_money_test"
 TEST_URL="postgresql://${OWNER_ROLE}:${OWNER_PASSWORD}@${HOST_ADDR}:${HOST_PORT}/${TEST_DB}"
-SCRATCH="/tmp/claude-1000/-home-abdalazizi-restaurant-os/9e37ab58-4cab-4b22-84d4-4d4b7273fc75/scratchpad"
+SCRATCH="$(mktemp -d)"
 PASSED=0; FAILED=0; LAST=""
 
-cleanup() { psql_db "$OWNER_ROLE" "$OWNER_PASSWORD" "$DB_NAME" -q -c "DROP DATABASE IF EXISTS ${TEST_DB} WITH (FORCE)" >/dev/null 2>&1 || true; }
+cleanup() {
+    rm -rf "$SCRATCH"
+    psql_db "$OWNER_ROLE" "$OWNER_PASSWORD" "$DB_NAME" -q -c "DROP DATABASE IF EXISTS ${TEST_DB} WITH (FORCE)" >/dev/null 2>&1 || true
+}
 trap cleanup EXIT
 require_docker
 [ "$(container_state)" = "running" ] || die "the database is not running. Run: npm run db:up"

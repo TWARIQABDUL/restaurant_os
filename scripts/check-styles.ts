@@ -39,6 +39,7 @@ const NEW_TREE = [
   'src/app',
   'src/storefront',
   'src/console',
+  'src/rider',
   // The render gate imports from all of the above, so it must not reach for the
   // legacy sheet either.
   'check',

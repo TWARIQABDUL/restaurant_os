@@ -12,9 +12,13 @@
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_DB="vendlyfy_orders_test"
 TEST_URL="postgresql://${OWNER_ROLE}:${OWNER_PASSWORD}@${HOST_ADDR}:${HOST_PORT}/${TEST_DB}"
+SCRATCH="$(mktemp -d)"
 PASSED=0; FAILED=0; LAST=""
 
-cleanup() { psql_db "$OWNER_ROLE" "$OWNER_PASSWORD" "$DB_NAME" -q -c "DROP DATABASE IF EXISTS ${TEST_DB} WITH (FORCE)" >/dev/null 2>&1 || true; }
+cleanup() {
+    rm -rf "$SCRATCH"
+    psql_db "$OWNER_ROLE" "$OWNER_PASSWORD" "$DB_NAME" -q -c "DROP DATABASE IF EXISTS ${TEST_DB} WITH (FORCE)" >/dev/null 2>&1 || true
+}
 trap cleanup EXIT
 require_docker
 [ "$(container_state)" = "running" ] || die "the database is not running. Run: npm run db:up"
@@ -228,9 +232,9 @@ step "Order numbers under concurrency — 20 at once"
 seq 1 20 | xargs -P 20 -I{} env PGPASSWORD="$OWNER_PASSWORD" \
     docker compose -f "$COMPOSE_FILE" exec -T -e PGPASSWORD="$OWNER_PASSWORD" "$SERVICE" \
     psql -h 127.0.0.1 -U "$OWNER_ROLE" -d "$TEST_DB" -tAc "SELECT next_order_number('${ST}')" \
-    > /tmp/claude-1000/-home-abdalazizi-restaurant-os/9e37ab58-4cab-4b22-84d4-4d4b7273fc75/scratchpad/nums.txt 2>/dev/null
-ALLOCATED="$(grep -c '^[0-9]' /tmp/claude-1000/-home-abdalazizi-restaurant-os/9e37ab58-4cab-4b22-84d4-4d4b7273fc75/scratchpad/nums.txt || echo 0)"
-DISTINCT="$(grep '^[0-9]' /tmp/claude-1000/-home-abdalazizi-restaurant-os/9e37ab58-4cab-4b22-84d4-4d4b7273fc75/scratchpad/nums.txt | sort -u | wc -l | tr -d ' ')"
+    > "$SCRATCH/nums.txt" 2>/dev/null
+ALLOCATED="$(grep -c '^[0-9]' "$SCRATCH/nums.txt" || echo 0)"
+DISTINCT="$(grep '^[0-9]' "$SCRATCH/nums.txt" | sort -u | wc -l | tr -d ' ')"
 if [ "$ALLOCATED" = "20" ] && [ "$DISTINCT" = "20" ]; then
     pass "twenty concurrent allocations produced twenty distinct numbers"
 else

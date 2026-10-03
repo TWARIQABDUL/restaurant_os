@@ -93,7 +93,7 @@ export const NAV_GROUPS: readonly (readonly NavItem[])[] = [
       label: 'Riders & cash',
       icon: 'riders',
       path: '/riders',
-      built: false,
+      built: true,
       needs: 'orders.assign_rider',
       milestone: 21,
     },

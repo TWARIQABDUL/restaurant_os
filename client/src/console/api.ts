@@ -341,3 +341,94 @@ export const orders = {
       { amount, reasonCode, reasonNote },
     ),
 };
+
+// ---------------------------------------------------------------------------
+// Staff — just enough to add a rider from CashReport's own button (milestone 21).
+// Settings' Staff panel (milestone 25) is this same endpoint's real home.
+// ---------------------------------------------------------------------------
+
+export type NewMember = {
+  created: boolean;
+  userId: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'manager' | 'rider';
+};
+
+export const members = {
+  createRider: (
+    storeId: string,
+    input: { name: string; email: string; password: string; plateNumber: string; phone?: string },
+  ): Promise<NewMember> =>
+    api.post<NewMember>(`/api/stores/${storeId}/members`, { ...input, role: 'rider' }),
+};
+
+// ---------------------------------------------------------------------------
+// Riders & cash — milestone 21
+// ---------------------------------------------------------------------------
+
+export type RosterRow = {
+  id: string;
+  name: string;
+  phone: string | null;
+  plate: string;
+  availability: 'available' | 'off_duty';
+  activeJobs: number;
+  cashCarried: string;
+  lastUpdate: string;
+};
+
+export type CashOrderLine = { id: string; orderNumber: number; label: string; amount: string };
+
+export type GapResolution = 'carry_over' | 'discount' | 'write_off';
+
+export type RiderCashCard = {
+  riderId: string;
+  name: string;
+  closedToday: boolean;
+  settlementId: string | null;
+  deliveredToday: CashOrderLine[];
+  stillOut: CashOrderLine[];
+  expected: string;
+  handedInToday: string;
+  due: string;
+  gapAmount: string | null;
+  gapResolution: GapResolution | null;
+};
+
+export type CarriedOverDebt = {
+  settlementId: string;
+  riderName: string;
+  businessDate: string;
+  gapAmount: string;
+  orderNumber: number | null;
+};
+
+export const ridersApi = {
+  roster: (storeId: string): Promise<{ roster: RosterRow[] }> =>
+    api.get<{ roster: RosterRow[] }>(`/api/stores/${storeId}/riders`),
+
+  cashReport: (storeId: string): Promise<{ cards: RiderCashCard[]; carriedOver: CarriedOverDebt[] }> =>
+    api.get<{ cards: RiderCashCard[]; carriedOver: CarriedOverDebt[] }>(`/api/stores/${storeId}/riders/cash-report`),
+
+  handover: (storeId: string, riderId: string, amount: string, note?: string): Promise<{ handoverId: string }> =>
+    api.post<{ handoverId: string }>(`/api/stores/${storeId}/riders/${riderId}/handover`, { amount, note }),
+
+  closeDay: (
+    storeId: string,
+    riderId: string,
+    counted: string,
+    resolution?: GapResolution,
+    gapOrderId?: string,
+    gapNote?: string,
+  ): Promise<{ settlementId: string }> =>
+    api.post<{ settlementId: string }>(`/api/stores/${storeId}/riders/${riderId}/close-day`, {
+      counted,
+      resolution,
+      gapOrderId,
+      gapNote,
+    }),
+
+  receiveCarriedOver: (storeId: string, settlementId: string): Promise<{ ok: boolean }> =>
+    api.post<{ ok: boolean }>(`/api/stores/${storeId}/riders/settlements/${settlementId}/receive`),
+};

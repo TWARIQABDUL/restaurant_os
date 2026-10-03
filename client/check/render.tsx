@@ -47,6 +47,9 @@ import { Dashboard } from '../src/console/Dashboard.tsx';
 import { NotificationsPanel } from '../src/console/NotificationsPanel.tsx';
 import { OrderAlert } from '../src/console/OrderAlert.tsx';
 import { columnOf, COLUMN_LABELS, Orders, statusMeta } from '../src/console/Orders.tsx';
+import { CashReport } from '../src/console/CashReport.tsx';
+import { RiderApp } from '../src/rider/Rider.tsx';
+import type { RiderHome } from '../src/rider/api.ts';
 import { Console } from '../src/console/Console.tsx';
 import { MOBILE_TABS, NAV_GROUPS, consoleHref, hrefFor, maySee } from '../src/console/nav.ts';
 import { dateline, greeting, notificationLine, relativeWhen, toneClasses, waitingClock } from '../src/console/lines.ts';
@@ -917,6 +920,52 @@ const DETAIL_RETURNED = orderDetail(ORDER_LIST[8]!, {
   expect(columnOf(ORDER_LIST[8]!) === 4, 'a return needs closing too');
 }
 
+// --- Riders & cash, and the rider's own app — milestone 21 ---------------------------------------
+const ROSTER = [
+  { id: 'r1', name: 'Eric Mugisha', phone: '078 455 9012', plate: 'RAD 482 K', availability: 'available' as const, activeJobs: 2, cashCarried: '0.00', lastUpdate: new Date().toISOString() },
+  { id: 'r2', name: 'Claude Habineza', phone: '078 612 7781', plate: 'RAE 115 C', availability: 'available' as const, activeJobs: 1, cashCarried: '10000.00', lastUpdate: new Date().toISOString() },
+  { id: 'r3', name: 'Olivier Nzeyimana', phone: '072 990 3310', plate: 'RAB 903 F', availability: 'off_duty' as const, activeJobs: 0, cashCarried: '0.00', lastUpdate: new Date().toISOString() },
+];
+const CASH_CARDS = [
+  {
+    riderId: 'r2', name: 'Claude Habineza', closedToday: false, settlementId: null,
+    deliveredToday: [{ id: 'o1', orderNumber: 1015, label: 'delivered', amount: '6000.00' }],
+    stillOut: [],
+    expected: '18500.00', handedInToday: '6000.00', due: '12500.00', gapAmount: null, gapResolution: null,
+  },
+  {
+    riderId: 'r1', name: 'Eric Mugisha', closedToday: false, settlementId: null,
+    deliveredToday: [],
+    stillOut: [{ id: 'o2', orderNumber: 1026, label: 'assigned, not picked up', amount: '12000.00' }],
+    expected: '0.00', handedInToday: '0.00', due: '0.00', gapAmount: null, gapResolution: null,
+  },
+  {
+    riderId: 'r3', name: 'Olivier Nzeyimana', closedToday: true, settlementId: 's1',
+    deliveredToday: [], stillOut: [],
+    expected: '0.00', handedInToday: '0.00', due: '0.00', gapAmount: '0.00', gapResolution: null,
+  },
+];
+const CARRIED_OVER = [
+  { settlementId: 's9', riderName: 'Olivier Nzeyimana', businessDate: '2026-09-21', gapAmount: '1000.00', orderNumber: 994 },
+];
+
+const RIDER_JOB_AT_STORE: RiderHome['jobs'][number] = {
+  id: 'j1', orderNumber: 1026, status: 'assigned', storeName: 'Nyama & Co.', storeAddress: 'KG 7 Ave, Kimihurura',
+  customer: 'Grace Ingabire', phone: '078 455 1209', address: 'KG 541 St, house 12, Kacyiru',
+  paymentMethod: 'cash', cashDue: '12000.00', total: '12000.00', placedAt: new Date().toISOString(),
+  lines: [{ id: 'l1', productName: 'Chicken burger', variantLabel: '', optionLabels: [], quantity: 2, unitPrice: '3500.00', lineTotal: '7000.00' }],
+};
+const RIDER_JOB_ON_ROAD: RiderHome['jobs'][number] = { ...RIDER_JOB_AT_STORE, id: 'j2', orderNumber: 1024, status: 'out', paymentMethod: 'mtn_momo', cashDue: null };
+const RIDER_JOB_ON_ROAD_CASH: RiderHome['jobs'][number] = { ...RIDER_JOB_AT_STORE, id: 'j3', orderNumber: 1029, status: 'out' };
+const RIDER_HOME: RiderHome = {
+  storeName: 'Nyama & Co.',
+  currency: CURRENCY,
+  me: { name: 'Eric Mugisha', phone: '078 455 9012', plateNumber: 'RAD 482 K' },
+  availability: 'available',
+  cashHeld: '0.00',
+  jobs: [RIDER_JOB_AT_STORE, RIDER_JOB_ON_ROAD, RIDER_JOB_ON_ROAD_CASH],
+};
+
 
 const consoleParts: readonly (readonly [string, ReactNode])[] = [
   ['Sidebar', inConsole(<Sidebar active="dashboard" unread={7} onOpenNotifications={noop} navigate={noop} />)],
@@ -990,6 +1039,20 @@ const consoleParts: readonly (readonly [string, ReactNode])[] = [
   // loading state — renders rather than throwing.
   ['Console · first paint', <Console slug="nyama" view={{ kind: 'dashboard' }} navigate={noop} />],
   ['Console · first paint, Orders', <Console slug="nyama" view={{ kind: 'orders' }} navigate={noop} />],
+  ['Console · first paint, Riders & cash', <Console slug="nyama" view={{ kind: 'riders' }} navigate={noop} />],
+
+  // CashReport — milestone 21. Same testing seam as Orders.tsx: no effects run in SSR.
+  ['CashReport · roster, cards and a carried-over debt', inConsole(<CashReport initialRoster={ROSTER} initialCards={CASH_CARDS} initialCarriedOver={CARRIED_OVER} />)],
+  ['CashReport · nothing to close today', inConsole(<CashReport initialRoster={ROSTER} initialCards={[]} initialCarriedOver={[]} />)],
+
+  // The rider's own app — milestone 21. RiderApp is exported precisely so the gate can seed it, the
+  // same reason Orders.tsx exports its own internals for testing.
+  ['Rider · list, with a cash job and an online one', <RiderApp storeId="s1" initialData={RIDER_HOME} />],
+  ['Rider · job detail, at the store (pick-up checklist)', <RiderApp storeId="s1" initialData={RIDER_HOME} initialSelectedId="j1" initialView="job" />],
+  ['Rider · job detail, on the road', <RiderApp storeId="s1" initialData={RIDER_HOME} initialSelectedId="j2" initialView="job" />],
+  ['Rider · the cash sheet', <RiderApp storeId="s1" initialData={RIDER_HOME} initialSelectedId="j3" initialView="job" initialMode="cash" />],
+  ['Rider · the couldn\'t-deliver sheet', <RiderApp storeId="s1" initialData={RIDER_HOME} initialSelectedId="j2" initialView="job" initialMode="fail" />],
+  ['Rider · no deliveries right now', <RiderApp storeId="s1" initialData={{ ...RIDER_HOME, jobs: [] }} />],
 ];
 
 for (const [name, node] of consoleParts) {

@@ -41,6 +41,8 @@ import storefrontCheckoutRoutes from '../routes/storefrontCheckout.ts';
 import storefrontAccountRoutes from '../routes/storefrontAccount.ts';
 import storeDashboardRoutes from '../routes/storeDashboard.ts';
 import storeOrderRoutes from '../routes/storeOrders.ts';
+import riderAppRoutes from '../routes/riderApp.ts';
+import storeRidersRoutes from '../routes/storeRiders.ts';
 import storeShellRoutes from '../routes/storeShell.ts';
 import storeNotificationRoutes from '../routes/storeNotifications.ts';
 import { publicInvitesRouter, storeInvitesRouter } from '../routes/invites.ts';
@@ -67,6 +69,10 @@ export const REQUIRED_PERMISSIONS = [
   // Milestone 20. V001 seeded this for owner/admin/manager from the start — Auth's invite screen already
   // promised a manager could "assign riders" — but nothing asked for it until the Orders board's picker did.
   'orders.assign_rider',
+  // Milestone 21. V001 seeded these for 'rider' at the very start (§5.4: "their own deliveries only"),
+  // and nothing asked for them until the rider's own app did — the same gap orders.assign_rider closed.
+  'deliveries.own_read',
+  'deliveries.own_update',
 ] as const;
 
 export function createApp(): Express {
@@ -146,6 +152,12 @@ export function createApp(): Express {
   // Milestone 19 shipped accept() alone, for the new-order alert. Milestone 20 fills in the rest: the board, the
   // list, declining, the rider picker, cash confirmation and returns.
   app.use('/api/stores/:storeId/orders', storeOrderRoutes);
+  // The rider's own app — their jobs, their availability, their own cash. Mounted separately from
+  // /orders because its permission is deliveries.own_*, not orders.*: a rider reaches none of the
+  // routes above, and nothing above reaches these.
+  app.use('/api/stores/:storeId/rider', riderAppRoutes);
+  // The merchant's own "Riders & cash" — the roster and the end-of-day settlement.
+  app.use('/api/stores/:storeId/riders', storeRidersRoutes);
   app.use('/api/stores/:storeId/notifications', storeNotificationRoutes);
   app.use('/api/stores/:storeId/settings', storeSettingsRoutes);
   app.use('/api/stores/:storeId/config', storeConfigRoutes);

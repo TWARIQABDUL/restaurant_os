@@ -32,6 +32,8 @@ export const USER = {
   customerA: uid(0x17),
   /** Admin at A AND manager at B — §5.4's "Owner at Nyama & Co. and Manager at Inzu Threads". */
   multiStore: uid(0x18),
+  /** A second rider at A — milestone 21's ownership check needs two riders to tell apart. */
+  riderC: uid(0x19),
 } as const;
 
 /**
@@ -86,6 +88,7 @@ const STAFF: { id: string; name: string; email: string; store: string; role: str
   { id: USER.managerA, name: 'Manager A', email: `manager-a@${EMAIL_DOMAIN}`, store: STORE.a, role: 'manager' },
   // A phone, because Auth's rider signs in with one: "078 455 9012".
   { id: USER.riderA, name: 'Rider A', email: `rider-a@${EMAIL_DOMAIN}`, store: STORE.a, role: 'rider', phone: '078 455 9012' },
+  { id: USER.riderC, name: 'Rider C', email: `rider-c@${EMAIL_DOMAIN}`, store: STORE.a, role: 'rider', phone: '078 455 9013' },
   { id: USER.adminB, name: 'Admin B', email: `admin-b@${EMAIL_DOMAIN}`, store: STORE.b, role: 'admin' },
 ];
 
@@ -197,6 +200,11 @@ export async function cleanup(): Promise<void> {
       [stores],
     );
     await tx.query(`DELETE FROM order_discounts WHERE store_id = ANY($1::uuid[])`, [stores]);
+    // Milestone 21: both reference store_members (RESTRICT) and rider_cash_settlements also reaches
+    // orders (gap_order_id, RESTRICT) — so both must go before orders and before store_members, not
+    // after. Found by a cleanup() that failed on exactly this FK the first time riders.test.ts ran.
+    await tx.query(`DELETE FROM rider_cash_handovers WHERE store_id = ANY($1::uuid[])`, [stores]);
+    await tx.query(`DELETE FROM rider_cash_settlements WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM orders WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM store_order_counters WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM promotions WHERE store_id = ANY($1::uuid[])`, [stores]);
@@ -249,9 +257,9 @@ export async function seedFixtures(): Promise<void> {
   // The rider needs a profile to be a rider in any useful sense, and the test that
   // creates one through the endpoint needs a plate already taken to collide with.
   await sql(
-    `INSERT INTO rider_profiles (user_id, store_id, plate_number, availability)
-          VALUES ($1, $2, 'RAX 100 A', 'available')`,
-    [USER.riderA, STORE.a],
+    `INSERT INTO rider_profiles (user_id, store_id, plate_number, availability) VALUES
+          ($1, $3, 'RAX 100 A', 'available'), ($2, $3, 'RAX 200 B', 'available')`,
+    [USER.riderA, USER.riderC, STORE.a],
   );
 
   // One identity, two stores, two roles.
@@ -315,7 +323,7 @@ export async function seedAuthPasswords(): Promise<void> {
   await sql(
     `UPDATE users SET password_hash = $2
       WHERE id = ANY($1::uuid[])`,
-    [[USER.ownerA, USER.managerA, USER.adminB, USER.superAdmin, USER.multiStore, USER.riderA, USER.customerA], hash],
+    [[USER.ownerA, USER.managerA, USER.adminB, USER.superAdmin, USER.multiStore, USER.riderA, USER.riderC, USER.customerA], hash],
   );
 }
 
@@ -555,6 +563,16 @@ export const ORDERS_BOARD = {
   returnedForRetry: uid(0x528),
 } as const;
 
+/** Milestone 21 — one order per rider-app action, all riderA's, none shared with ORDERS_BOARD's own. */
+export const RIDER_BOARD = {
+  toPickUp: uid(0x530),
+  onRoadMomo: uid(0x531),
+  onRoadCash: uid(0x532),
+  toReturn: uid(0x533),
+  /** Delivered AND cash-confirmed already, today — for the roster and the cash report to read. */
+  confirmedToday: uid(0x534),
+} as const;
+
 /**
  * Returns the complaint's id, because the fixture does not choose it.
  *
@@ -658,6 +676,43 @@ export async function seedOrdersBoard(): Promise<void> {
   // returnedMomo needs its escrow released to be refundable the way a real delivered-then-returned order's
   // would be — the same fact the DB suite (db/scripts/test-orders-console.sh) sets up by hand.
   await sql(`UPDATE orders SET settlement_status = 'released' WHERE id = $1`, [ORDERS_BOARD.returnedMomo]);
+}
+
+/** Milestone 21 — riderA's own fixtures: one order per action the rider app and CashReport exercise. */
+export async function seedRiderBoard(): Promise<void> {
+  const base = {
+    toPickUp: ['assigned', 'mtn_momo', 'unpaid'] as const,
+    onRoadMomo: ['out', 'mtn_momo', 'unpaid'] as const,
+    onRoadCash: ['out', 'cash', 'unpaid'] as const,
+    toReturn: ['out', 'mtn_momo', 'paid'] as const,
+    confirmedToday: ['delivered', 'cash', 'unpaid'] as const,
+  } as const;
+
+  let number = 9700;
+  for (const [key, [status, method, payStatus]] of Object.entries(base)) {
+    number += 1;
+    const id = RIDER_BOARD[key as keyof typeof RIDER_BOARD];
+    const paidAt = payStatus === 'paid' ? new Date() : null;
+    await withTransaction(async (tx) => {
+      await tx.query(
+        `INSERT INTO orders (id, store_id, order_number, tracking_code, idempotency_key, guest_name, guest_phone,
+                             delivery_address, fulfilment_type, status, payment_method, payment_status, paid_at,
+                             currency, subtotal_amount, rider_user_id)
+              VALUES ($1, $2, $3, $4, $5, 'A Customer', '078 000 0002',
+                      'KG 11 Ave, Kigali', 'delivery', $6, $7, $8, $9, 'RWF', 8000, $10)`,
+        [id, STORE.a, number, `trk_rider_${number}`, `idem_rider_board_${number}`, status, method, payStatus, paidAt, USER.riderA],
+      );
+      await tx.query(
+        `INSERT INTO order_items (order_id, store_id, variant_id, product_name, unit_price_amount, quantity)
+              VALUES ($1, $2, $3, 'Passion Juice', 8000, 1)`,
+        [id, STORE.a, uid(0x310)],
+      );
+    });
+  }
+
+  // Delivered and cash-confirmed, through the real function — not hand-set — so cash_reported_amount,
+  // cash_confirmed_at and payment_status agree the way confirm_cash_payment() actually leaves them.
+  await sql(`SELECT confirm_cash_payment($1, 8000, $2)`, [RIDER_BOARD.confirmedToday, USER.ownerA]);
 }
 
 /** The notifications the panel reads. Written through notify(), so V010 checks the payload keys as in production. */

@@ -20,6 +20,8 @@ type StoreRow = {
   why: string;
   /** V018. The tel: link on StoreDesktop's store-info panel. */
   phone?: string;
+  /** V023. Where a rider collects from — not store_pickup_settings.address, which is customer-facing only. */
+  address?: string;
   /**
    * V018. Opening hours as [day, opens, closes] with ISO day numbers, 1 = Monday.
    * A day with no entry is closed, so Inzu's missing Sunday IS its Sunday.
@@ -42,6 +44,7 @@ const STORES: StoreRow[] = [
     why: 'the demo store almost every board is drawn against',
     // Shop.dc.html's header reads "Open · closes 22:00" and StoreDesktop's panel "Daily 10:00-22:00".
     phone: '+250 78 000 0000', hours: daily('10:00', '22:00'),
+    address: 'KG 7 Ave, Kimihurura',
   },
   {
     id: STORE.inzu, slug: 'inzu', name: 'Inzu Threads', template: 'fashion',
@@ -49,6 +52,7 @@ const STORES: StoreRow[] = [
     why: 'the second industry, and the one carrying a real variant matrix',
     // StoreDesktop's clothing variant: "Open · closes 19:00", and shut on Sunday.
     phone: '+250 78 111 2020', hours: weekdaysAndSaturday('10:00', '19:00'),
+    address: 'KG 5 Ave, Kimihurura',
   },
   {
     id: STORE.kicks, slug: 'kigali-kicks', name: 'Kigali Kicks', template: 'fashion',
@@ -59,6 +63,7 @@ const STORES: StoreRow[] = [
     // spanning two days.
     phone: '+250 78 222 3030',
     hours: [[5, '18:00', '01:00'], [6, '18:00', '01:00']],
+    address: 'KN 4 Ave, Nyarugenge',
   },
   {
     id: STORE.ubwiza, slug: 'ubwiza-beauty', name: 'Ubwiza Beauty', template: 'beauty',
@@ -83,15 +88,15 @@ export async function seedStores(ctx: Ctx): Promise<void> {
   for (const s of STORES) {
     await ctx.sql(
       `INSERT INTO stores (id, slug, name, country, selling_currency, status, plan_key,
-                           public_phone, industry_template_id, industry_template_version)
-       SELECT $1, $2, $3, 'RW', 'RWF', $4, $5, $7, t.id, v.version
+                           public_phone, address, industry_template_id, industry_template_version)
+       SELECT $1, $2, $3, 'RW', 'RWF', $4, $5, $7, $8, t.id, v.version
          FROM industry_templates t
          JOIN industry_template_versions v
            ON v.template_id = t.id AND v.status = 'published'
         WHERE t.key = $6
         ORDER BY v.version DESC
         LIMIT 1`,
-      [s.id, s.slug, s.name, s.status, s.plan, s.template, s.phone ?? null],
+      [s.id, s.slug, s.name, s.status, s.plan, s.template, s.phone ?? null, s.address ?? null],
     );
     for (const [day, opens, closes] of s.hours ?? []) {
       await ctx.sql(

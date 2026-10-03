@@ -22,6 +22,7 @@ import { ApiFailure } from '../app/api.ts';
 import { Alert, Button, SkeletonCard, Toast } from '../shared/ui/index.ts';
 import { dashboard as dashboardApi, notifications as notificationsApi } from './api.ts';
 import type { DashboardData, OrderAlert as AlertData } from './api.ts';
+import { CashReport } from './CashReport.tsx';
 import { Dashboard } from './Dashboard.tsx';
 import { NotificationsPanel } from './NotificationsPanel.tsx';
 import { OrderAlert } from './OrderAlert.tsx';
@@ -35,8 +36,8 @@ import { unlockSoundOnFirstGesture } from './chime.ts';
 const ALERT_EVERY_MS = 10_000;
 const FIGURES_EVERY_MS = 60_000;
 
-/** Milestone 20 adds 'orders'. Every screen from here adds one more case, not a new prop. */
-export type ConsoleView = { kind: 'dashboard' } | { kind: 'orders' };
+/** Milestone 20 added 'orders'; milestone 21 adds 'riders'. Every screen from here adds one more case. */
+export type ConsoleView = { kind: 'dashboard' } | { kind: 'orders' } | { kind: 'riders' };
 
 type Props = {
   slug: string;
@@ -203,6 +204,8 @@ function ConsoleFrame({ view, navigate }: { view: ConsoleView; navigate: (to: st
 
         {view.kind === 'orders' ? (
           <Orders navigate={navigate} />
+        ) : view.kind === 'riders' ? (
+          <CashReport />
         ) : data === null ? (
           failure === null ? (
             <div className="flex flex-col gap-4">
