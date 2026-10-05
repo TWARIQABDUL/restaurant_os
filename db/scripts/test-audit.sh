@@ -213,9 +213,13 @@ equals "every entry links to exactly one predecessor" "0" \
        AND a.previous_hash <> (SELECT entry_hash FROM audit_log b WHERE b.sequence = a.sequence - 1)"
 equals "no two entries hash the same, even written in the same instant" "10" \
     "SELECT count(DISTINCT entry_hash) FROM audit_log"
+# SEQUENCE IS THE ORDER, created_at IS ONLY ROUGHLY ONE. created_at is now() — the moment the writing TRANSACTION began — while
+# the sequence is taken when the row is chained, under a lock. Ten writers that start together can therefore chain in a different
+# order from the one they started in, by milliseconds. The assertion used to demand strict agreement and failed about one run in
+# three; the claim worth making is that the two never drift apart by more than the writers' own overlap.
 equals "and they are ordered within the second they were written" "true" \
     "SELECT bool_and(ok)::text FROM (
-       SELECT created_at >= lag(created_at) OVER (ORDER BY sequence) AS ok FROM audit_log) t
+       SELECT created_at >= lag(created_at) OVER (ORDER BY sequence) - interval '1 second' AS ok FROM audit_log) t
      WHERE ok IS NOT NULL"
 
 # =============================================================================

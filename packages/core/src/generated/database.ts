@@ -452,7 +452,7 @@ export interface KycDocumentsRow {
   quality: string | null;
   quality_note: string | null;
   review_outcome: string | null;
-  /** When the bytes may be deleted. NULL because the retention period is a placeholder in the design — one of the two things Part 8 says to answer before this phase ships. */
+  /** When the bytes may be deleted. Set by trigger for a face video (the moment the case is decided or the video is replaced); NULL for ID documents, which are kept encrypted — no period has been chosen, so none is invented. */
   retain_until: Date | null;
   purged_at: Date | null;
   superseded_at: Date | null;

@@ -29,6 +29,7 @@ import { Complaints } from './Complaints.tsx';
 import { Customers } from './Customers.tsx';
 import { Customize } from './Customize.tsx';
 import { Settings } from './Settings.tsx';
+import { Verify } from './Verify.tsx';
 import { Dashboard } from './Dashboard.tsx';
 import { NotificationsPanel } from './NotificationsPanel.tsx';
 import { OrderAlert } from './OrderAlert.tsx';
@@ -67,7 +68,8 @@ export type ConsoleView =
   | { kind: 'analytics' }
   | { kind: 'settings' }
   | { kind: 'design' }
-  | { kind: 'theme' };
+  | { kind: 'theme' }
+  | { kind: 'verify' };
 
 /** The sidebar highlights the list while its editor is open: the editor is Products, one level down. */
 export function activeItem(view: ConsoleView): string {
@@ -84,10 +86,11 @@ export function Console({ slug, view, navigate }: Props): ReactNode {
   // THE TWO STUDIOS ARE FULL-SCREEN EDITORS, not console pages: their boards have a header and a preview and no sidebar,
   // and the console's polling (the order alert, the dashboard figures) has no business running behind a design editor.
   // They still need the shell — the store, the role and the money formatter — so they sit inside the same provider.
-  if (view.kind === 'design' || view.kind === 'theme') {
+  // The identity check is a third such screen: a phone-width flow with its own header, opened from Money's banner.
+  if (view.kind === 'design' || view.kind === 'theme' || view.kind === 'verify') {
     return (
       <ShellProvider slug={slug} fallback={(state, retry) => <ShellFallback state={state} retry={retry} navigate={navigate} />}>
-        {view.kind === 'design' ? <Customize navigate={navigate} /> : <ThemeStudio navigate={navigate} />}
+        {view.kind === 'design' ? <Customize navigate={navigate} /> : view.kind === 'theme' ? <ThemeStudio navigate={navigate} /> : <Verify navigate={navigate} />}
       </ShellProvider>
     );
   }

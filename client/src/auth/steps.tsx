@@ -112,6 +112,13 @@ export function SignInStep({
           Sign in
         </Button>
       </form>
+      {/* Milestone 26: the way in for somebody with no account. Not on the Auth board, which assumes one exists. */}
+      <p className="mt-4 text-center text-caption text-muted">
+        New to Vendlyfy?{' '}
+        <a href="/signup" className="font-semibold text-store-primary">
+          Create your store
+        </a>
+      </p>
     </>
   );
 }

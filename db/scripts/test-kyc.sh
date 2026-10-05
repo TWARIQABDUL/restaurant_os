@@ -302,11 +302,21 @@ equals  "and naming the case, so it can be found from either end" "kyc_submissio
 equals  "the log is still sound after all of it" "0" "SELECT count(*) FROM verify_audit_chain()"
 
 # =============================================================================
-step "Retention: built, and inert until somebody sets a period"
+step "Retention: the face video goes once used, the ID photos stay (V028)"
 # =============================================================================
-equals "no document has a retention date, because the period is a placeholder" "0" \
-    "SELECT count(*) FROM kyc_documents WHERE retain_until IS NOT NULL"
-equals "so the sweep does nothing" "0" "SELECT count(*) FROM purge_expired_kyc_documents()"
+# V012 shipped this section as "inert until somebody sets a period", because the design's [RETENTION PERIOD] was an open
+# question. V028 is the answer: a face video is due the moment its case is decided or it is replaced; ID documents have no
+# date at all, because they are kept.
+equals "no ID document has a retention date — they are kept" "0" \
+    "SELECT count(*) FROM kyc_documents WHERE retain_until IS NOT NULL AND part <> 'face_video'"
+equals "only the videos of decided cases are due" "0" \
+    "SELECT count(*) FROM kyc_documents d JOIN kyc_submissions s ON s.id = d.submission_id
+      WHERE d.part = 'face_video' AND d.retain_until IS NOT NULL AND s.status NOT IN ('approved','rejected')"
+EXPECT_VIDEOS="$(q "SELECT count(*) FROM kyc_documents d JOIN kyc_submissions s ON s.id = d.submission_id
+                     WHERE d.part = 'face_video' AND d.purged_at IS NULL AND s.status IN ('approved','rejected')")"
+equals "and the sweep removes exactly those" "${EXPECT_VIDEOS}" "SELECT count(*) FROM purge_expired_kyc_documents()"
+equals "the ID photos of the approved case are untouched" "2" \
+    "SELECT count(*) FROM kyc_documents WHERE submission_id='${K1}' AND part IN ('id_front','id_back') AND purged_at IS NULL"
 accepts "set one, as an answered decision would" \
     "UPDATE kyc_documents SET retain_until = now() - interval '1 day'
       WHERE submission_id='${K1}' AND part='id_front'"
@@ -321,6 +331,23 @@ equals  "running it again purges nothing twice" "0" "SELECT count(*) FROM purge_
 refuses "a purged document pretending to still have bytes" "purged_has_no_key" \
     "UPDATE kyc_documents SET storage_key='kyc/back-again.jpg'
       WHERE submission_id='${K1}' AND part='id_front'"
+
+S4='44444444-0000-0000-0000-000000000004'; D4='aaaa0000-0000-0000-0000-000000000004'
+accepts "a fourth merchant, to retake a video before any decision" \
+    "INSERT INTO stores (id,slug,name,country,selling_currency,status) VALUES ('${S4}','retake-video','Retake Video','RW','RWF','active');
+     INSERT INTO users (id,scope,email,password_hash,name) VALUES ('${D4}','platform','retake@example.com','h','Retake Person');
+     INSERT INTO store_members (user_id,store_id,role) VALUES ('${D4}','${S4}','owner')"
+K4="$(q "SELECT submit_kyc('${S4}','${D4}','national_id')")"
+accepts "the first video" "SELECT attach_kyc_document('${K4}','face_video','abc:one.bin','video/webm',100)"
+accepts "a second one, after the person blinked" "SELECT attach_kyc_document('${K4}','face_video','abc:two.bin','video/webm',100)"
+equals "the replaced video is due at once" "abc:one.bin|true" \
+    "SELECT storage_key || '|' || (retain_until IS NOT NULL) FROM kyc_documents WHERE submission_id='${K4}' AND part='face_video' AND superseded_at IS NOT NULL"
+equals "the live one is not" "abc:two.bin|false" \
+    "SELECT storage_key || '|' || (retain_until IS NOT NULL) FROM kyc_documents WHERE submission_id='${K4}' AND part='face_video' AND superseded_at IS NULL"
+accepts "a replaced ID photo is kept as the record of what was first sent" \
+    "SELECT attach_kyc_document('${K4}','id_front','abc:front1.bin','image/jpeg',100); SELECT attach_kyc_document('${K4}','id_front','abc:front2.bin','image/jpeg',100)"
+equals "with no retention date" "0" \
+    "SELECT count(*) FROM kyc_documents WHERE submission_id='${K4}' AND part='id_front' AND retain_until IS NOT NULL"
 
 # =============================================================================
 step "Ten reviewers deciding one case at once"

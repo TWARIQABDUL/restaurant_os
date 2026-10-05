@@ -260,6 +260,11 @@ export function Wallet({ navigate, initialData, initialActivity, initialPayouts,
           <span className="flex flex-col gap-0.5">
             <strong>{lock.title}</strong>
             <span className="text-body text-ink-2">{lock.body}</span>
+            <span className="mt-1">
+              <Button variant="secondary" onClick={() => navigate(hrefFor(store.slug, '/verify'))}>
+                {data.identity === 'in_review' ? 'See where it stands' : 'Verify now'}
+              </Button>
+            </span>
           </span>
         </div>
       )}

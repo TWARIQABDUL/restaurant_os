@@ -26,6 +26,8 @@ import { errorHandler, unmatchedRoute } from './errorHandler.ts';
 import sessionRoutes from '../routes/session.ts';
 import storeConfigRoutes from '../routes/storeConfig.ts';
 import storeThemeRoutes from '../routes/storeTheme.ts';
+import { storeKycRoutes } from '../routes/storeKyc.ts';
+import onboardingRoutes from '../routes/onboarding.ts';
 import storefrontConfigRoutes from '../routes/storefrontConfig.ts';
 import storefrontThemeRoutes from '../routes/storefrontTheme.ts';
 import storefrontStoreRoutes from '../routes/storefrontStore.ts';
@@ -146,6 +148,8 @@ export function createApp(): Express {
 
   // Names no store: it tells a signed-in person which stores they are a member of.
   app.use('/api/session', sessionRoutes);
+  // Milestone 26: a stranger becomes a merchant. Public by nature; rate-limited like sign-in. See the router's header.
+  app.use('/api/onboarding', onboardingRoutes);
 
   // THE STORE IS IN THE PATH. Not in a header, not in the body, and with no fallback to
   // "the first active store" — the three things the old resolveTenant() did. The guard
@@ -184,6 +188,7 @@ export function createApp(): Express {
   app.use('/api/stores/:storeId/settings', storeSettingsRoutes);
   app.use('/api/stores/:storeId/config', storeConfigRoutes);
   app.use('/api/stores/:storeId/theme', storeThemeRoutes);
+  app.use('/api/stores/:storeId/kyc', storeKycRoutes);
 
   // Product photos, served from whichever ImageStore is configured. PUBLIC and GET-only: a storefront <img>
   // carries no session, and the name is 128 random bits.

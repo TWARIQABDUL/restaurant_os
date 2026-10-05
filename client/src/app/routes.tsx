@@ -20,6 +20,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { AuthPage } from '../auth/AuthPage.tsx';
+import { Onboarding } from '../onboarding/Onboarding.tsx';
 import { Console } from '../console/Console.tsx';
 import type { ConsoleView } from '../console/Console.tsx';
 import { Rider } from '../rider/Rider.tsx';
@@ -93,6 +94,11 @@ function RiderRoute(): ReactNode {
   return <Rider slug={slug} navigate={(to) => navigate(to)} />;
 }
 
+function SignupRoute(): ReactNode {
+  const navigate = useNavigate();
+  return <Onboarding navigate={(to) => navigate(to)} />;
+}
+
 export function AppRoutes(): ReactNode {
   return (
     <BrowserRouter>
@@ -100,6 +106,8 @@ export function AppRoutes(): ReactNode {
         {/* Auth keeps its own path handling for the invite token, which it reads from the URL itself. */}
         <Route path="/signin" element={<AuthPage />} />
         <Route path="/invite/:token" element={<AuthPage />} />
+        {/* Milestone 26: a stranger becomes a merchant. `signup` is reserved at the column (V001), so it cannot be a store. */}
+        <Route path="/signup" element={<SignupRoute />} />
 
         {/* The console, BEFORE the storefront's /:store — react-router prefers the more specific path either
             way, and V001 refuses `app` as a slug at the column, so the two cannot collide. */}
@@ -117,6 +125,7 @@ export function AppRoutes(): ReactNode {
         <Route path="/app/:store/customers" element={<ConsoleRoute view="customers" />} />
         <Route path="/app/:store/analytics" element={<ConsoleRoute view="analytics" />} />
         <Route path="/app/:store/settings" element={<ConsoleRoute view="settings" />} />
+        <Route path="/app/:store/verify" element={<ConsoleRoute view="verify" />} />
         <Route path="/app/:store/store-design" element={<ConsoleRoute view="design" />} />
         <Route path="/app/:store/store-design/theme" element={<ConsoleRoute view="theme" />} />
 

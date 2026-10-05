@@ -58,6 +58,12 @@ import { SAMPLE_CATEGORIES, SAMPLE_PRODUCTS, StorePreview } from '../src/console
 import { storeLookVariables, storeThemeVariables } from '../src/styles/store-theme.ts';
 import { Analytics } from '../src/console/Analytics.tsx';
 import { Settings } from '../src/console/Settings.tsx';
+import { Verify } from '../src/console/Verify.tsx';
+import { BlockedView, CameraView, TipsView } from '../src/console/FaceCapture.tsx';
+import type { KycStatus } from '../src/console/kycApi.ts';
+import { BLUR_BELOW, GLARE_ABOVE, PROMPTS, RETENTION_LINE, glareShare, outcomeCopy, partRow, photoChecks, pickVideoType, promptAt, retakePartOf, sentLine, sharpness } from '../src/console/kycLines.ts';
+import { LookLayout, Onboarding } from '../src/onboarding/Onboarding.tsx';
+import { OTHER, accountProblem, businessReady, cleanPrice, whatFor } from '../src/onboarding/lines.ts';
 import type { Member, SettingsBase, SettingsExtra } from '../src/console/settingsApi.ts';
 import { generatePassword, grantableRoles, hoursSummary, maskPhone, paymentState, payoutSentence, visibleModules, weekFrom, weekToRows, zoneAreasLine, zoneFeeLine } from '../src/console/settingsLines.ts';
 import { Complaints } from '../src/console/Complaints.tsx';
@@ -1705,6 +1711,120 @@ const visibleText = allHtml
   .replaceAll('&quot;', '"')
   .replaceAll('&#x27;', "'")
   .replace(/\s+/g, ' ');
+
+
+// --- milestone 26: the identity check and onboarding ---------------------------------------------------------------
+const kycStatus = (outcome: KycStatus['outcome'], parts: [string, string][], over: Partial<NonNullable<KycStatus['submission']>> = {}): KycStatus => ({
+  outcome,
+  verified: outcome === 'approved',
+  submission: outcome === 'none' ? null : { id: 'k1', reference: 5521, documentType: 'national_id', submittedAt: new Date().toISOString(), decisionNote: null, parts: parts.map(([part, state]) => ({ part: part as 'id_front', state: state as 'accepted', purged: false })), ...over },
+});
+const PARTS_OK: [string, string][] = [['id_front', 'accepted'], ['id_back', 'accepted'], ['face_video', 'accepted']];
+const KYC_NONE = kycStatus('none', []);
+const KYC_BUILDING = kycStatus('building', [['id_front', 'received'], ['id_back', 'missing'], ['face_video', 'missing']]);
+const KYC_REVIEW = kycStatus('inReview', [['id_front', 'received'], ['id_back', 'received'], ['face_video', 'received']]);
+const KYC_REDO = kycStatus('redoRequested', [['id_front', 'accepted'], ['id_back', 'retake'], ['face_video', 'accepted']], { decisionNote: 'The back of your ID is blurry, so we can’t read the numbers.' });
+const KYC_REJECTED = kycStatus('rejected', [['id_front', 'received'], ['id_back', 'received'], ['face_video', 'received']], { decisionNote: 'The face in the video didn’t match the photo on the ID.' });
+// The video of a decided case is gone — V028 + the sweep — and the screen says so.
+const KYC_APPROVED: KycStatus = { ...kycStatus('approved', PARTS_OK), submission: { ...kycStatus('approved', PARTS_OK).submission!, parts: kycStatus('approved', PARTS_OK).submission!.parts.map((p) => (p.part === 'face_video' ? { ...p, purged: true } : p)) } };
+
+const kycParts: readonly (readonly [string, ReactNode])[] = [
+  ['Verify · intro', inConsole(<Verify navigate={noop} initial={{ status: KYC_NONE, step: 'intro' }} />)],
+  ['Verify · intro, a case half built', inConsole(<Verify navigate={noop} initial={{ status: KYC_BUILDING, step: 'intro' }} />)],
+  ['Verify · front of the ID, nothing taken yet', inConsole(<Verify navigate={noop} initial={{ status: KYC_NONE, step: 'front' }} />)],
+  ['Verify · front, a good photo', inConsole(<Verify navigate={noop} initial={{ status: KYC_NONE, step: 'front', prepared: { good: true, checks: [{ label: 'No glare or shadow', ok: true }, { label: 'Text is sharp and readable', ok: true }] } }} />)],
+  ['Verify · front, glare', inConsole(<Verify navigate={noop} initial={{ status: KYC_NONE, step: 'front', prepared: { good: false, checks: [{ label: 'Glare is covering your details. Tilt the card away from the light.', ok: false }, { label: 'Text is sharp and readable', ok: true }] } }} />)],
+  ['Verify · back of the ID', inConsole(<Verify navigate={noop} initial={{ status: KYC_BUILDING, step: 'back' }} />)],
+  ['Verify · passport photo page', inConsole(<Verify navigate={noop} initial={{ status: KYC_NONE, step: 'front', documentType: 'passport' }} />)],
+  ['Verify · review', inConsole(<Verify navigate={noop} initial={{ status: kycStatus('building', [['id_front', 'received'], ['id_back', 'received'], ['face_video', 'received']]), step: 'review' }} />)],
+  ['Verify · done', inConsole(<Verify navigate={noop} initial={{ status: KYC_REVIEW, step: 'done' }} />)],
+  ['Verify · outcome, one photo to redo', inConsole(<Verify navigate={noop} initial={{ status: KYC_REDO, step: 'outcome' }} />)],
+  ['Verify · outcome, rejected', inConsole(<Verify navigate={noop} initial={{ status: KYC_REJECTED, step: 'outcome' }} />)],
+  ['Verify · outcome, in review', inConsole(<Verify navigate={noop} initial={{ status: KYC_REVIEW, step: 'outcome' }} />)],
+  ['Verify · outcome, approved', inConsole(<Verify navigate={noop} initial={{ status: KYC_APPROVED, step: 'outcome' }} />)],
+  ['Face · tips', <TipsView key="f1" onReady={noop} />],
+  ['Face · blocked', <BlockedView key="f2" onTryAgain={noop} onClose={noop} />],
+  ['Face · looking', <CameraView key="f3" phase="searching" t={0} autoStart onStart={noop} onClose={noop} />],
+  ['Face · no detector, start by button', <CameraView key="f4" phase="ready" t={0} autoStart={false} onStart={noop} onClose={noop} />],
+  ['Face · recording, turn left', <CameraView key="f5" phase="recording" t={1.6} autoStart onStart={noop} onClose={noop} />],
+  ['Face · lost', <CameraView key="f6" phase="lost" t={0} autoStart onStart={noop} onClose={noop} />],
+];
+const onboardingParts: readonly (readonly [string, ReactNode])[] = [
+  ['Onboarding · your business', <Onboarding key="o1" navigate={noop} initial={{ step: 0, industries: [{ key: 'food', name: 'Food & drinks' }, { key: 'fashion', name: 'Fashion' }] }} />],
+  ['Onboarding · business filled in', <Onboarding key="o2" navigate={noop} initial={{ step: 0, industries: [{ key: 'food', name: 'Food & drinks' }, { key: 'fashion', name: 'Fashion' }], business: { name: 'Nyama & Co.', industry: 'food', slug: 'nyama-and-co' } }} />],
+  ['Onboarding · your account', <Onboarding key="o3" navigate={noop} initial={{ step: 1, industries: [], business: { name: 'Nyama & Co.', industry: 'food', slug: 'nyama-and-co' } }} />],
+  ['Onboarding · look and feel', <LookLayout key="o4" ready error={null} problem={null} color="#2A55A0" onColor={noop} logoUrl={null} onPickLogo={noop} onRemoveLogo={noop} fileInput={null} action={<span>Continue</span>} preview={<StorePreview theme={compileTheme({ ...DEFAULT_INPUTS, brand: '#2A55A0' })} design={DEFAULT_DESIGN} device="mobile" storeName="Nyama & Co." products={SAMPLE_PRODUCTS} categories={SAMPLE_CATEGORIES} cartTotal="0" />} />],
+  ['Onboarding · first product', <Onboarding key="o5" navigate={noop} initial={{ step: 3, industries: [], business: { name: 'Nyama & Co.', industry: 'food', slug: 'nyama-and-co' }, created: { storeId: 's1', slug: 'nyama-and-co' } }} />],
+  ['Onboarding · ready', <Onboarding key="o6" navigate={noop} initial={{ step: 4, industries: [], business: { name: 'Nyama & Co.', industry: 'food', slug: 'nyama-and-co' }, created: { storeId: 's1', slug: 'nyama-and-co' } }} />],
+];
+
+const kycHtml: string[] = [];
+for (const [name, node] of [...kycParts, ...onboardingParts]) {
+  const html = render(name, node);
+  // The swatches and previews carry the brand's own hex as data, like the studios — see studioParts above.
+  allHtml += html;
+  kycHtml.push(html);
+}
+const kycText = kycHtml.join(' ').replace(/<[^>]+>/g, ' ').replaceAll('&amp;', '&').replaceAll('&#x27;', "'").replace(/\s+/g, ' ');
+const kycAt = (i: number): string => kycHtml[i]!.replace(/<[^>]+>/g, ' ').replaceAll('&amp;', '&').replaceAll('&#x27;', "'").replace(/\s+/g, ' ');
+expect(kycHtml.length === kycParts.length + onboardingParts.length, 'every identity and onboarding part rendered');
+
+// The board's words, where they were kept.
+expect(kycAt(0).includes('Before you get paid, we need to know it’s you') && kycAt(0).includes('Takes about 2 minutes. It protects your money and your customers.'), 'the intro');
+expect(kycAt(0).includes('National ID') && kycAt(0).includes('Passport') && !kycAt(0).includes('Driving licence'), 'two documents, because the database knows two');
+expect(kycAt(1).includes('Continue') && !kycAt(0).includes('Continue'), 'a half-built case says Continue, a fresh one says Start');
+expect(kycAt(2).includes('Front of your ID') && kycAt(2).includes('Take photo') && kycAt(2).includes('Upload from gallery'), 'the capture screen offers the camera and the gallery');
+expect(kycAt(3).includes('Use this photo') && kycAt(3).includes('Retake'), 'a good photo');
+expect(kycAt(4).includes('Glare is covering your details. Tilt the card away from the light.') && kycAt(4).includes('Retake photo') && kycAt(4).includes('use it anyway'), 'a glare photo says why and still has a way forward');
+expect(kycAt(5).includes('Back of your ID'), 'the back');
+expect(kycAt(6).includes('Photo page of your passport'), 'a passport has one photo');
+expect(kycAt(7).includes('Send for verification') && kycAt(7).includes('Face video'), 'review');
+expect(kycAt(9).includes('One photo needs redoing') && kycAt(9).includes('What our team said') && kycAt(9).includes('The back of your ID is blurry') && kycAt(9).includes('Retake the back of my ID'), 'the redo outcome, with the reviewer\'s sentence and the one part');
+expect(kycAt(9).includes('Accepted') && kycAt(9).includes('Retake'), 'two parts accepted, one to retake');
+expect(kycAt(10).includes('We couldn’t verify you') && kycAt(10).includes('The face in the video didn’t match the photo on the ID.') && kycAt(10).includes('Start again') && kycAt(10).includes('Call Vendlyfy support'), 'rejected');
+expect(kycAt(11).includes('We’re checking your ID') && kycAt(11).includes('Most checks are done within 24 hours.'), 'in review');
+expect(kycAt(12).includes('You’re verified') && kycAt(12).includes('See my money') && kycAt(12).includes('deleted'), 'approved');
+expect(kycAt(12).includes('Accepted · deleted'), 'a deleted video says so');
+expect(!kycText.includes('[RETENTION PERIOD]') && !kycText.includes('RETENTION PERIOD'), 'the board\'s placeholder is not shown to a merchant');
+expect(RETENTION_LINE.includes('face video is deleted') && RETENTION_LINE.includes('ID photos are kept'), 'the retention sentence says what is true');
+expect(!kycText.includes('We’ll text') && !kycText.includes('text 078'), 'nothing promises an SMS the system cannot send');
+expect(kycAt(13).includes('Now a short video of your face') && kycAt(13).includes('Good light') && kycAt(13).includes('Hold steady'), 'the face tips');
+expect(kycAt(14).includes('We can’t use your camera'), 'a blocked camera has a screen');
+expect(kycAt(15).includes('Looking for your face') && kycAt(16).includes('Start recording') && !kycAt(15).includes('Start recording'), 'no face detector → a button; with one → none');
+expect(kycAt(17).includes('Slowly turn your head left') && kycAt(17).includes('0:04'), 'recording shows the prompt for that second and the countdown');
+expect(kycAt(18).includes('We lost your face'), 'a lost face');
+
+// The logic behind them.
+const flat = (v: number, n = 40): { data: number[]; width: number; height: number } => ({ data: Array.from({ length: n * n * 4 }, (_, i) => (i % 4 === 3 ? 255 : v)), width: n, height: n });
+const textured = (n = 40): { data: number[]; width: number; height: number } => ({ data: Array.from({ length: n * n * 4 }, (_, i) => (i % 4 === 3 ? 255 : ((i >> 2) % 2 === 0 ? 40 : 200))), width: n, height: n });
+expect(sharpness(flat(128)) < BLUR_BELOW && sharpness(textured()) > BLUR_BELOW, 'a flat image is soft and a textured one is sharp');
+expect(glareShare(flat(255)) === 1 && glareShare(flat(128)) === 0, 'glare is the share of blown-out pixels');
+expect(photoChecks(textured()).good && !photoChecks(flat(128)).good && !photoChecks(flat(255)).good, 'photoChecks: sharp and clean passes; soft or blown-out does not');
+expect(photoChecks(flat(255)).checks.some((c) => !c.ok && c.label.startsWith('Glare')), 'and the failing check says which');
+expect(GLARE_ABOVE > 0 && GLARE_ABOVE < 0.2, 'the glare threshold is a small share, not most of the frame');
+expect(photoChecks(textured()).checks.length === 2, 'only the two checks that can be measured are claimed — no "corners visible" tick');
+expect(promptAt(0).title === 'Look straight at the camera' && promptAt(1.3).title === 'Slowly turn your head left' && promptAt(4.5).title === 'Blink twice' && PROMPTS.length === 4, 'the board\'s four prompts on its schedule');
+expect(pickVideoType((t) => t === 'video/webm') === 'video/webm' && pickVideoType((t) => t === 'video/mp4') === 'video/mp4' && pickVideoType(() => false) === null, 'the recorder\'s container: WebM, then MP4, else none');
+expect(retakePartOf(KYC_REDO) === 'id_back' && retakePartOf(KYC_REVIEW) === null, 'the retake names exactly one part');
+expect(outcomeCopy('redoRequested', 'x', 'face_video', null).cta === 'Record my face video again', 'a face-video retake says so');
+expect(partRow('id_back', 'retake', 'redoRequested', false).tone === 'bad' && partRow('id_front', 'accepted', 'approved', true).note === 'Accepted · deleted', 'part rows');
+expect(sentLine(new Date(2026, 9, 5, 14, 10).toISOString(), new Date(2026, 9, 5, 18, 0)) === 'today at 14:10' && sentLine(new Date(2026, 9, 4, 9, 5).toISOString(), new Date(2026, 9, 5, 18, 0)) === 'yesterday at 09:05', 'sent today / yesterday');
+
+// Onboarding.
+const onboardingAt = (i: number): string => kycAt(kycParts.length + i);
+expect(onboardingAt(0).includes('Create your store') && onboardingAt(0).includes('What do you sell?') && onboardingAt(0).includes('Other') && onboardingAt(0).includes('Food & drinks'), 'step 1 is the board\'s, with the server\'s business types and Other');
+expect(onboardingAt(0).includes('Fills in from your business name'), 'the address waits for a name');
+expect(onboardingAt(1).includes('We’ll set up:') && onboardingAt(1).includes('Menu with categories') && onboardingAt(1).includes('nyama-and-co is available'), 'picking a type says what it sets up, and the address is shown');
+expect(onboardingAt(2).includes('Your account') && onboardingAt(2).includes('Create my store') && onboardingAt(2).includes('At least 10 characters'), 'the added account step');
+expect(onboardingAt(3).includes('Make it yours') && onboardingAt(3).includes('Brand color') && !onboardingAt(3).includes('Banner photo'), 'look and feel, without the banner nothing displays');
+expect(onboardingAt(4).includes('Add your first product') && kycHtml[kycParts.length + 4]!.includes('e.g. Chicken Burger') && onboardingAt(4).includes('extras or spice level') && onboardingAt(4).includes('Skip for now'), 'first product, with the type\'s own example');
+expect(onboardingAt(5).includes('Your store is ready') && onboardingAt(5).includes('nyama-and-co') && onboardingAt(5).includes('View store') && onboardingAt(5).includes('Go to dashboard'), 'ready');
+expect(accountProblem({ name: 'A', email: 'a@b.rw', phone: '', password: 'a-long-enough-one' }) === 'Enter your name.', 'the account step names the first problem');
+expect(accountProblem({ name: 'Aline', email: 'nope', phone: '', password: 'a-long-enough-one' }) === 'Enter a valid email address.' && accountProblem({ name: 'Aline', email: 'a@b.rw', phone: '', password: 'short' }) !== null && accountProblem({ name: 'Aline', email: 'a@b.rw', phone: '', password: 'a-long-enough-one' }) === null, 'email and password rules');
+expect(businessReady('Nyama', 'food', true) && !businessReady('N', 'food', true) && !businessReady('Nyama', null, true) && !businessReady('Nyama', 'food', false), 'the first step needs a name, a type and a free address');
+expect(whatFor(null).product === 'Your product' && whatFor(OTHER).category === 'General' && whatFor('made-up').sets.length > 0, 'a type the board never drew still gets a sensible example');
+expect(cleanPrice('1,500 RWF') === '1500', 'a price is digits');
+
 
 // --- Settings: the rules that live outside the JSX ---------------------------------
 expect(visibleModules(CONSOLE_SHELL.config.modules).join() === 'modifiers,delivery,pickup,table,scheduled,stock', 'Settings lists the six modules and hides the two specialist ones that are off');
