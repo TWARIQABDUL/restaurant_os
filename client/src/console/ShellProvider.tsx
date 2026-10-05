@@ -21,7 +21,7 @@ import type { ReactNode } from 'react';
 import { ApiFailure, api } from '../app/api.ts';
 import type { Membership, SessionResult } from '../app/api.ts';
 import { bindConfig, formatMoney } from '../app/core.ts';
-import type { Attribute, CurrencyFormat, FeatureGate, MoneyInput, Vocabulary } from '../app/core.ts';
+import type { Attribute, CurrencyFormat, EffectiveConfig, FeatureGate, MoneyInput, Vocabulary } from '../app/core.ts';
 import { applyStoreTheme, parseStoreTheme } from '../styles/store-theme.ts';
 import { shell } from './api.ts';
 import type { ConsoleMe, ConsoleStore, ShellBadges, ShellData } from './api.ts';
@@ -53,6 +53,13 @@ export type ShellContextValue = {
   refreshBadges: () => void;
   /** Lets a screen correct one badge without a round trip, for the count it just changed itself. */
   setBadges: (next: ShellBadges) => void;
+  /**
+   * The store's whole resolved configuration, and the way to replace it. Settings → Features switches modules and the
+   * business type, and the sidebar, the vocabulary and every `has()` gate must follow in the same breath — not on the
+   * next page load — so the screen hands the server's answer back here.
+   */
+  config: EffectiveConfig;
+  setConfig: (config: EffectiveConfig) => void;
 };
 
 /** Exported for the render gate, which mounts console screens with a fixed store rather than a live one. */
@@ -172,6 +179,8 @@ export function ShellProvider({ slug, children, fallback }: Props): ReactNode {
       may: (permission: string) => permissions.includes(permission),
       refreshBadges,
       setBadges,
+      config: data.config,
+      setConfig: (config: EffectiveConfig) => setData((prev) => (prev === null ? prev : { ...prev, config })),
     };
   }, [data, badges, memberships, refreshBadges]);
 

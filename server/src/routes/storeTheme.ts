@@ -28,15 +28,20 @@ import {
   CARD_TREATMENTS,
   HARMONIES,
   HEADING_FONTS,
+  DEFAULT_DESIGN,
   HEROES,
+  HOMEPAGE_SECTIONS,
   MERCHANT_VISIBLE_TOKENS,
   MOODS,
+  PRODUCT_LAYOUTS,
   SHAPES,
   compileTheme,
   failingChecks,
+  isMediaPath,
   isPublishable,
 } from '../core.ts';
-import type { CompiledTheme, ThemeInputs } from '../core.ts';
+import type { CompiledTheme, Design, ThemeInputs } from '../core.ts';
+import * as designs from '../repositories/designs.ts';
 import * as themes from '../repositories/themes.ts';
 
 const router = Router({ mergeParams: true });
@@ -72,6 +77,41 @@ function readInputs(body: Record<string, unknown>): ThemeInputs {
     cardTreatment: requiredOneOf(body, 'cardTreatment', CARD_TREATMENTS),
     hero: requiredOneOf(body, 'hero', HEROES),
   };
+}
+
+/**
+ * The design (layout, sections, logo) from a request body, or null when the request did not carry one.
+ *
+ * OPTIONAL, because ThemeStudio and Customize are two screens over one draft: ThemeStudio saves colours and must not
+ * reset the layout Customize chose, so an absent `design` means "leave it as it is", never "back to the default".
+ */
+function readDesign(body: Record<string, unknown>, storeId: string): Design | null {
+  const raw = body['design'];
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw badRequest('design must be an object.', 'INVALID_DESIGN');
+  const d = raw as Record<string, unknown>;
+
+  const sections: Design['sections'] = { ...DEFAULT_DESIGN.sections };
+  const given = d['sections'];
+  if (given !== undefined) {
+    if (typeof given !== 'object' || given === null || Array.isArray(given)) throw badRequest('sections must be an object.', 'INVALID_DESIGN');
+    for (const [key, value] of Object.entries(given)) {
+      // `products` is rejected by name: the board draws it locked, and silently ignoring a client that tried to
+      // switch it off would hide the mistake.
+      if (!(HOMEPAGE_SECTIONS as readonly string[]).includes(key)) throw badRequest(`“${key}” is not a section you can switch.`, 'INVALID_DESIGN');
+      if (typeof value !== 'boolean') throw badRequest(`${key} must be on or off.`, 'INVALID_DESIGN');
+      sections[key as keyof Design['sections']] = value;
+    }
+  }
+
+  const layout = requiredOneOf(d, 'productLayout', PRODUCT_LAYOUTS);
+  const logo = d['logoUrl'];
+  // This store's own upload, not merely one this server issued: the path carries the store id, so another store's
+  // logo cannot be borrowed by guessing its URL.
+  if (logo !== undefined && logo !== null && (!isMediaPath(logo) || !logo.startsWith(`/api/media/${storeId}/`))) {
+    throw badRequest('That logo was not uploaded here. Upload it again.', 'INVALID_LOGO');
+  }
+  return { productLayout: layout, sections, logoUrl: logo === undefined ? null : (logo as string | null) };
 }
 
 /** The wire shape of a theme: what it was made from, what it produced, and how to read it. */
@@ -126,9 +166,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const storeId = storeIdOf(req);
     const both = await themes.findBoth(storeId);
+    const design = await designs.findBoth(storeId);
     res.json({
       draft: presentStored(both.draft),
       published: presentStored(both.published),
+      // Customize's half. A store that never opened it has none, and the client shows the default.
+      design: { draft: design.draft, published: design.published, defaults: DEFAULT_DESIGN },
     });
   }),
 );
@@ -148,9 +191,14 @@ router.put(
     const inputs = readInputs(bodyOf(req.body));
     const theme = compileTheme(inputs);
 
-    await withTransaction((tx) => themes.saveDraft(storeId, theme, tx), {
-      label: 'PUT /api/stores/:storeId/theme/draft',
-    });
+    const design = readDesign(bodyOf(req.body), storeId);
+    await withTransaction(
+      async (tx) => {
+        await themes.saveDraft(storeId, theme, tx);
+        if (design !== null) await designs.saveDraft(storeId, design, tx);
+      },
+      { label: 'PUT /api/stores/:storeId/theme/draft' },
+    );
 
     res.json({ draft: present(theme) });
   }),
@@ -187,11 +235,21 @@ router.post(
       );
     }
 
+    const sent = readDesign(bodyOf(req.body), storeId);
+
     const publishedAt = await withTransaction(
       async (tx) => {
         // Both rows in one transaction: the draft is what the merchant will reopen, and it must
         // not be able to end up describing something other than what went live.
         await themes.saveDraft(storeId, theme, tx);
+
+        // THE DESIGN GOES LIVE WITH THE PALETTE, in the same transaction, so a store never has a new colour scheme
+        // with the old layout. Sent explicitly it is taken as given; absent, it is the draft's (what Customize saved),
+        // and failing that the default — never "whatever happens to be published".
+        const design = sent ?? (await designs.findBoth(storeId, tx)).draft ?? DEFAULT_DESIGN;
+        await designs.saveDraft(storeId, design, tx);
+        await designs.publish(storeId, design, tx);
+
         return themes.publish(storeId, theme, tx);
       },
       { label: 'POST /api/stores/:storeId/theme/publish' },
@@ -218,6 +276,7 @@ router.delete(
         `DELETE FROM store_themes WHERE store_id = $1 AND status = 'published'`,
         [storeId],
       );
+      await designs.revertPublished(storeId, tx);
       return rowCount !== null && rowCount > 0;
     }, { label: 'DELETE /api/stores/:storeId/theme/published' });
 

@@ -11,7 +11,7 @@
 // named". GET /api/session is what turns one into the other, and it is the only place that does.
 
 import { api, upload } from '../app/api.ts';
-import type { CompiledColors, CurrencyFormat, EffectiveConfig } from '../app/core.ts';
+import type { CompiledColors, CurrencyFormat, Design, EffectiveConfig, ThemeInputs } from '../app/core.ts';
 
 // ---------------------------------------------------------------------------
 // The shell — one document, loaded once per store
@@ -893,4 +893,44 @@ export const analyticsApi = {
   load: (storeId: string, tab: AnalyticsTab, range: AnalyticsRange): Promise<AnalyticsPayload & { range: number; from: string; to: string }> =>
     api.get(`/api/stores/${storeId}/analytics/${tab}?range=${range}`),
   exportUrl: (storeId: string, tab: AnalyticsTab, range: AnalyticsRange): string => `/api/stores/${storeId}/analytics/${tab}/export?range=${range}`,
+};
+
+// ---------------------------------------------------------------------------
+// The store's look — milestone 25 (ThemeStudio and Customize)
+// ---------------------------------------------------------------------------
+
+
+export type StoredLook = {
+  inputs: ThemeInputs;
+  colors: CompiledColors;
+  dark: boolean;
+  outline: boolean;
+  /** False when this build's compiler would now produce a different palette from the one on record. */
+  matchesCompiler?: boolean;
+  updatedAt?: string;
+  publishedAt?: string | null;
+};
+
+export type StoredDesign = Design & { updatedAt: string; publishedAt: string | null };
+
+export type LookPayload = {
+  draft: StoredLook | null;
+  published: StoredLook | null;
+  design: { draft: StoredDesign | null; published: StoredDesign | null; defaults: Design };
+};
+
+export const lookApi = {
+  load: (storeId: string): Promise<LookPayload> => api.get<LookPayload>(`/api/stores/${storeId}/theme`),
+
+  /** A draft is never gated: the studio shows what is wrong rather than refusing to remember it. */
+  saveDraft: (storeId: string, inputs: ThemeInputs, design?: Design): Promise<unknown> =>
+    api.put(`/api/stores/${storeId}/theme/draft`, { ...inputs, ...(design === undefined ? {} : { design }) }),
+
+  publish: (storeId: string, inputs: ThemeInputs, design?: Design): Promise<unknown> =>
+    api.post(`/api/stores/${storeId}/theme/publish`, { ...inputs, ...(design === undefined ? {} : { design }) }),
+
+  /** Back to the platform's own look. The draft is kept. */
+  revert: (storeId: string): Promise<{ reverted: boolean }> => api.delete<{ reverted: boolean }>(`/api/stores/${storeId}/theme/published`),
+
+  uploadLogo: (storeId: string, file: Blob): Promise<{ url: string }> => upload<{ url: string }>(`/api/stores/${storeId}/uploads`, file),
 };

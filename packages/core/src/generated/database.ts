@@ -1334,6 +1334,33 @@ export interface StaffInvitesRow {
   revoked_at: Date | null;
 }
 
+/** `store_designs.product_layout`, from its CHECK constraint. */
+export type StoreDesignsProductLayout =
+  | 'grid'
+  | 'list';
+
+/** `store_designs.status`, from its CHECK constraint. */
+export type StoreDesignsStatus =
+  | 'draft'
+  | 'published';
+
+/**
+ * What Customize edits: product layout, which homepage sections show, the logo. Not colours — those are store_themes. Draft and published, written together by one publish.
+ */
+export interface StoreDesignsRow {
+  store_id: string;
+  status: StoreDesignsStatus;
+  product_layout: StoreDesignsProductLayout;
+  show_promo: boolean;
+  show_categories: boolean;
+  show_featured: boolean;
+  show_info: boolean;
+  logo_url: string | null;
+  created_at: Date;
+  updated_at: Date;
+  published_at: Date | null;
+}
+
 /**
  * When a store is open, one row per open day. A day with no row is closed. closes_at <= opens_at means it closes after midnight — see store_open_state().
  */
@@ -1707,6 +1734,7 @@ export interface Database {
   rider_profiles: RiderProfilesRow;
   role_permissions: RolePermissionsRow;
   staff_invites: StaffInvitesRow;
+  store_designs: StoreDesignsRow;
   store_hours: StoreHoursRow;
   store_members: StoreMembersRow;
   store_order_counters: StoreOrderCountersRow;
@@ -1788,6 +1816,7 @@ export const TABLE_NAMES = [
   'rider_profiles',
   'role_permissions',
   'staff_invites',
+  'store_designs',
   'store_hours',
   'store_members',
   'store_order_counters',

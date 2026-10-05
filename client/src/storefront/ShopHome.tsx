@@ -38,7 +38,7 @@ type Props = {
 };
 
 export function ShopHome({ onOpenProduct, onOpenCart }: Props): ReactNode {
-  const { face, money, has, t, cart, setCart, refreshCart } = useStore();
+  const { face, money, has, t, cart, setCart, refreshCart, design } = useStore();
 
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -161,7 +161,10 @@ export function ShopHome({ onOpenProduct, onOpenCart }: Props): ReactNode {
   );
 
   const fulfilment = fulfilmentLine(face, money, has);
-  const showPromo = debounced.trim() === '' && category === null && face.banner !== null;
+  // The merchant's Customize choices. Every one defaults ON (core's DEFAULT_DESIGN), so a store that never opened the
+  // editor is exactly what it was. The products section has no switch: there is nothing to render without it.
+  const showPromo = design.sections.promo && debounced.trim() === '' && category === null && face.banner !== null;
+  const asList = design.productLayout === 'list';
   const activeCategory = face.categories.find((c) => c.id === category) ?? null;
   const gridTitle =
     debounced.trim() !== '' ? 'Results' : (activeCategory?.name ?? t('catalog'));
@@ -179,16 +182,20 @@ export function ShopHome({ onOpenProduct, onOpenCart }: Props): ReactNode {
       <div className="mx-auto grid max-w-[1360px] gap-0 lg:grid-cols-[220px_minmax(0,1fr)_340px] lg:gap-8 lg:px-10 lg:py-7">
         {/* Left column on desktop; a rail under the header on mobile. */}
         <div className="lg:pt-1">
-          <CategoryNav
-            categories={face.categories}
-            active={category}
-            onPick={setCategory}
-            allLabel={t('catalog')}
-            totalCount={null}
-          />
-          <div className="px-4 lg:px-0">
-            <StoreInfo />
-          </div>
+          {design.sections.categories ? (
+            <CategoryNav
+              categories={face.categories}
+              active={category}
+              onPick={setCategory}
+              allLabel={t('catalog')}
+              totalCount={null}
+            />
+          ) : null}
+          {design.sections.info ? (
+            <div className="px-4 lg:px-0">
+              <StoreInfo />
+            </div>
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-4 px-4 pb-28 lg:px-0 lg:pb-0">
@@ -206,7 +213,7 @@ export function ShopHome({ onOpenProduct, onOpenCart }: Props): ReactNode {
             </Alert>
           )}
 
-          <div className="flex items-baseline justify-between">
+          <div className={`flex items-baseline justify-between ${design.sections.featured ? '' : 'hidden'}`}>
             <h2 className="font-display text-title font-bold lg:text-heading">{gridTitle}</h2>
             {products === null ? null : (
               <span className="text-caption text-store-muted">
@@ -258,7 +265,7 @@ export function ShopHome({ onOpenProduct, onOpenCart }: Props): ReactNode {
             )
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
+              <div className={asList ? 'flex flex-col gap-2.5' : 'grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4'}>
                 {products.map((product) => {
                   const tile = tileFor(product.id);
                   const rating = product.rating;
@@ -274,6 +281,7 @@ export function ShopHome({ onOpenProduct, onOpenCart }: Props): ReactNode {
                   return (
                     <ProductCard
                       key={product.id}
+                      layout={asList ? 'list' : 'grid'}
                       scale="roomy"
                       name={product.name}
                       price={money(product.price)}

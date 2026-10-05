@@ -43,7 +43,8 @@
   /* --- Type ---------------------------------------------------------------
      Bricolage Grotesque for display, Figtree for everything you read, JetBrains
      Mono for codes, SKUs and order ids. */
-  --font-display: 'Bricolage Grotesque', 'Figtree', ui-sans-serif, system-ui, sans-serif;
+  /* --font-display is NOT here: a store's heading font is a runtime choice, so `font-display` is the @utility below,
+     which reads --store-font-display and falls back to this same Bricolage stack. */
   --font-sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
 
@@ -166,11 +167,9 @@
   --spacing: 0.25rem;
 
   /* --- Radius ------------------------------------------------------------- */
-  --radius-chip: 8px;
-  --radius-control: 10px;
-  --radius-card: 14px;
   --radius-sheet: 20px;
-  --radius-pill: 999px;
+  /* chip, control, card and pill are in the `@theme inline` block below: a store's SHAPE (sharp / soft / round) is a
+     runtime choice that the storefront applies to its own subtree, so they must resolve where they are USED. */
 
   /* --- Elevation ----------------------------------------------------------
      Three levels and no more: flat on borders, shadow only for things that
@@ -199,6 +198,15 @@
    of use and subtree overrides work.
    ========================================================================= */
 @theme inline {
+  /* --- The store's LOOK: shape. ------------------------------------------
+     Defaults are the platform's own values, so nothing changes where no look is applied — the console never sets these
+     variables, and only the storefront (and the studio's preview) does, from the store's theme inputs. `inline`, for the
+     reason this whole block gives: the value must resolve on the element that USES the utility, not at :root. */
+  --radius-chip: var(--store-radius-chip, 8px);
+  --radius-control: var(--store-radius-control, 10px);
+  --radius-card: var(--store-radius-card, 14px);
+  --radius-pill: var(--store-radius-pill, 999px);
+
   --color-store-bg: var(--store-bg);                  /* Page       */
   --color-store-surface: var(--store-surface);        /* Cards      */
   --color-store-text: var(--store-text);              /* Text       */
@@ -300,4 +308,13 @@
   button {
     cursor: pointer;
   }
+}
+
+/* The store's heading font, and the two things a heading font carries besides a family: Sport is italic and upper-case,
+   so the variables below exist for it alone and default to nothing. A custom utility rather than a theme token, because
+   a theme token is one value and a heading font is three. */
+@utility font-display {
+  font-family: var(--store-font-display, 'Bricolage Grotesque', 'Figtree', ui-sans-serif, system-ui, sans-serif);
+  font-style: var(--store-heading-style, normal);
+  text-transform: var(--store-heading-transform, none);
 }

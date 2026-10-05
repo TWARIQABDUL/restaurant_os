@@ -170,3 +170,80 @@ export function parseStoreTheme(value: unknown): ParseResult {
 
   return errors.length > 0 ? { ok: false, errors } : { ok: true, theme: draft };
 }
+
+// ---------------------------------------------------------------------------
+// The store's LOOK — shape, heading font, card treatment. Milestone 25.
+// ---------------------------------------------------------------------------
+//
+// The palette (above) is colour; this is everything else ThemeStudio's inputs say. §2.2: the runtime never derives a
+// value — so these are TABLES, transcribed from StorePreview.dc.html's own SHAPES and FONTS maps, and what a store
+// chose is a key into them. A merchant's input never reaches a stylesheet as text; only a table value does.
+//
+// SET ON THE SUBTREE, NEVER ON :root, and never in the console. tokens.css defines `rounded-card`, `rounded-pill`,
+// `font-display` and the rest as `var(--store-…, <platform default>)`, so where nothing sets these the console is
+// exactly what it was — and the storefront and the studio's preview, which do, are the only places that change.
+
+import type { CardTreatment, HeadingFont, Shape } from '../app/core.ts';
+
+type Radii = { chip: string; control: string; card: string; pill: string };
+
+// Board: sharp 2/2/2, soft card 14 · button 10 · chip 8, round card 24 · button and chip fully round. `control` is a
+// BUTTON's radius on the board; it is also what a field uses here, so round is 22px — a pill at the kit's 44px height,
+// without turning every text field into a capsule it was never drawn as.
+const SHAPE: Readonly<Record<Shape, Radii>> = {
+  sharp: { chip: '2px', control: '2px', card: '2px', pill: '2px' },
+  soft: { chip: '8px', control: '10px', card: '14px', pill: '8px' },
+  round: { chip: '999px', control: '22px', card: '24px', pill: '999px' },
+};
+
+type Face = { family: string; style: string; transform: string };
+
+const FONT: Readonly<Record<HeadingFont, Face>> = {
+  modern: { family: "'Bricolage Grotesque', 'Figtree', sans-serif", style: 'normal', transform: 'none' },
+  editorial: { family: "'Fraunces', Georgia, serif", style: 'normal', transform: 'none' },
+  sport: { family: "'Archivo', 'Figtree', sans-serif", style: 'italic', transform: 'uppercase' },
+  classic: { family: "'DM Serif Display', Georgia, serif", style: 'normal', transform: 'none' },
+};
+
+export type StoreLookInputs = { shape: Shape; headingFont: HeadingFont; cardTreatment: CardTreatment };
+
+/** The custom properties a look sets, as a plain object — usable as a React `style` (SSR-safe) or via setProperty. */
+export function storeLookVariables(look: StoreLookInputs, dark: boolean): Record<string, string> {
+  const r = SHAPE[look.shape];
+  const f = FONT[look.headingFont];
+  // Card treatment: raised has a shadow and no edge; outlined has the store's border and no shadow; flat has neither
+  // and sits on a surface nudged toward the tint. `color-mix` rather than a computed hex: the theme engine owns colours.
+  const card: Record<CardTreatment, Record<string, string>> = {
+    shadow: { '--store-card-edge': 'transparent', '--store-card-bg': 'var(--store-surface)', '--store-card-shadow': `0 8px 20px rgb(0 0 0 / ${dark ? '0.45' : '0.10'})` },
+    outlined: { '--store-card-edge': 'var(--store-border)', '--store-card-bg': 'var(--store-surface)', '--store-card-shadow': 'none' },
+    flat: { '--store-card-edge': 'transparent', '--store-card-bg': 'color-mix(in srgb, var(--store-surface) 50%, var(--store-tint))', '--store-card-shadow': 'none' },
+  };
+  return {
+    '--store-radius-chip': r.chip,
+    '--store-radius-control': r.control,
+    '--store-radius-card': r.card,
+    '--store-radius-pill': r.pill,
+    '--store-font-display': f.family,
+    '--store-heading-style': f.style,
+    '--store-heading-transform': f.transform,
+    ...card[look.cardTreatment],
+  };
+}
+
+export function applyStoreLook(look: StoreLookInputs, dark: boolean, target: HTMLElement): void {
+  for (const [name, value] of Object.entries(storeLookVariables(look, dark))) target.style.setProperty(name, value);
+}
+
+export function clearStoreLook(look: StoreLookInputs, target: HTMLElement): void {
+  for (const name of Object.keys(storeLookVariables(look, false))) target.style.removeProperty(name);
+}
+
+/** The palette as a `style` object, for a preview that must render without an effect. Same values as applyStoreTheme. */
+export function storeThemeVariables(theme: StoreTheme): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const token of STORE_TOKEN_NAMES) {
+    const value = theme[token];
+    if (typeof value === 'string' && HEX.test(value)) out[CSS_VARIABLE[token]] = value;
+  }
+  return out;
+}

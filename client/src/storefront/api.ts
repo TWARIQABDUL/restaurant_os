@@ -12,7 +12,7 @@
 // lifetime — it survives a route change and then disagrees with the server about what is in the cart.
 
 import { api } from '../app/api.ts';
-import type { CurrencyFormat } from '../app/core.ts';
+import type { CurrencyFormat, Design } from '../app/core.ts';
 
 export type OpenState = {
   isOpen: boolean;
@@ -284,6 +284,8 @@ export type ThemePayload = {
     publishedAt: string;
   } | null;
   currency: CurrencyFormat;
+  /** Milestone 25: the published layout, sections and logo — or the default for a store that never opened Customize. */
+  design: Design;
 };
 
 const enc = encodeURIComponent;

@@ -27,12 +27,15 @@ import { Analytics } from './Analytics.tsx';
 import { Categories } from './Categories.tsx';
 import { Complaints } from './Complaints.tsx';
 import { Customers } from './Customers.tsx';
+import { Customize } from './Customize.tsx';
+import { Settings } from './Settings.tsx';
 import { Dashboard } from './Dashboard.tsx';
 import { NotificationsPanel } from './NotificationsPanel.tsx';
 import { OrderAlert } from './OrderAlert.tsx';
 import { Orders } from './Orders.tsx';
 import { Wallet } from './Wallet.tsx';
 import { ProductEditor } from './ProductEditor.tsx';
+import { ThemeStudio } from './ThemeStudio.tsx';
 import { Products } from './Products.tsx';
 import { Reviews } from './Reviews.tsx';
 import { MobileTabs, Sidebar } from './Sidebar.tsx';
@@ -61,7 +64,10 @@ export type ConsoleView =
   | { kind: 'complaints' }
   | { kind: 'reviews' }
   | { kind: 'customers' }
-  | { kind: 'analytics' };
+  | { kind: 'analytics' }
+  | { kind: 'settings' }
+  | { kind: 'design' }
+  | { kind: 'theme' };
 
 /** The sidebar highlights the list while its editor is open: the editor is Products, one level down. */
 export function activeItem(view: ConsoleView): string {
@@ -75,6 +81,17 @@ type Props = {
 };
 
 export function Console({ slug, view, navigate }: Props): ReactNode {
+  // THE TWO STUDIOS ARE FULL-SCREEN EDITORS, not console pages: their boards have a header and a preview and no sidebar,
+  // and the console's polling (the order alert, the dashboard figures) has no business running behind a design editor.
+  // They still need the shell — the store, the role and the money formatter — so they sit inside the same provider.
+  if (view.kind === 'design' || view.kind === 'theme') {
+    return (
+      <ShellProvider slug={slug} fallback={(state, retry) => <ShellFallback state={state} retry={retry} navigate={navigate} />}>
+        {view.kind === 'design' ? <Customize navigate={navigate} /> : <ThemeStudio navigate={navigate} />}
+      </ShellProvider>
+    );
+  }
+
   return (
     <ShellProvider slug={slug} fallback={(state, retry) => <ShellFallback state={state} retry={retry} navigate={navigate} />}>
       <ConsoleFrame view={view} navigate={navigate} />
@@ -253,6 +270,8 @@ function ConsoleFrame({ view, navigate }: { view: ConsoleView; navigate: (to: st
           <Customers navigate={navigate} />
         ) : view.kind === 'analytics' ? (
           <Analytics />
+        ) : view.kind === 'settings' ? (
+          <Settings navigate={navigate} />
         ) : data === null ? (
           failure === null ? (
             <div className="flex flex-col gap-4">

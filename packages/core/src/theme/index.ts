@@ -13,6 +13,8 @@ export {
 } from './color.ts';
 export type { Hsl, Rgb } from './color.ts';
 export { compileTheme, failingChecks, isPublishable } from './compile.ts';
+export { DEFAULT_DESIGN, HOMEPAGE_SECTIONS, PRODUCT_LAYOUTS, isMediaPath } from './design.ts';
+export type { Design, HomepageSection, ProductLayout } from './design.ts';
 export {
   CARD_TREATMENTS,
   HARMONIES,

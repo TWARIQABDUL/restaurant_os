@@ -28,6 +28,10 @@
 
 export {
   CARD_TREATMENTS,
+  DEFAULT_DESIGN,
+  HOMEPAGE_SECTIONS,
+  PRODUCT_LAYOUTS,
+  isMediaPath,
   HARMONIES,
   HEADING_FONTS,
   HEROES,
@@ -79,6 +83,9 @@ export type {
   ConfigTemplate,
   ContrastCheck,
   CurrencyFormat,
+  Design,
+  HomepageSection,
+  ProductLayout,
   Decimal,
   EffectiveConfig,
   FeatureGate,

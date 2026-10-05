@@ -51,7 +51,15 @@ import { CashReport } from '../src/console/CashReport.tsx';
 import { Categories, pageTitle, productsMeta, sectionState } from '../src/console/Categories.tsx';
 import { ProductEditor } from '../src/console/ProductEditor.tsx';
 import { Wallet } from '../src/console/Wallet.tsx';
+import { Customize, toPreview } from '../src/console/Customize.tsx';
+import { ThemeStudio, accentClashes, normaliseHex } from '../src/console/ThemeStudio.tsx';
+import { DEFAULT_INPUTS } from '../src/console/lookDraft.ts';
+import { SAMPLE_CATEGORIES, SAMPLE_PRODUCTS, StorePreview } from '../src/console/StorePreview.tsx';
+import { storeLookVariables, storeThemeVariables } from '../src/styles/store-theme.ts';
 import { Analytics } from '../src/console/Analytics.tsx';
+import { Settings } from '../src/console/Settings.tsx';
+import type { Member, SettingsBase, SettingsExtra } from '../src/console/settingsApi.ts';
+import { generatePassword, grantableRoles, hoursSummary, maskPhone, paymentState, payoutSentence, visibleModules, weekFrom, weekToRows, zoneAreasLine, zoneFeeLine } from '../src/console/settingsLines.ts';
 import { Complaints } from '../src/console/Complaints.tsx';
 import { Customers } from '../src/console/Customers.tsx';
 import { Reviews } from '../src/console/Reviews.tsx';
@@ -65,7 +73,8 @@ import type { RiderHome } from '../src/rider/api.ts';
 import { Console } from '../src/console/Console.tsx';
 import { MOBILE_TABS, NAV_GROUPS, consoleHref, hrefFor, maySee } from '../src/console/nav.ts';
 import { dateline, greeting, notificationLine, relativeWhen, toneClasses, waitingClock } from '../src/console/lines.ts';
-import { formatMoney } from '../src/app/core.ts';
+import { DEFAULT_DESIGN, compileTheme, formatMoney } from '../src/app/core.ts';
+import type { Design, ThemeInputs } from '../src/app/core.ts';
 
 const problems: string[] = [];
 let checks = 0;
@@ -377,6 +386,7 @@ const FACE: StoreFace = {
 const CURRENCY = CURRENCY_FOR_LINE;
 
 const STORE_VALUE: StoreContextValue = {
+  design: DEFAULT_DESIGN,
   face: FACE,
   currency: CURRENCY,
   // The real vocabulary and gates come from the config engine; the gate only needs them to answer.
@@ -790,6 +800,24 @@ const CONSOLE_SHELL: ShellContextValue = {
   may: () => true,
   refreshBadges: noop,
   setBadges: noop,
+  config: {
+    template: { key: 'food', name: 'Food & drinks', accentColor: '#1D6B47', version: 1 },
+    words: {} as never,
+    modules: {
+      modifiers: { enabled: true, source: 'template', label: 'Priced extras' },
+      delivery: { enabled: true, source: 'template', label: 'Delivery' },
+      pickup: { enabled: true, source: 'template', label: 'Pickup' },
+      table: { enabled: false, source: 'template', label: 'Table ordering' },
+      scheduled: { enabled: false, source: 'template', label: 'Scheduled' },
+      stock: { enabled: true, source: 'store', label: 'Stock' },
+      appointments: { enabled: false, source: 'template', label: 'Appointments' },
+      rx: { enabled: false, source: 'template', label: 'Prescription' },
+    },
+    attributes: [],
+    orderSteps: [],
+    productFlags: [],
+  },
+  setConfig: noop,
 };
 
 function inConsole(node: ReactNode): ReactNode {
@@ -1407,6 +1435,110 @@ const ANALYTICS_PAYMENTS: AnalyticsPayload & { range: number; from: string; to: 
   expect(revenueNote(ANALYTICS_REVENUE.data as never).includes('Today is partial'), 'the revenue note says today is partial');
 }
 
+
+// --- the studios — milestone 25 ------------------------------------------------------------------
+// THE STUDIO PARTS ARE RENDERED INTO allHtml BUT NOT kitHtml, the exception TokenSheet already has, and for the same
+// reason: their whole purpose is to show merchant-chosen colours — swatches, a generated palette, a preview painted in it —
+// so a hex in their markup is the feature, not a value that escaped the token layer.
+const KICKS: ThemeInputs = { brand: '#E4572E', accent: '#F4D35E', harmony: 'complementary', mood: 'light', shape: 'round', headingFont: 'sport', cardTreatment: 'shadow', hero: 'fill' };
+const RUN: ThemeInputs = { brand: '#C6F432', accent: null, harmony: 'split', mood: 'dark', shape: 'soft', headingFont: 'modern', cardTreatment: 'flat', hero: 'fill' };
+const LIST_DESIGN: Design = { productLayout: 'list', sections: { promo: false, categories: true, featured: false, info: true }, logoUrl: null };
+
+{
+  // The look tables are the board's own SHAPES and FONTS.
+  const sharp = storeLookVariables({ shape: 'sharp', headingFont: 'modern', cardTreatment: 'flat' }, false);
+  expect(sharp['--store-radius-card'] === '2px' && sharp['--store-radius-control'] === '2px', 'sharp is 2px everywhere, as the board draws it');
+  const soft = storeLookVariables({ shape: 'soft', headingFont: 'modern', cardTreatment: 'flat' }, false);
+  expect(soft['--store-radius-card'] === '14px' && soft['--store-radius-control'] === '10px' && soft['--store-radius-chip'] === '8px', 'soft is 14 / 10 / 8');
+  const round = storeLookVariables({ shape: 'round', headingFont: 'modern', cardTreatment: 'flat' }, false);
+  expect(round['--store-radius-card'] === '24px' && round['--store-radius-pill'] === '999px', 'round is 24px cards and fully round pills');
+  expect(round['--store-radius-control'] === '22px', 'a round BUTTON is a pill at the kit\'s 44px; a field is not turned into a capsule it was never drawn as');
+
+  const sport = storeLookVariables({ shape: 'soft', headingFont: 'sport', cardTreatment: 'flat' }, false);
+  expect(sport['--store-heading-style'] === 'italic' && sport['--store-heading-transform'] === 'uppercase', 'Sport headings are italic and upper-case');
+  expect(storeLookVariables({ shape: 'soft', headingFont: 'editorial', cardTreatment: 'flat' }, false)['--store-font-display']!.includes('Fraunces'), 'Editorial is Fraunces');
+  expect(storeLookVariables({ shape: 'soft', headingFont: 'classic', cardTreatment: 'flat' }, false)['--store-font-display']!.includes('DM Serif Display'), 'Classic is DM Serif Display');
+
+  const raised = storeLookVariables({ shape: 'soft', headingFont: 'modern', cardTreatment: 'shadow' }, false);
+  const raisedDark = storeLookVariables({ shape: 'soft', headingFont: 'modern', cardTreatment: 'shadow' }, true);
+  expect(raised['--store-card-shadow']!.includes('0.10') && raisedDark['--store-card-shadow']!.includes('0.45'), 'a raised card\'s shadow is stronger on a dark page');
+  expect(storeLookVariables({ shape: 'soft', headingFont: 'modern', cardTreatment: 'outlined' }, false)['--store-card-edge'] === 'var(--store-border)', 'an outlined card takes the store\'s border colour');
+  expect(storeLookVariables({ shape: 'soft', headingFont: 'modern', cardTreatment: 'flat' }, false)['--store-card-shadow'] === 'none', 'a flat card has no shadow');
+
+  // The palette variables are exactly the compiler's output, and nothing else.
+  const vars = storeThemeVariables(compileTheme(KICKS).colors);
+  expect(Object.keys(vars).length === 12 && vars['--store-primary'] === compileTheme(KICKS).colors.primary, 'twelve palette variables, taken from the compiler');
+  expect(Object.keys(storeThemeVariables({ ...compileTheme(KICKS).colors, bg: 'red; background: url(x)' })).length === 11, 'a value that is not a hex never becomes a variable');
+
+  // Studio rules.
+  expect(normaliseHex('e4572e') === '#E4572E' && normaliseHex('#e4572e') === '#E4572E', 'a typed hex is normalised to the compiler\'s form');
+  expect(accentClashes('#1D6B47', '#1E6C48'), 'a second colour nearly identical to the brand clashes');
+  expect(!accentClashes('#E4572E', '#2EC4B6'), 'a contrasting one does not');
+  expect(!accentClashes('#17160F', '#FFFFFF'), 'black and white are far apart in luminance');
+  expect(toPreview([{ id: 'p', name: 'Fries', sub: '', categories: ['Sides'], price: '1500.00', trackStock: false, stock: null, state: 'ok', status: 'active', coverImageUrl: null }, { id: 'd', name: 'Hidden', sub: '', categories: [], price: '1.00', trackStock: false, stock: null, state: 'draft', status: 'draft', coverImageUrl: null }], (v) => `${v} RWF`).length === 1, 'the preview shows only live products');
+  expect(SAMPLE_PRODUCTS.length === 8 && SAMPLE_CATEGORIES.length === 4, 'a store with nothing yet still has something to judge a look by');
+  expect(DEFAULT_INPUTS.brand === '#1D6B47', 'a store that never opened the studio starts from the platform\'s green');
+}
+
+const studioParts: readonly (readonly [string, ReactNode])[] = [
+  ['ThemeStudio · a light look', inConsole(<ThemeStudio navigate={noop} initial={{ inputs: DEFAULT_INPUTS, design: DEFAULT_DESIGN }} />)],
+  ['ThemeStudio · Kigali Kicks, manual second color', inConsole(<ThemeStudio navigate={noop} initial={{ inputs: KICKS, design: DEFAULT_DESIGN }} />)],
+  ['ThemeStudio · a dark look', inConsole(<ThemeStudio navigate={noop} initial={{ inputs: RUN, design: DEFAULT_DESIGN }} />)],
+  ['Customize · mobile preview, grid', inConsole(<Customize navigate={noop} initial={{ inputs: DEFAULT_INPUTS, design: DEFAULT_DESIGN }} />)],
+  ['Customize · desktop preview, list with sections off', inConsole(<Customize navigate={noop} initialDevice="desktop" initial={{ inputs: KICKS, design: LIST_DESIGN }} initialProducts={[{ id: 'a1', name: 'Chicken Burger', meta: 'Burgers', price: '3,500 RWF' }, { id: 'a2', name: 'Fries', meta: 'Sides', price: '1,500 RWF' }]} initialCategories={['Burgers', 'Sides']} />)],
+  ['Customize · with a logo', inConsole(<Customize navigate={noop} initial={{ inputs: RUN, design: { ...DEFAULT_DESIGN, logoUrl: '/api/media/s1/0123456789abcdef0123456789abcdef.png' } }} />)],
+  ['StorePreview · every section on', <StorePreview key="p1" theme={compileTheme(KICKS)} design={DEFAULT_DESIGN} device="mobile" storeName="Kigali Kicks" products={SAMPLE_PRODUCTS} categories={SAMPLE_CATEGORIES} cartTotal="113,000 RWF" />],
+  ['StorePreview · every section off', <StorePreview key="p2" theme={compileTheme(RUN)} design={{ ...DEFAULT_DESIGN, sections: { promo: false, categories: false, featured: false, info: false } }} device="desktop" storeName="Run Rwanda" products={SAMPLE_PRODUCTS} categories={SAMPLE_CATEGORIES} cartTotal="113,000 RWF" />],
+];
+
+const studioHtml: string[] = [];
+for (const [name, node] of studioParts) {
+  const html = render(name, node);
+  allHtml += html;
+  studioHtml.push(html);
+}
+const studioText = studioHtml.join(' ').replace(/<[^>]+>/g, ' ').replaceAll('&amp;', '&').replace(/\s+/g, ' ');
+expect(studioHtml.length === studioParts.length, 'every studio part rendered');
+expect(studioHtml[6]!.includes('--store-primary:'), 'the preview carries the compiler\'s palette as variables on its own subtree');
+expect(studioHtml[6]!.includes('Popular right now') && studioHtml[6]!.includes('Your promotion') && studioHtml[6]!.includes('Weekdays 12:00–15:00'), 'with every section on, the preview shows each');
+expect(!studioHtml[7]!.includes('Popular right now') && !studioHtml[7]!.includes('Your promotion') && !studioHtml[7]!.includes('Weekdays'), 'with every section off, none of them is drawn');
+expect(studioHtml[7]!.includes('View cart'), 'but the cart bar is not a section: it stays');
+expect(studioHtml[4]!.includes('flex-col gap-2') && !studioHtml[4]!.includes('grid-cols-4'), 'the list layout is rows, not the four-column desktop grid');
+expect(studioHtml[3]!.includes('grid-cols-2'), 'the mobile grid is two columns');
+expect(studioHtml[5]!.includes('0123456789abcdef0123456789abcdef.png'), 'a logo replaces the letter mark');
+expect(studioText.includes('Pick your colors. Vendlyfy builds the rest and keeps it readable.'), 'ThemeStudio\'s own subtitle');
+expect(studioText.includes('For sale badges and highlights.') && studioText.includes('Let Vendlyfy pick'), 'the second-color panel');
+expect(studioText.includes('Nothing. Your colors work exactly as picked.') || studioText.includes('nudged'), 'the adjustment notes say what was done, or that nothing was');
+expect(studioText.includes('Text needs 4.5:1 against its background, buttons need 3:1 against the page.'), 'the readability footnote');
+expect(studioText.includes('Changes are saved as a draft') && studioText.includes('Homepage sections') && studioText.includes('The products section is always shown.'), 'Customize\'s own wording');
+expect(studioText.includes('Replace logo') || studioText.includes('Add logo'), 'the logo control');
+
+const SETTINGS_BASE: SettingsBase = {
+  pickup: { address: 'KG 7 Ave, Kacyiru', readyMinutes: 15, instructions: null },
+  payout: { methodKey: 'mtn_momo', phone: '0781234412', settlementMode: 'manual', automaticAt: null },
+  paymentMethods: [{ key: 'mtn_momo', isConnected: true, connectedAt: '2026-01-01T00:00:00Z' }, { key: 'cash', isConnected: true, connectedAt: '2026-01-01T00:00:00Z' }],
+};
+const SETTINGS_EXTRA: SettingsExtra = {
+  store: { name: 'Nyama & Co.', slug: 'nyama', publicPhone: '0788000111', address: 'KG 7 Ave, Kacyiru', timeZone: 'Africa/Kigali', acceptingOrders: true },
+  zones: [
+    { id: 'z1', name: 'Kigali city centre', feeAmount: '1000.00', etaMinMinutes: 25, etaMaxMinutes: 35, isActive: true, areas: ['Kacyiru', 'Kimihurura', 'Kiyovu'] },
+    { id: 'z2', name: 'Outer Kigali', feeAmount: '0.00', etaMinMinutes: 40, etaMaxMinutes: 60, isActive: true, areas: ['Kanombe', 'Remera', 'Gikondo', 'Nyamirambo', 'Kicukiro'] },
+  ],
+  hours: [1, 2, 3, 4, 5].map((day) => ({ day, opens: '09:00', closes: '18:00' })),
+  catalogue: [
+    { key: 'mtn_momo', name: 'MTN MoMo', kind: 'online', status: 'live' },
+    { key: 'airtel_money', name: 'Airtel Money', kind: 'online', status: 'live' },
+    { key: 'mpesa', name: 'M-Pesa', kind: 'online', status: 'draft' },
+    { key: 'cash', name: 'Cash on delivery', kind: 'offline', status: 'live' },
+  ],
+};
+const SETTINGS_MEMBERS: Member[] = [
+  { user_id: 'u1', name: 'Aline Uwase', email: 'aline@nyama.rw', phone: null, role: 'owner', created_at: '2026-01-01', created_by: null, plate_number: null, availability: null },
+  { user_id: 'u2', name: 'Eric Mugisha', email: 'eric@nyama.rw', phone: '0788111222', role: 'manager', created_at: '2026-02-01', created_by: 'u1', plate_number: null, availability: null },
+  { user_id: 'u3', name: 'Jean Claude', email: 'jc@nyama.rw', phone: null, role: 'rider', created_at: '2026-02-02', created_by: 'u1', plate_number: 'RAE 123 B', availability: 'available' },
+];
+const SETTINGS_SEED = { base: SETTINGS_BASE, extra: SETTINGS_EXTRA, members: SETTINGS_MEMBERS };
+
 const consoleParts: readonly (readonly [string, ReactNode])[] = [
   ['Sidebar', inConsole(<Sidebar active="dashboard" unread={7} onOpenNotifications={noop} navigate={noop} />)],
   ['DashboardMobile · bottom bar', inConsole(<MobileTabs active="dashboard" navigate={noop} />)],
@@ -1527,6 +1659,13 @@ const consoleParts: readonly (readonly [string, ReactNode])[] = [
   ['Analytics · Top items', inConsole(<Analytics initial={ANALYTICS_ITEMS} initialTab="items" />)],
   ['Analytics · Payment methods', inConsole(<Analytics initial={ANALYTICS_PAYMENTS} initialTab="payments" />)],
   ['Analytics · Delivery performance', inConsole(<Analytics initial={ANALYTICS_DELIVERY} initialTab="delivery" />)],
+  ['Settings · all five panels', inConsole(<Settings navigate={noop} initial={SETTINGS_SEED} />)],
+  ['Settings · add a delivery zone', inConsole(<Settings navigate={noop} initial={SETTINGS_SEED} initialOpen="zone" />)],
+  ['Settings · pickup', inConsole(<Settings navigate={noop} initial={SETTINGS_SEED} initialOpen="pickup" />)],
+  ['Settings · payout destination', inConsole(<Settings navigate={noop} initial={SETTINGS_SEED} initialOpen="payout" />)],
+  ['Settings · add staff', inConsole(<Settings navigate={noop} initial={SETTINGS_SEED} initialOpen="staff" />)],
+  ['Settings · change business type', inConsole(<Settings navigate={noop} initial={{ ...SETTINGS_SEED, templates: [{ key: 'food', name: 'Food & drinks' }, { key: 'fashion', name: 'Fashion' }] }} initialOpen="template" />)],
+  ['Settings · nothing set up yet', inConsole(<Settings navigate={noop} initial={{ ...SETTINGS_SEED, base: { pickup: null, payout: null, paymentMethods: [] }, extra: { ...SETTINGS_SEED.extra, zones: [], hours: [] } }} />)],
   ['Categories · none yet', inConsole(<Categories initialRows={[]} />)],
 
   // CashReport — milestone 21. Same testing seam as Orders.tsx: no effects run in SSR.
@@ -1566,6 +1705,17 @@ const visibleText = allHtml
   .replaceAll('&quot;', '"')
   .replaceAll('&#x27;', "'")
   .replace(/\s+/g, ' ');
+
+// --- Settings: the rules that live outside the JSX ---------------------------------
+expect(visibleModules(CONSOLE_SHELL.config.modules).join() === 'modifiers,delivery,pickup,table,scheduled,stock', 'Settings lists the six modules and hides the two specialist ones that are off');
+expect(zoneAreasLine({ areas: ['A', 'B', 'C', 'D', 'E'] }) === 'A, B, C and 2 more', 'a long area list is summarised');
+expect(zoneFeeLine({ feeAmount: '0.00', etaMinMinutes: 40, etaMaxMinutes: 60 }, (v) => v) === 'Free · 40–60 min', 'a zone with no fee says Free');
+expect(paymentState({ status: 'draft' }, false) === 'unavailable' && paymentState({ status: 'live' }, false) === 'connectable' && paymentState({ status: 'draft' }, true) === 'connected', 'payment states');
+expect(maskPhone('250781234412') === '078 ••• 4412', 'a payout phone is masked');
+expect(payoutSentence(null).startsWith('Add the MoMo'), 'no payout yet asks for one');
+expect(hoursSummary(weekToRows(weekFrom(SETTINGS_EXTRA.hours))) === 'Mon–Fri 09:00–18:00', 'hours collapse into a range');
+expect(grantableRoles('owner').includes('admin') && !grantableRoles('admin').includes('admin') && grantableRoles('manager').length === 0, 'who can create whom');
+expect(/^(?=.*\d)[A-Za-z0-9]{12}$/.test(generatePassword()), 'a generated password is 12 characters with a digit');
 
 // --- the copy is the boards', not a paraphrase --------------------------------
 //

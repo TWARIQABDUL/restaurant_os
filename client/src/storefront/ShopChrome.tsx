@@ -137,19 +137,24 @@ export function StoreHeader({
   onCart: () => void;
   today: number;
 }): ReactNode {
-  const { face, t } = useStore();
+  const { face, t, design } = useStore();
   const initial = face.store.name.trim().charAt(0).toUpperCase();
 
   return (
     <header className="border-b border-store-border bg-store-surface">
       <div className="mx-auto flex max-w-[1360px] items-center gap-3 px-4 py-3 lg:h-[76px] lg:gap-6 lg:px-10 lg:py-0">
         <div className="flex min-w-0 items-center gap-3">
-          <span
-            aria-hidden="true"
-            className="flex size-11 shrink-0 items-center justify-center rounded-control bg-store-primary font-display text-[22px] font-bold text-store-on-primary"
-          >
-            {initial}
-          </span>
+          {design.logoUrl === null ? (
+            <span
+              aria-hidden="true"
+              className="flex size-11 shrink-0 items-center justify-center rounded-control bg-store-primary font-display text-[22px] font-bold text-store-on-primary"
+            >
+              {initial}
+            </span>
+          ) : (
+            // The merchant's own logo (Customize): decorative, because the store's name is right beside it.
+            <img src={design.logoUrl} alt="" className="size-11 shrink-0 rounded-control object-cover" />
+          )}
           <span className="flex min-w-0 flex-col">
             <h1 className="truncate font-display text-title font-bold leading-tight lg:text-heading">
               {face.store.name}

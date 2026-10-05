@@ -20,6 +20,7 @@ import { Router } from 'express';
 import { createHash } from 'node:crypto';
 import { badRequest, notFound, readConsistent } from '../db/index.ts';
 import { asyncHandler } from '../api/handler.ts';
+import * as designs from '../repositories/designs.ts';
 import * as themes from '../repositories/themes.ts';
 
 const router = Router();
@@ -40,7 +41,10 @@ router.get(
       const theme = await themes.findPublishedBySlug(slug, tx);
       if (theme === null) return null;
       const currency = await themes.findCurrencyBySlug(slug, tx);
-      return { ...theme, currency };
+      // The published layout, sections and logo — or the default. Read with the theme in the same transaction so a
+      // shopfront never gets one half of a publish.
+      const design = await designs.findPublishedForStore(theme.store.id, tx);
+      return { ...theme, currency, design };
     }, 'GET /api/storefront/:slug/theme');
 
     if (found === null) throw notFound('No store at that address.', 'NO_SUCH_STORE');
@@ -66,6 +70,7 @@ router.get(
               publishedAt: found.theme.publishedAt,
             },
       currency: found.currency,
+      design: found.design,
     };
 
     // Strong ETag over the payload, for the reason storefrontConfig.ts gives: hashing the answer

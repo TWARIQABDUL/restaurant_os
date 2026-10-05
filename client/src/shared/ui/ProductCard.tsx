@@ -58,6 +58,12 @@ type Props = {
   onOpen?: () => void;
   /** `compact` is Main's console card. `roomy` is the storefront grid's. */
   scale?: 'compact' | 'roomy';
+  /**
+   * `list` is Customize's other product layout (milestone 25): a row — tile, name and meta, price, action — instead of a
+   * card. Same slots and the same sold-out rules, because a layout is a choice about arrangement, not about what a card
+   * says; two components would be two places for "sold out" to drift.
+   */
+  layout?: 'grid' | 'list';
   /** Replaces the round action — the board's sold-out card offers "Notify me". */
   secondaryAction?: { label: string; onSelect?: () => void };
 };
@@ -76,6 +82,7 @@ export function ProductCard({
   onAdd,
   onOpen,
   scale = 'compact',
+  layout = 'grid',
   secondaryAction,
 }: Props): ReactNode {
   const roomy = scale === 'roomy';
@@ -94,11 +101,19 @@ export function ProductCard({
       {badge === undefined ? null : <CardBadge label={badge.label} tone={badge.tone} />}
     </>
   );
-  const tileClass = `relative flex w-full items-center justify-center ${roomy ? 'h-32' : 'h-[92px]'}`;
+  const asList = layout === 'list';
+  // A list row's tile is a small square with its own corners; a grid card's is the full-width top of the card.
+  const tileClass = asList
+    ? 'relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-control'
+    : `relative flex w-full items-center justify-center ${roomy ? 'h-32' : 'h-[92px]'}`;
   const tileStyle = { background: tileBackground, color: tileForeground };
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-card border border-store-border bg-store-surface">
+    <article
+      className={`overflow-hidden rounded-card border border-[color:var(--store-card-edge,var(--store-border))] bg-[color:var(--store-card-bg,var(--store-surface))] [box-shadow:var(--store-card-shadow,none)] ${
+        layout === 'list' ? 'flex items-center gap-3 p-2' : 'flex flex-col'
+      }`}
+    >
       {/* A placeholder tile, not an <img>: the boards draw one, and a product with no photo is the
           common case for a merchant adding their first ten items from a phone. */}
       {onOpen === undefined ? (
@@ -117,7 +132,8 @@ export function ProductCard({
         </button>
       )}
 
-      <div className={roomy ? 'flex grow flex-col px-3 pb-3 pt-2.5' : 'px-2.5 pb-2.5 pt-2'}>
+      <div className={asList ? 'flex min-w-0 grow items-center gap-3' : roomy ? 'flex grow flex-col px-3 pb-3 pt-2.5' : 'px-2.5 pb-2.5 pt-2'}>
+        <div className={asList ? 'flex min-w-0 grow flex-col' : 'contents'}>
         <div
           className={`${roomy ? 'text-body' : 'text-caption'} font-semibold ${soldOut ? 'text-store-muted' : 'text-store-text'}`}
         >
@@ -136,8 +152,9 @@ export function ProductCard({
             </s>
           )}
         </div>
+        </div>
 
-        <div className={roomy ? 'mt-1.5 flex justify-end' : 'mt-1 flex justify-end'}>
+        <div className={asList ? 'flex shrink-0 justify-end' : roomy ? 'mt-1.5 flex justify-end' : 'mt-1 flex justify-end'}>
           {secondaryAction === undefined ? (
             onAdd === undefined ? null : (
               <RoundButton label={`Add ${name}`} onClick={onAdd}>
