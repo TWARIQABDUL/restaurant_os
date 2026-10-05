@@ -41,7 +41,7 @@ import { ComplaintSheet } from '../src/storefront/ComplaintSheet.tsx';
 import { tileFor } from '../src/storefront/tiles.ts';
 import { ShellContext } from '../src/console/ShellProvider.tsx';
 import type { ShellContextValue } from '../src/console/ShellProvider.tsx';
-import type { CategoryRow, DashboardData, OrderAlert as OrderAlertData, OrderDetail, OrderListItem, ProductList, ProductSaved } from '../src/console/api.ts';
+import type { ActivityRow, AnalyticsPayload, CategoryRow, ComplaintDetail, ComplaintListItem, CustomerDetail, CustomerList, ReviewsPage, DashboardData, Payout, RefundRow as WalletRefund, WalletData, OrderAlert as OrderAlertData, OrderDetail, OrderListItem, ProductList, ProductSaved } from '../src/console/api.ts';
 import { MobileTabs, Sidebar } from '../src/console/Sidebar.tsx';
 import { Dashboard } from '../src/console/Dashboard.tsx';
 import { NotificationsPanel } from '../src/console/NotificationsPanel.tsx';
@@ -50,6 +50,14 @@ import { columnOf, COLUMN_LABELS, Orders, statusMeta } from '../src/console/Orde
 import { CashReport } from '../src/console/CashReport.tsx';
 import { Categories, pageTitle, productsMeta, sectionState } from '../src/console/Categories.tsx';
 import { ProductEditor } from '../src/console/ProductEditor.tsx';
+import { Wallet } from '../src/console/Wallet.tsx';
+import { Analytics } from '../src/console/Analytics.tsx';
+import { Complaints } from '../src/console/Complaints.tsx';
+import { Customers } from '../src/console/Customers.tsx';
+import { Reviews } from '../src/console/Reviews.tsx';
+import { COMPLAINT_BADGE, RESPONSES, ageShort, canReopen, closedNote, deliveryLine, lowTrend, productRating, reasonLabel, reportReasonLabel, stars, timelineLine } from '../src/console/supportLines.ts';
+import { chartTitle, compact, delta, formatDay, itemsTiles, onTimeTone, ordersNote, ordersTiles, paymentsTiles, revenueNote, summaryTiles } from '../src/console/analyticsLines.ts';
+import { activityLine, availableNote, flowSteps, lockFor, payoutLine, pendingNote, refundLine, stamp } from '../src/console/walletLines.ts';
 import { Products, statusChip, stockCell } from '../src/console/Products.tsx';
 import { EMPTY_STATE, cleanAmount, problems as editorProblems, previewMeta, stateFrom, suggestSku, toDoc, variantRows } from '../src/console/catalogue.ts';
 import { RiderApp } from '../src/rider/Rider.tsx';
@@ -751,7 +759,7 @@ const CONSOLE_SHELL: ShellContextValue = {
     id: 'u1',
     name: 'Aline Uwase',
     role: 'owner',
-    permissions: ['orders.read', 'orders.update', 'wallet.read', 'settings.write', 'products.write'],
+    permissions: ['orders.read', 'orders.update', 'wallet.read', 'settings.write', 'products.write', 'support.write', 'customers.read', 'customers.write'],
   },
   stores: [
     { storeId: 's1', slug: 'nyama', name: 'Nyama & Co.', role: 'owner' },
@@ -1105,6 +1113,300 @@ const TSHIRT_STATE = stateFrom(TSHIRT);
   expect(productsMeta({ productCount: 1 }, 'Menu item', 'Menu items') === '1 menu item', 'and a single one is singular');
 }
 
+
+// --- the wallet — milestone 23 -------------------------------------------------------------------
+const HOUR = 3_600_000;
+const iso = (msAgo: number): string => new Date(Date.now() - msAgo).toISOString();
+
+const WALLET: WalletData = {
+  currency: 'RWF',
+  pending: '42000.00',
+  available: '184500.00',
+  updatedAt: iso(0),
+  pendingOrders: 3,
+  nextRelease: { at: new Date(Date.now() + HOUR / 2).toISOString(), amount: '15500.00' },
+  identity: 'verified',
+  refundsOwed: '0.00',
+  holdMinutes: 60,
+  cashWithRiders: '10000.00',
+  shortfalls: 1,
+  payout: { methodKey: 'mtn_momo', phoneMasked: '078 ••• 4412', mode: 'automatic', automaticAt: '08:00' },
+};
+
+const ACTIVITY: ActivityRow[] = [
+  { id: 'a1', at: iso(HOUR / 4), kind: 'sale', amount: '15500.00', balanceAfter: '226500.00', pot: 'pending', note: null, orderNumber: 1023, method: 'mtn_momo', released: false, availableAt: new Date(Date.now() + HOUR / 2).toISOString(), refund: null, withdrawal: null },
+  { id: 'a2', at: iso(HOUR), kind: 'sale', amount: '18000.00', balanceAfter: '211000.00', pot: 'pending', note: null, orderNumber: 1021, method: 'card', released: true, availableAt: null, refund: null, withdrawal: null },
+  { id: 'a3', at: iso(2 * HOUR), kind: 'refund', amount: '-3000.00', balanceAfter: '193000.00', pot: 'available', note: null, orderNumber: 1019, method: null, released: null, availableAt: null, refund: { approvedAmount: '3000.00', orderTotal: '12500.00', partial: true }, withdrawal: null },
+  { id: 'a4', at: iso(3 * HOUR), kind: 'refund', amount: '-8000.00', balanceAfter: '196000.00', pot: 'pending', note: null, orderNumber: 1018, method: null, released: null, availableAt: null, refund: { approvedAmount: '8000.00', orderTotal: '8000.00', partial: false }, withdrawal: null },
+  { id: 'a5', at: iso(8 * HOUR), kind: 'withdrawal', amount: '-212000.00', balanceAfter: '204000.00', pot: 'available', note: null, orderNumber: null, method: null, released: null, availableAt: null, refund: null, withdrawal: { status: 'completed', initiatedBy: 'automatic', phone: '0781114412', failureReason: null } },
+  { id: 'a6', at: iso(30 * HOUR), kind: 'withdrawal', amount: '-50000.00', balanceAfter: '416000.00', pot: 'available', note: null, orderNumber: null, method: null, released: null, availableAt: null, refund: null, withdrawal: { status: 'failed', initiatedBy: 'manual', phone: '0781114412', failureReason: 'PAYEE_NOT_FOUND' } },
+  { id: 'a7', at: iso(31 * HOUR), kind: 'adjust', amount: '-6000.00', balanceAfter: '416000.00', pot: 'available', note: 'Escalated complaint, refund approved by Vendlyfy', orderNumber: null, method: null, released: null, availableAt: null, refund: null, withdrawal: null },
+];
+
+const PAYOUTS: Payout[] = [
+  { id: 'p1', amount: '212000.00', phoneMasked: '078 ••• 4412', status: 'completed', failureReason: null, initiatedBy: 'automatic', requestedAt: iso(8 * HOUR), completedAt: iso(8 * HOUR - 120_000) },
+  { id: 'p2', amount: '30000.00', phoneMasked: '078 ••• 4412', status: 'processing', failureReason: null, initiatedBy: 'manual', requestedAt: iso(HOUR / 10), completedAt: null },
+  { id: 'p3', amount: '50000.00', phoneMasked: '078 ••• 4412', status: 'failed', failureReason: 'MoMo number isn’t registered to Aline Uwase.', initiatedBy: 'manual', requestedAt: iso(30 * HOUR), completedAt: null },
+  { id: 'p4', amount: '30000.00', phoneMasked: '078 ••• 4412', status: 'rejected', failureReason: 'Held while a dispute on #0998 was open.', initiatedBy: 'manual', requestedAt: iso(80 * HOUR), completedAt: null },
+];
+
+const WALLET_REFUNDS: WalletRefund[] = [
+  { id: 'r1', orderNumber: 1020, reason: 'item_missing', note: null, requestedAt: iso(5 * HOUR), amount: '5000.00', approvedAmount: null, orderTotal: '12000.00', status: 'pending', rejectionReason: null, settledAt: null },
+  { id: 'r2', orderNumber: 1019, reason: 'quality_problem', note: null, requestedAt: iso(9 * HOUR), amount: '3000.00', approvedAmount: '3000.00', orderTotal: '12500.00', status: 'approved', rejectionReason: null, settledAt: iso(2 * HOUR) },
+  { id: 'r3', orderNumber: 1014, reason: 'arrived_late', note: null, requestedAt: iso(300 * HOUR), amount: '7000.00', approvedAmount: null, orderTotal: '7000.00', status: 'rejected', rejectionReason: 'rider tracking shows on-time delivery.', settledAt: null },
+  { id: 'r4', orderNumber: 1011, reason: 'other', note: 'Customer sent it back', requestedAt: iso(20 * HOUR), amount: '2000.00', approvedAmount: '2000.00', orderTotal: '9000.00', status: 'queued', rejectionReason: null, settledAt: null },
+];
+
+{
+  const m = (v: string): string => formatMoney(v, CURRENCY);
+  const tz = 'Africa/Kigali';
+
+  // The ledger is worded the board's way.
+  const sale = activityLine(ACTIVITY[0]!, tz, m);
+  expect(sale.what === 'Sale · #1023', 'a sale reads Sale · #n');
+  expect(sale.chip.label === 'Pending' && sale.sub.startsWith('Paid by MoMo · Available at '), 'inside the hold window a sale is Pending and says when it clears');
+  expect(sale.amount.startsWith('+') && sale.positive, 'a sale adds');
+  expect(activityLine(ACTIVITY[1]!, tz, m).chip.label === 'Available', 'once released it is Available');
+  expect(activityLine(ACTIVITY[1]!, tz, m).sub === 'Paid by card', 'and a card sale says card');
+
+  const part = activityLine(ACTIVITY[2]!, tz, m);
+  expect(part.what === 'Refund · #1019 (part)', 'a partial refund says (part)');
+  expect(part.sub.startsWith('Approved by Vendlyfy · ') && part.sub.includes(' of '), 'and how much of the order');
+  expect(part.amount.startsWith('−'), 'a refund takes — with the board\'s true minus, not a hyphen');
+  expect(activityLine(ACTIVITY[3]!, tz, m).sub === 'Refunded before it cleared · Never reached Available', 'a refund from Pending says it never reached Available');
+
+  expect(activityLine(ACTIVITY[4]!, tz, m).what === 'Automatic payout' && activityLine(ACTIVITY[4]!, tz, m).chip.label === 'Paid out', 'an arrived automatic payout is Paid out');
+  const failed = activityLine(ACTIVITY[5]!, tz, m);
+  expect(failed.amount === '—' && failed.chip.label === 'Failed' && failed.sub.endsWith('Returned to Available'), 'a failed payout moved nothing, and says the money is back');
+  expect(failed.sub.includes('078 ••• 4412') && !failed.sub.includes('0781114412'), 'and the number is never printed whole');
+
+  expect(payoutLine(PAYOUTS[0]!, tz).chip.label === 'Completed' && payoutLine(PAYOUTS[0]!, tz).note.startsWith('Arrived '), 'the Withdrawals tab says Completed and when it arrived');
+  expect(payoutLine(PAYOUTS[1]!, tz).chip.label === 'Processing', 'in flight is Processing');
+  expect(payoutLine(PAYOUTS[2]!, tz).canRetry && !payoutLine(PAYOUTS[3]!, tz).canRetry, 'a failed one can be retried; a rejected one is a decision');
+  expect(payoutLine(PAYOUTS[2]!, tz).note.endsWith('Money returned to Available.'), 'both say where the money went');
+
+  expect(refundLine(WALLET_REFUNDS[0]!, tz, m).chip.label === 'Waiting for Vendlyfy', 'a pending refund waits for Vendlyfy');
+  expect(refundLine(WALLET_REFUNDS[1]!, tz, m).amount.includes('of'), 'a part refund shows of the order total');
+  expect(refundLine(WALLET_REFUNDS[2]!, tz, m).amount.endsWith('(full)'), 'a refund of the whole order says (full)');
+  expect(refundLine(WALLET_REFUNDS[2]!, tz, m).note.startsWith('Vendlyfy: '), 'a rejection quotes Vendlyfy');
+  expect(refundLine(WALLET_REFUNDS[3]!, tz, m).chip.label === 'Approved · waiting for funds' && refundLine(WALLET_REFUNDS[3]!, tz, m).reason === 'Customer sent it back', 'a queued refund says so, and "other" shows the merchant\'s own note');
+
+  // The four steps.
+  expect(flowSteps({ mode: 'automatic', locked: false, automaticAt: '08:00', holdMinutes: 60 })[3]!.title === 'Paid out at 08:00', 'automatic reads Paid out at 08:00');
+  expect(flowSteps({ mode: 'manual', locked: false, automaticAt: null, holdMinutes: 60 })[3]!.title === 'Paid out when you withdraw', 'manual reads when you withdraw');
+  expect(flowSteps({ mode: 'manual', locked: true, automaticAt: null, holdMinutes: 60 })[3]!.body === 'On hold until your identity is verified.', 'a locked store says why');
+  expect(flowSteps({ mode: 'manual', locked: false, automaticAt: null, holdMinutes: 90 })[1]!.body.includes('90 minutes'), 'the hold is the configured one, not a hard-coded 60');
+
+  expect(lockFor('verified') === null, 'a verified store has no banner');
+  expect(lockFor('in_review')!.title === 'Payouts are on hold while we check your ID', 'in review has the board\'s own title');
+  expect(lockFor('not_started')!.title === 'Verify your identity to get paid', 'not started too');
+
+  expect(availableNote({ locked: true, mode: 'automatic', methodKey: 'mtn_momo', phoneMasked: '078 ••• 4412', automaticAt: '08:00', storeNowHHMM: '09:00' }) === 'Yours, but held until you’re verified.', 'a locked store\'s money is held');
+  expect(availableNote({ locked: false, mode: 'manual', methodKey: 'mtn_momo', phoneMasked: 'x', automaticAt: null, storeNowHHMM: '09:00' }) === 'Stays here until you withdraw.', 'manual stays put');
+  expect(availableNote({ locked: false, mode: 'automatic', methodKey: 'mtn_momo', phoneMasked: '078 ••• 4412', automaticAt: '08:00', storeNowHHMM: '09:00' }) === 'Goes to MTN MoMo 078 ••• 4412 tomorrow at 08:00.', 'after 08:00 the next payout is tomorrow');
+  expect(availableNote({ locked: false, mode: 'automatic', methodKey: 'mtn_momo', phoneMasked: '078 ••• 4412', automaticAt: '08:00', storeNowHHMM: '07:00' }).endsWith('today at 08:00.'), 'and before it, today');
+  expect(pendingNote(0, null, tz, m).startsWith('Nothing waiting'), 'nothing pending says so');
+  expect(pendingNote(1, WALLET.nextRelease, tz, m).startsWith('From 1 order.'), 'one order is singular');
+  expect(pendingNote(3, WALLET.nextRelease, tz, m).includes('becomes available at'), 'three orders says when the next clears');
+
+  // Stamps.
+  const noon = new Date('2026-10-05T12:00:00Z');
+  expect(stamp('2026-10-05T11:02:00Z', tz, noon) === 'Today 13:02', 'a stamp is in the store\'s zone (Kigali is UTC+2)');
+  expect(stamp('2026-10-04T19:10:00Z', tz, noon) === 'Yesterday 21:10', 'yesterday keeps its clock time');
+  expect(/^20 Sep\w* \d\d:\d\d$/.test(stamp('2026-09-20T13:12:00Z', tz, noon)), 'older ones carry the date and the time');
+}
+
+
+// --- support and insight — milestone 24 ----------------------------------------------------------
+const COMPLAINT_LIST: ComplaintListItem[] = [
+  { id: 'cp1', reference: 'C-051', reason: 'item_missing', customer: 'Sandrine Keza', orderNumber: 1023, at: iso(2 * HOUR), status: 'open' },
+  { id: 'cp2', reference: 'C-050', reason: 'quality_problem', customer: 'Pacifique Irakoze', orderNumber: 1027, at: iso(5 * HOUR), status: 'open' },
+];
+
+const COMPLAINT: ComplaintDetail = {
+  id: 'cp1',
+  reference: 'C-051',
+  reason: 'item_missing',
+  status: 'open',
+  text: 'The salad wasn’t in the bag. Everything else was fine.',
+  at: iso(2 * HOUR),
+  reopenedCount: 0,
+  customer: { name: 'Sandrine Keza', phone: '078 543 6671' },
+  order: {
+    id: 'o1',
+    number: 1023,
+    items: [{ label: '2× Grilled chicken', amount: '12500.00' }, { label: '1× Salad', amount: '3000.00' }],
+    total: '15500.00',
+    refunded: '0.00',
+    deliveredAt: iso(3 * HOUR),
+    riderName: 'Claude Habineza',
+    paymentMethod: 'mtn_momo',
+    fulfilment: 'delivery',
+  },
+  evidence: [{ id: 'e1', side: 'customer', kind: 'photo', label: 'Photo of bag', url: null }],
+  timeline: [{ type: 'filed', side: 'customer', note: null, at: iso(2 * HOUR), actor: null }],
+  decision: null,
+  pendingRefund: null,
+};
+
+const COMPLAINT_ESCALATED: ComplaintDetail = {
+  ...COMPLAINT,
+  id: 'cp3',
+  reference: 'C-047',
+  reason: 'wrong_item',
+  status: 'escalated',
+  timeline: [
+    { type: 'filed', side: 'customer', note: null, at: iso(60 * HOUR), actor: null },
+    { type: 'rejected', side: 'store', note: 'Our packing photo shows the platter.', at: iso(59 * HOUR), actor: 'Aline Uwase' },
+    { type: 'reopened', side: 'customer', note: null, at: iso(50 * HOUR), actor: null },
+    { type: 'escalated', side: 'store', note: 'We disagree on what was delivered.', at: iso(48 * HOUR), actor: 'Aline Uwase' },
+  ],
+};
+
+const REVIEWS_PAGE: ReviewsPage = {
+  overview: { averageRating: '4.3', last90Days: 126, needsReply: 3, lowThisMonth: 4, lowLastMonth: 7, reportedOpen: 1 },
+  reviews: [
+    { id: 'rv1', product: 'Grilled chicken', customer: 'Pacifique I.', orderNumber: 1027, at: iso(5 * HOUR), rating: 2, body: 'Tasty but arrived cold.', reply: null, reported: null },
+    { id: 'rv2', product: 'Chicken burger', customer: 'Sandrine K.', orderNumber: 1023, at: iso(HOUR), rating: 5, body: 'Juicy and the sauce is perfect.', reply: null, reported: null },
+    { id: 'rv3', product: 'Grilled chicken', customer: 'Kevin M.', orderNumber: 1011, at: iso(48 * HOUR), rating: 4, body: 'Great taste, fries a bit soft.', reply: 'Thanks Kevin! We’ve switched to vented boxes for fries.', reported: null },
+    { id: 'rv4', product: 'Brochette platter', customer: 'Anonymous123', orderNumber: 901, at: iso(72 * HOUR), rating: 1, body: 'Worst place ever, the owner is a thief.', reply: null, reported: { reason: 'abusive' } },
+  ],
+  nextCursor: null,
+  byProduct: [
+    { id: 'p1', name: 'Chicken burger', count: 58, average: '4.6' },
+    { id: 'p2', name: 'Grilled chicken', count: 41, average: '4.1' },
+    { id: 'p3', name: 'Veggie wrap', count: 2, average: null },
+    { id: 'p4', name: 'Mango juice', count: 0, average: null },
+  ],
+  minForAverage: 3,
+};
+
+const CUSTOMER_LIST: CustomerList = {
+  rows: [
+    { key: '784551209', name: 'Grace Ingabire', phone: '078 455 1209', orders: 14, spent: '168000.00', lastOrderAt: iso(2 * HOUR), account: true, complaints: 1 },
+    { key: '785436671', name: 'Sandrine Keza', phone: '078 543 6671', orders: 6, spent: '81000.00', lastOrderAt: iso(3 * HOUR), account: true, complaints: 1 },
+    { key: '783301180', name: 'Aimable Kayitare', phone: '078 330 1180', orders: 1, spent: '8500.00', lastOrderAt: iso(4 * HOUR), account: false, complaints: 0 },
+  ],
+  total: 1240,
+  page: 1,
+  pageSize: 25,
+  counts: { all: 1240, regular: 86, account: 410, guest: 830 },
+};
+
+const CUSTOMER: CustomerDetail = {
+  ...CUSTOMER_LIST.rows[1]!,
+  usualAddress: 'KG 7 Ave, Kimihurura',
+  recent: [
+    { id: 'o1', number: 1026, at: iso(3 * HOUR), total: '12000.00', status: 'delivered' },
+    { id: 'o2', number: 990, at: iso(96 * HOUR), total: '7000.00', status: 'delivered' },
+  ],
+  note: 'Allergic to peanuts',
+};
+
+const DAYS14 = Array.from({ length: 14 }, (_, i) => `2026-09-${String(10 + i).padStart(2, '0')}`);
+const ANALYTICS_REVENUE: AnalyticsPayload & { range: number; from: string; to: string } = {
+  tab: 'summary',
+  range: 14,
+  from: '2026-09-10',
+  to: '2026-09-23',
+  data: {
+    dates: DAYS14,
+    methods: [
+      { key: 'mtn_momo', name: 'MTN MoMo', kind: 'online' },
+      { key: 'cash', name: 'Cash on delivery', kind: 'offline' },
+      { key: 'airtel_money', name: 'Airtel Money', kind: 'online' },
+    ],
+    byDay: Object.fromEntries(DAYS14.map((d, i) => [d, { mtn_momo: String(310000 + i * 9000), cash: String(110000 + i * 3000) }])),
+    revenue: '6800000.00',
+    previousRevenue: '6070000.00',
+    orders: 810,
+    previousOrders: 750,
+    refunded: '94500.00',
+    pendingNow: '42000.00',
+    paidOut: '5900000.00',
+    automaticPayouts: 14,
+    repeatShare: 41,
+  },
+};
+
+const ANALYTICS_ITEMS: AnalyticsPayload & { range: number; from: string; to: string } = {
+  tab: 'items', range: 14, from: '2026-09-10', to: '2026-09-23',
+  data: { items: [{ name: 'Grilled chicken', sold: 230, revenue: '1840000.00' }, { name: 'Chicken burger', sold: 412, revenue: '1442000.00' }, { name: 'Fries', sold: 520, revenue: '780000.00' }], itemsSold: 1778, bestSeller: 'Fries', topEarner: 'Grilled chicken', outOfStockNow: 2 },
+};
+
+const ANALYTICS_DELIVERY: AnalyticsPayload & { range: number; from: string; to: string } = {
+  tab: 'delivery', range: 14, from: '2026-09-10', to: '2026-09-23',
+  data: {
+    riders: [
+      { id: 'r1', name: 'Eric Mugisha', deliveries: 212, avgMinutes: 24, onTimeShare: 94 },
+      { id: 'r2', name: 'Claude Habineza', deliveries: 180, avgMinutes: 27, onTimeShare: 88 },
+      { id: 'r3', name: 'Olivier Nzeyimana', deliveries: 96, avgMinutes: 31, onTimeShare: 81 },
+    ],
+    orderToDoorMinutes: 38, prepMinutes: 14, waitingForRiderMinutes: 6, returned: 4, topReturnReason: 'Customer not answering', etaMaxMinutes: 60,
+  },
+};
+
+const ANALYTICS_ORDERS: AnalyticsPayload & { range: number; from: string; to: string } = {
+  tab: 'orders', range: 14, from: '2026-09-10', to: '2026-09-23',
+  data: { dates: DAYS14, perDay: Object.fromEntries(DAYS14.map((d, i) => [d, 40 + i * 3])), total: 810, previousTotal: 750, deliveryShare: 72, turnedAway: 49, topReason: 'Item out of stock', acceptMinutes: 2.1, busiestHour: 12 },
+};
+
+const ANALYTICS_PAYMENTS: AnalyticsPayload & { range: number; from: string; to: string } = {
+  tab: 'payments', range: 14, from: '2026-09-10', to: '2026-09-23',
+  data: {
+    methods: [
+      { key: 'mtn_momo', name: 'MTN MoMo', kind: 'online', orders: 470, revenue: '4200000.00', successRate: 98.9 },
+      { key: 'cash', name: 'Cash on delivery', kind: 'offline', orders: 220, revenue: '1500000.00', successRate: null },
+    ],
+    paidOnlineShare: 73, failedPayments: 31, retriedAfterFailure: 22, cashUnconfirmed: { orders: 1, amount: '12500.00' }, refunds: { count: 6, amount: '94500.00' },
+  },
+};
+
+{
+  const m = (v: string): string => formatMoney(v, CURRENCY);
+
+  // Complaints — the board's words.
+  expect(reasonLabel('item_missing') === 'Missing item' && reasonLabel('arrived_late') === 'Late delivery', 'a complaint reason reads as the board words it');
+  expect(COMPLAINT_BADGE.open.label === 'Needs a reply' && COMPLAINT_BADGE.escalated.label === 'With Vendlyfy', 'the badges say whose move it is');
+  expect(ageShort(iso(2 * HOUR)) === '2 h' && ageShort(iso(5 * 24 * HOUR)) === '5 d' && ageShort(iso(30 * 60_000)) === '30 min', 'a complaint\'s age reads 30 min, 2 h, 5 d');
+  expect(RESPONSES.resolve.submit === 'Send and resolve' && RESPONSES.reject.submit === 'Reject complaint' && RESPONSES.escalate.submit === 'Escalate to Vendlyfy', 'the three buttons');
+  expect(RESPONSES.escalate.help.includes('can refund from your wallet'), 'escalating says Vendlyfy can refund from the wallet');
+  expect(closedNote('open') === '' && closedNote('escalated').includes('comes out of your available balance'), 'an open complaint has no closed note; an escalated one explains the wallet');
+  expect(canReopen('resolved') && canReopen('rejected') && !canReopen('open') && !canReopen('escalated'), 'only a resolved or rejected complaint can be reopened');
+  expect(timelineLine(COMPLAINT_ESCALATED.timeline[0]!, 'Aline Uwase') === 'Complaint filed by customer', 'the first line is the filing');
+  expect(timelineLine(COMPLAINT_ESCALATED.timeline[1]!, 'Aline Uwase') === 'You rejected: “Our packing photo shows the platter.”', 'your own action is "You"');
+  expect(timelineLine(COMPLAINT_ESCALATED.timeline[1]!, 'Somebody Else') === 'Aline Uwase rejected: “Our packing photo shows the platter.”', 'a colleague is named, not called You');
+  expect(timelineLine(COMPLAINT_ESCALATED.timeline[2]!, 'Aline Uwase') === 'Customer reopened it', 'a customer reopen reads that way');
+  expect(timelineLine({ type: 'reopened', side: 'store', note: null, at: iso(0), actor: 'Aline Uwase' }, 'Aline Uwase') === 'Reopened by you', 'and your own reopen');
+  expect(timelineLine(COMPLAINT_ESCALATED.timeline[3]!, 'Aline Uwase').startsWith('You escalated to Vendlyfy: “'), 'escalating reads that way');
+  expect(deliveryLine(COMPLAINT.order, () => '14:02') === 'Delivered by Claude H. at 14:02 · paid by MTN MoMo', 'the order card says who delivered, when, and how it was paid');
+  expect(deliveryLine({ ...COMPLAINT.order, deliveredAt: null, fulfilment: 'pickup' }, () => '') === 'Pickup · paid by MTN MoMo', 'a pickup order says Pickup');
+
+  // Reviews.
+  expect(stars(4) === '★★★★☆' && stars(1) === '★☆☆☆☆', 'stars are always five wide');
+  expect(lowTrend(4, 7) === 'Down from 7 last month' && lowTrend(9, 7) === 'Up from 7 last month' && lowTrend(3, 3) === 'Same as last month', 'the month-on-month line says which way');
+  expect(productRating({ count: 58, average: '4.6' }).text === '★ 4.6 (58)', 'three or more reviews show an average');
+  expect(productRating({ count: 2, average: null }).text === '2 reviews' && productRating({ count: 1, average: null }).text === '1 review', 'under three, the count — never an average of one');
+  expect(productRating({ count: 0, average: null }).text === 'No reviews', 'and none says so');
+  expect(reportReasonLabel('personal_info') === 'shares personal info', 'a report reason reads in a sentence');
+
+  // Analytics.
+  expect(delta(6800000, 6070000, 14).text === '+12% vs previous 14 days' && delta(6800000, 6070000, 14).tone === 'good', 'a rise reads +12% and is good');
+  expect(delta(90, 100, 7).text === '−10% vs previous 7 days' && delta(90, 100, 7).tone === 'bad', 'a fall reads with a true minus and is bad');
+  expect(delta(5, 0, 7).text === 'Nothing to compare with yet', 'with no previous period it says so rather than printing infinity');
+  expect(compact('6800000.00', 'RWF') === '6.8M RWF' && compact('84000.00', 'RWF') === '84K RWF' && compact('8400.00', 'RWF') === '8,400 RWF', 'big figures are compact, small ones exact');
+  expect(formatDay('2026-09-10') === '10 Sep', 'an axis label is the store\'s own date, unshifted');
+  expect(chartTitle('revenue', ['2026-09-10', '2026-09-23']) === 'Revenue per day, 10 Sep–23 Sep', 'the chart title names its span');
+  const tiles = summaryTiles(ANALYTICS_REVENUE.data as never, 14, 'RWF', m);
+  expect(tiles.length === 4 && tiles[0]!.value === '6.8M RWF' && tiles[3]!.value === '41%', 'summary has the board\'s four tiles');
+  expect(itemsTiles(ANALYTICS_ITEMS.data as never)[3]!.label === 'Out of stock now', 'the stock tile says what is known, not what would need a history');
+  expect(ordersNote(ANALYTICS_ORDERS.data as never).includes('Busiest hour: 12:00–13:00.'), 'the orders note names the busiest hour');
+  expect(ordersTiles(ANALYTICS_ORDERS.data as never, 14)[1]!.value === '72% / 28%', 'delivery and pickup add to a hundred');
+  expect(paymentsTiles(ANALYTICS_PAYMENTS.data as never, m)[2]!.tone === 'bad', 'unconfirmed cash is flagged');
+  expect(onTimeTone(94) === 'good' && onTimeTone(88) === 'warn' && onTimeTone(81) === 'bad' && onTimeTone(null) === 'none', 'the on-time bar goes green from 90, amber from 85, red below');
+  expect(revenueNote(ANALYTICS_REVENUE.data as never).includes('Today is partial'), 'the revenue note says today is partial');
+}
+
 const consoleParts: readonly (readonly [string, ReactNode])[] = [
   ['Sidebar', inConsole(<Sidebar active="dashboard" unread={7} onOpenNotifications={noop} navigate={noop} />)],
   ['DashboardMobile · bottom bar', inConsole(<MobileTabs active="dashboard" navigate={noop} />)],
@@ -1192,6 +1494,39 @@ const consoleParts: readonly (readonly [string, ReactNode])[] = [
   ['AddProduct · a simple product with its own stock', inConsole(<ProductEditor navigate={noop} productId={null} initialState={{ ...EMPTY_STATE, name: 'Fries', price: '1500', trackStock: true, stock: '120', sku: 'NY-020' }} initialCategories={SECTIONS} />)],
   ['Categories · sections in every state', inConsole(<Categories initialRows={SECTIONS} />)],
   ['Categories · deleting a section that has products', inConsole(<Categories initialRows={SECTIONS} initialDoomed="c1" />)],
+  ['Console · first paint, Money', <Console slug="nyama" view={{ kind: 'money' }} navigate={noop} />],
+  ['Wallet · Activity, automatic payouts', inConsole(<Wallet navigate={noop} initialData={WALLET} initialActivity={ACTIVITY} />)],
+  ['Wallet · Activity, nothing yet', inConsole(<Wallet navigate={noop} initialData={{ ...WALLET, pendingOrders: 0, nextRelease: null, pending: '0.00' }} initialActivity={[]} />)],
+  ['Wallet · Withdrawals', inConsole(<Wallet navigate={noop} initialData={WALLET} initialActivity={ACTIVITY} initialPayouts={PAYOUTS} initialTab="withdrawals" />)],
+  ['Wallet · Withdrawals, none yet', inConsole(<Wallet navigate={noop} initialData={WALLET} initialActivity={ACTIVITY} initialPayouts={[]} initialTab="withdrawals" />)],
+  ['Wallet · Refunds', inConsole(<Wallet navigate={noop} initialData={WALLET} initialActivity={ACTIVITY} initialRefunds={WALLET_REFUNDS} initialTab="refunds" />)],
+  ['Wallet · ID in review', inConsole(<Wallet navigate={noop} initialData={{ ...WALLET, identity: 'in_review' }} initialActivity={ACTIVITY} />)],
+  ['Wallet · ID not started, manual payouts', inConsole(<Wallet navigate={noop} initialData={{ ...WALLET, identity: 'not_started', payout: { ...WALLET.payout!, mode: 'manual', automaticAt: null } }} initialActivity={ACTIVITY} />)],
+  ['Wallet · approved refunds waiting for funds', inConsole(<Wallet navigate={noop} initialData={{ ...WALLET, refundsOwed: '2000.00' }} initialActivity={ACTIVITY} />)],
+  ['Wallet · no payout number yet', inConsole(<Wallet navigate={noop} initialData={{ ...WALLET, payout: null }} initialActivity={ACTIVITY} />)],
+  ['Wallet · the Withdraw sheet', inConsole(<Wallet navigate={noop} initialData={WALLET} initialActivity={ACTIVITY} initialSheet={{ amount: '50000' }} />)],
+  ['Console · first paint, Complaints', <Console slug="nyama" view={{ kind: 'complaints' }} navigate={noop} />],
+  ['Console · first paint, Reviews', <Console slug="nyama" view={{ kind: 'reviews' }} navigate={noop} />],
+  ['Console · first paint, Customers', <Console slug="nyama" view={{ kind: 'customers' }} navigate={noop} />],
+  ['Console · first paint, Analytics', <Console slug="nyama" view={{ kind: 'analytics' }} navigate={noop} />],
+  ['Complaints · an open one, ready to answer', inConsole(<Complaints navigate={noop} initialCounts={{ open: 2, escalated: 1, closed: 3 }} initialList={COMPLAINT_LIST} initialDetail={COMPLAINT} />)],
+  ['Complaints · the reject response', inConsole(<Complaints navigate={noop} initialCounts={{ open: 2, escalated: 1, closed: 3 }} initialList={COMPLAINT_LIST} initialDetail={COMPLAINT} initialKind="reject" initialNote="Our packing photo shows it." />)],
+  ['Complaints · the escalate response', inConsole(<Complaints navigate={noop} initialCounts={{ open: 2, escalated: 1, closed: 3 }} initialList={COMPLAINT_LIST} initialDetail={COMPLAINT} initialKind="escalate" />)],
+  ['Complaints · escalated, with the whole thread', inConsole(<Complaints navigate={noop} initialCounts={{ open: 1, escalated: 1, closed: 0 }} initialList={[{ ...COMPLAINT_LIST[0]!, id: 'cp3', status: 'escalated' }]} initialDetail={COMPLAINT_ESCALATED} />)],
+  ['Complaints · resolved, with a refund waiting', inConsole(<Complaints navigate={noop} initialCounts={{ open: 0, escalated: 0, closed: 1 }} initialList={[{ ...COMPLAINT_LIST[0]!, status: 'resolved' }]} initialDetail={{ ...COMPLAINT, status: 'resolved', pendingRefund: '3000.00' }} />)],
+  ['Complaints · none here', inConsole(<Complaints navigate={noop} initialCounts={{ open: 0, escalated: 0, closed: 0 }} initialList={[]} />)],
+  ['Reviews · the page', inConsole(<Reviews initialPage={REVIEWS_PAGE} />)],
+  ['Reviews · replying', inConsole(<Reviews initialPage={REVIEWS_PAGE} initialEditing={{ id: 'rv1', mode: 'reply' }} />)],
+  ['Reviews · reporting', inConsole(<Reviews initialPage={REVIEWS_PAGE} initialEditing={{ id: 'rv4', mode: 'report' }} />)],
+  ['Reviews · none yet', inConsole(<Reviews initialPage={{ ...REVIEWS_PAGE, reviews: [], overview: { averageRating: null, last90Days: 0, needsReply: 0, lowThisMonth: 0, lowLastMonth: 0, reportedOpen: 0 }, byProduct: [] }} />)],
+  ['Customers · the list and one customer', inConsole(<Customers navigate={noop} initialList={CUSTOMER_LIST} initialDetail={CUSTOMER} />)],
+  ['Customers · the list alone', inConsole(<Customers navigate={noop} initialList={CUSTOMER_LIST} />)],
+  ['Customers · nobody yet', inConsole(<Customers navigate={noop} initialList={{ ...CUSTOMER_LIST, rows: [], total: 0, counts: { all: 0, regular: 0, account: 0, guest: 0 } }} />)],
+  ['Analytics · Summary', inConsole(<Analytics initial={ANALYTICS_REVENUE} />)],
+  ['Analytics · Orders over time', inConsole(<Analytics initial={ANALYTICS_ORDERS} initialTab="orders" />)],
+  ['Analytics · Top items', inConsole(<Analytics initial={ANALYTICS_ITEMS} initialTab="items" />)],
+  ['Analytics · Payment methods', inConsole(<Analytics initial={ANALYTICS_PAYMENTS} initialTab="payments" />)],
+  ['Analytics · Delivery performance', inConsole(<Analytics initial={ANALYTICS_DELIVERY} initialTab="delivery" />)],
   ['Categories · none yet', inConsole(<Categories initialRows={[]} />)],
 
   // CashReport — milestone 21. Same testing seam as Orders.tsx: no effects run in SSR.
@@ -1302,6 +1637,39 @@ for (const phrase of [
   'Called “Sections” in your Food & drinks template. Order here is the order on your store.',
   'Hidden sections and empty ones don’t appear. Menu items can sit in more than one section.',
   'Its 6 menu items stay in your catalog.',
+  // The wallet's, milestone 23.
+  'MoMo and card payments land here. Cash stays with you and your riders.',
+  'How your money moves',
+  'Customer pays',
+  'Yours to withdraw. Refunds you approve come out of here.',
+  'Paid out when you withdraw',
+  'Goes to MTN MoMo 078 ••• 4412 tomorrow at 08:00.',
+  'Payouts are on hold while we check your ID',
+  'Verify your identity to get paid',
+  'Yours, but held until you’re verified.',
+  'An approved refund waiting for funds is paid before you are. It settles as soon as the balance covers it.',
+  'Withdraw to MoMo',
+  'Usually arrives in minutes. If it fails, the money comes straight back to Available.',
+  'Where your payouts go',
+  'Vendlyfy usually answers within a day.',
+  'No withdrawals yet.',
+  // Support and insight, milestone 24.
+  'Customers file these from their order. Reply here; escalate to Vendlyfy if you can’t agree.',
+  'Tell the customer what you did. They can reopen it if they’re not happy.',
+  'Ask Vendlyfy to decide. They see the whole thread, rider notes and photos, and can refund from your wallet.',
+  'Also refund part of the order',
+  'What the customer said',
+  'Reviews go live straight away. You can reply publicly, or report one to Vendlyfy if it breaks the rules. You can’t edit or remove them.',
+  'Stores show an average only after 3 reviews. Until then customers see the count.',
+  'Reported: abusive or hateful. Vendlyfy will review it. It stays visible until they decide.',
+  'Everyone who ordered, with or without an account. Guests are matched by phone number.',
+  'Private note (staff only)',
+  'Usual address',
+  'Revenue per day, 10 Sep–23 Sep',
+  'Orders per day, 10 Sep–23 Sep',
+  'Cash counts once it’s confirmed on the order.',
+  'On time means delivered within 60 minutes of the order',
+  'No complaints here.',
 ]) {
   expect(visibleText.includes(phrase), `the boards' wording is missing: ${phrase}`);
 }

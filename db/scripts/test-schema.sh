@@ -202,8 +202,11 @@ equals  "and the membership is gone with them" "0" \
 # =============================================================================
 step "role_permissions — Auth's invite screen, verbatim"
 # =============================================================================
-equals "a manager can accept and update orders, assign riders, edit products and stock" \
-    "orders.assign_rider,orders.read,orders.update,products.write,stock.write" \
+# Milestone 24 (V026) added support.write and customers.read/write: the nav shows Complaints, Reviews and Customers to
+# every console role. The invite screen's sentence does not mention them — a designer question; the NEGATIVES below
+# (no payouts, wallet or settings) are the half that matters and are unchanged.
+equals "a manager can accept and update orders, assign riders, edit products and stock — and answer customers" \
+    "customers.read,customers.write,orders.assign_rider,orders.read,orders.update,products.write,stock.write,support.write" \
     "SELECT string_agg(permission, ',' ORDER BY permission) FROM role_permissions WHERE scope='store' AND role='manager'"
 equals "a manager cannot see payouts, the wallet or store settings" "0" \
     "SELECT count(*) FROM role_permissions WHERE scope='store' AND role='manager'

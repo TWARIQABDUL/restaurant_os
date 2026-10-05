@@ -40,7 +40,11 @@ import momoWebhookRoutes from '../routes/momoWebhook.ts';
 import storefrontCheckoutRoutes from '../routes/storefrontCheckout.ts';
 import storefrontAccountRoutes from '../routes/storefrontAccount.ts';
 import storeDashboardRoutes from '../routes/storeDashboard.ts';
+import storeAnalyticsRoutes from '../routes/storeAnalytics.ts';
 import storeCategoriesRoutes from '../routes/storeCategories.ts';
+import storeComplaintsRoutes from '../routes/storeComplaints.ts';
+import storeCustomersRoutes from '../routes/storeCustomers.ts';
+import storeReviewsRoutes from '../routes/storeReviews.ts';
 import storeOrderRoutes from '../routes/storeOrders.ts';
 import storeProductsRoutes from '../routes/storeProducts.ts';
 import { mediaRouter, uploadRouter } from '../routes/storeUploads.ts';
@@ -78,6 +82,10 @@ export const REQUIRED_PERMISSIONS = [
   'deliveries.own_update',
   // Milestone 22: the catalogue's admin. V001 seeded it for owner/admin/manager at the start.
   'products.write',
+  // Milestone 24. V026 adds these three; analytics asks the wallet.read already required above.
+  'support.write',
+  'customers.read',
+  'customers.write',
 ] as const;
 
 export function createApp(): Express {
@@ -167,6 +175,11 @@ export function createApp(): Express {
   app.use('/api/stores/:storeId/products', storeProductsRoutes);
   app.use('/api/stores/:storeId/categories', storeCategoriesRoutes);
   app.use('/api/stores/:storeId/uploads', uploadRouter);
+  // Milestone 24: support and insight. See each router's header for the permission it asks.
+  app.use('/api/stores/:storeId/complaints', storeComplaintsRoutes);
+  app.use('/api/stores/:storeId/reviews', storeReviewsRoutes);
+  app.use('/api/stores/:storeId/customers', storeCustomersRoutes);
+  app.use('/api/stores/:storeId/analytics', storeAnalyticsRoutes);
   app.use('/api/stores/:storeId/notifications', storeNotificationRoutes);
   app.use('/api/stores/:storeId/settings', storeSettingsRoutes);
   app.use('/api/stores/:storeId/config', storeConfigRoutes);

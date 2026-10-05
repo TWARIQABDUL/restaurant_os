@@ -315,6 +315,17 @@ export interface CustomerAddressesRow {
 }
 
 /**
+ * Staff-only, one per customer per store. An empty note deletes the row rather than storing an empty string, so "has a note" is the row existing.
+ */
+export interface CustomerNotesRow {
+  store_id: string;
+  customer_key: string;
+  note: string;
+  updated_by: string | null;
+  updated_at: Date;
+}
+
+/**
  * The areas a zone covers. An area belongs to exactly ONE zone per store, or checkout cannot say which fee applies.
  */
 export interface DeliveryZoneAreasRow {
@@ -1644,6 +1655,7 @@ export interface Database {
   countries: CountriesRow;
   currencies: CurrenciesRow;
   customer_addresses: CustomerAddressesRow;
+  customer_notes: CustomerNotesRow;
   delivery_zone_areas: DeliveryZoneAreasRow;
   delivery_zones: DeliveryZonesRow;
   industry_template_version_modules: IndustryTemplateVersionModulesRow;
@@ -1724,6 +1736,7 @@ export const TABLE_NAMES = [
   'countries',
   'currencies',
   'customer_addresses',
+  'customer_notes',
   'delivery_zone_areas',
   'delivery_zones',
   'industry_template_version_modules',

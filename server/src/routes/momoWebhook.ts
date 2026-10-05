@@ -22,7 +22,8 @@
 
 import { Router } from 'express';
 import * as collections from '../repositories/collections.ts';
-import { isConfigured } from '../payments/momo.ts';
+import * as payouts from '../repositories/payouts.ts';
+import { isConfigured, isDisbursementConfigured } from '../payments/momo.ts';
 
 const router = Router();
 
@@ -44,6 +45,23 @@ router.post('/callback/collection/:referenceId', (req, res) => {
   void collections.refresh(referenceId).catch((error: unknown) => {
     console.error(
       `[momo] recheck failed for collection ${referenceId}:`,
+      error instanceof Error ? error.message : String(error),
+    );
+  });
+});
+
+// Milestone 23. The same rules, for the other direction: the body is ignored, the status is re-read from
+// MoMo's authenticated endpoint, and resolve_disbursement() is idempotent.
+router.post('/callback/disbursement/:referenceId', (req, res) => {
+  const referenceId = req.params['referenceId'];
+  res.status(200).json({ received: true });
+
+  if (typeof referenceId !== 'string' || !REFERENCE.test(referenceId)) return;
+  if (!isDisbursementConfigured()) return;
+
+  void payouts.refresh(referenceId).catch((error: unknown) => {
+    console.error(
+      `[momo] recheck failed for payout ${referenceId}:`,
       error instanceof Error ? error.message : String(error),
     );
   });

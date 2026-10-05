@@ -556,3 +556,341 @@ export const categoriesApi = {
   remove: (storeId: string, id: string): Promise<CategoryList & { detached: number }> =>
     api.delete<CategoryList & { detached: number }>(`/api/stores/${storeId}/categories/${id}`),
 };
+
+// ---------------------------------------------------------------------------
+// The wallet — milestone 23
+// ---------------------------------------------------------------------------
+
+export type IdentityState = 'verified' | 'in_review' | 'not_started';
+
+export type WalletData = {
+  currency: string;
+  pending: string;
+  available: string;
+  updatedAt: string;
+  pendingOrders: number;
+  nextRelease: { at: string; amount: string } | null;
+  identity: IdentityState;
+  /** Approved refunds the balance cannot cover yet — paid before the merchant, and holding payouts. */
+  refundsOwed: string;
+  holdMinutes: number;
+  cashWithRiders: string;
+  shortfalls: number;
+  payout: { methodKey: string; phoneMasked: string; mode: 'manual' | 'automatic'; automaticAt: string | null } | null;
+};
+
+export type ActivityFilter = 'all' | 'sale' | 'refund' | 'withdrawal' | 'adjust';
+
+export type ActivityRow = {
+  id: string;
+  at: string;
+  kind: 'sale' | 'refund' | 'withdrawal' | 'adjust';
+  amount: string;
+  balanceAfter: string;
+  pot: 'pending' | 'available';
+  note: string | null;
+  orderNumber: number | null;
+  method: string | null;
+  released: boolean | null;
+  availableAt: string | null;
+  refund: { approvedAmount: string | null; orderTotal: string; partial: boolean } | null;
+  withdrawal: { status: WithdrawalStatus; initiatedBy: 'manual' | 'automatic'; phone: string; failureReason: string | null } | null;
+};
+
+export type WithdrawalStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'rejected';
+
+export type Payout = {
+  id: string;
+  amount: string;
+  phoneMasked: string;
+  status: WithdrawalStatus;
+  failureReason: string | null;
+  initiatedBy: 'manual' | 'automatic';
+  requestedAt: string;
+  completedAt: string | null;
+};
+
+export type RefundRow = {
+  id: string;
+  orderNumber: number;
+  reason: string;
+  note: string | null;
+  requestedAt: string;
+  amount: string;
+  approvedAmount: string | null;
+  orderTotal: string;
+  status: 'pending' | 'approved' | 'rejected' | 'queued';
+  rejectionReason: string | null;
+  settledAt: string | null;
+};
+
+type Cursor = { at: string; id: string } | null;
+
+export const walletApi = {
+  load: (storeId: string): Promise<WalletData> => api.get<WalletData>(`/api/stores/${storeId}/wallet`),
+
+  activity: (storeId: string, filter: ActivityFilter, cursor: Cursor): Promise<{ activity: ActivityRow[]; nextCursor: Cursor }> => {
+    const params = new URLSearchParams({ filter });
+    if (cursor !== null) {
+      params.set('before', cursor.at);
+      params.set('beforeId', cursor.id);
+    }
+    return api.get<{ activity: ActivityRow[]; nextCursor: Cursor }>(`/api/stores/${storeId}/wallet/activity?${params.toString()}`);
+  },
+
+  refunds: (storeId: string): Promise<{ refunds: RefundRow[] }> =>
+    api.get<{ refunds: RefundRow[] }>(`/api/stores/${storeId}/wallet/refunds`),
+
+  payouts: (
+    storeId: string,
+    cursor: { requestedAt: string; id: string } | null,
+  ): Promise<{ payouts: Payout[]; nextCursor: { requestedAt: string; id: string } | null }> => {
+    const params = new URLSearchParams();
+    if (cursor !== null) {
+      params.set('before', cursor.requestedAt);
+      params.set('beforeId', cursor.id);
+    }
+    return api.get<{ payouts: Payout[]; nextCursor: { requestedAt: string; id: string } | null }>(
+      `/api/stores/${storeId}/payouts?${params.toString()}`,
+    );
+  },
+
+  payout: (storeId: string, id: string): Promise<{ payout: Payout }> =>
+    api.get<{ payout: Payout }>(`/api/stores/${storeId}/payouts/${id}`),
+
+  /** The destination is never sent: the server uses the number in the store's settings. */
+  withdraw: (storeId: string, amount: string, idempotencyKey: string): Promise<{ withdrawalId: string; status: WithdrawalStatus; failureReason: string | null }> =>
+    api.post(`/api/stores/${storeId}/payouts`, { amount, idempotencyKey }),
+
+  setMode: (storeId: string, mode: 'manual' | 'automatic'): Promise<{ payout: { mode: 'manual' | 'automatic'; automaticAt: string | null; phoneMasked: string } | null }> =>
+    api.put(`/api/stores/${storeId}/payouts/mode`, { mode }),
+};
+
+// ---------------------------------------------------------------------------
+// Support and insight — milestone 24
+// ---------------------------------------------------------------------------
+
+export type ReviewFilter = 'all' | 'reply' | 'low';
+
+export type ReviewItem = {
+  id: string;
+  product: string;
+  customer: string;
+  orderNumber: number;
+  at: string;
+  rating: number;
+  body: string | null;
+  reply: string | null;
+  reported: { reason: string } | null;
+};
+
+export type ReviewsOverview = {
+  averageRating: string | null;
+  last90Days: number;
+  needsReply: number;
+  lowThisMonth: number;
+  lowLastMonth: number;
+  reportedOpen: number;
+};
+
+export type ProductRating = { id: string; name: string; count: number; average: string | null };
+
+export type ReviewsPage = {
+  overview: ReviewsOverview | null;
+  reviews: ReviewItem[];
+  nextCursor: { at: string; id: string } | null;
+  byProduct: ProductRating[] | null;
+  minForAverage: number;
+};
+
+export type ReportReason = 'abusive' | 'personal_info' | 'not_a_customer' | 'spam';
+
+export const reviewsApi = {
+  load: (storeId: string, filter: ReviewFilter, cursor: { at: string; id: string } | null): Promise<ReviewsPage> => {
+    const params = new URLSearchParams({ filter });
+    if (cursor !== null) {
+      params.set('before', cursor.at);
+      params.set('beforeId', cursor.id);
+    }
+    return api.get<ReviewsPage>(`/api/stores/${storeId}/reviews?${params.toString()}`);
+  },
+  reply: (storeId: string, id: string, body: string): Promise<{ ok: boolean }> =>
+    api.post<{ ok: boolean }>(`/api/stores/${storeId}/reviews/${id}/reply`, { body }),
+  report: (storeId: string, id: string, reason: ReportReason): Promise<{ ok: boolean }> =>
+    api.post<{ ok: boolean }>(`/api/stores/${storeId}/reviews/${id}/report`, { reason }),
+};
+
+export type ComplaintTab = 'open' | 'escalated' | 'closed';
+export type ComplaintStatus = 'open' | 'escalated' | 'resolved' | 'rejected';
+
+export type ComplaintListItem = {
+  id: string;
+  reference: string;
+  reason: string;
+  customer: string;
+  orderNumber: number;
+  at: string;
+  status: ComplaintStatus;
+};
+
+export type TimelineEvent = {
+  type: string;
+  side: 'customer' | 'store' | 'rider' | 'platform' | 'system';
+  note: string | null;
+  at: string;
+  actor: string | null;
+};
+
+export type ComplaintDetail = {
+  id: string;
+  reference: string;
+  reason: string;
+  status: ComplaintStatus;
+  text: string;
+  at: string;
+  reopenedCount: number;
+  customer: { name: string; phone: string | null };
+  order: {
+    id: string;
+    number: number;
+    items: { label: string; amount: string }[];
+    total: string;
+    refunded: string;
+    deliveredAt: string | null;
+    riderName: string | null;
+    paymentMethod: string;
+    fulfilment: 'delivery' | 'pickup';
+  };
+  evidence: { id: string; side: string; kind: string; label: string; url: string | null }[];
+  timeline: TimelineEvent[];
+  decision: 'refunded' | 'rejected' | null;
+  pendingRefund: string | null;
+};
+
+export const complaintsApi = {
+  list: (storeId: string, tab: ComplaintTab): Promise<{ counts: Record<ComplaintTab, number>; complaints: ComplaintListItem[] }> =>
+    api.get(`/api/stores/${storeId}/complaints?tab=${tab}`),
+  get: (storeId: string, id: string): Promise<{ complaint: ComplaintDetail }> =>
+    api.get<{ complaint: ComplaintDetail }>(`/api/stores/${storeId}/complaints/${id}`),
+  resolve: (storeId: string, id: string, note: string, refundAmount?: string): Promise<{ complaint: ComplaintDetail }> =>
+    api.post<{ complaint: ComplaintDetail }>(`/api/stores/${storeId}/complaints/${id}/resolve`, { note, refundAmount }),
+  reject: (storeId: string, id: string, note: string): Promise<{ complaint: ComplaintDetail }> =>
+    api.post<{ complaint: ComplaintDetail }>(`/api/stores/${storeId}/complaints/${id}/reject`, { note }),
+  escalate: (storeId: string, id: string, note: string): Promise<{ complaint: ComplaintDetail }> =>
+    api.post<{ complaint: ComplaintDetail }>(`/api/stores/${storeId}/complaints/${id}/escalate`, { note }),
+  reopen: (storeId: string, id: string): Promise<{ complaint: ComplaintDetail }> =>
+    api.post<{ complaint: ComplaintDetail }>(`/api/stores/${storeId}/complaints/${id}/reopen`),
+};
+
+export type CustomerSegment = 'all' | 'regular' | 'account' | 'guest';
+
+export type CustomerRow = {
+  key: string;
+  name: string;
+  phone: string | null;
+  orders: number;
+  spent: string;
+  lastOrderAt: string;
+  account: boolean;
+  complaints: number;
+};
+
+export type CustomerList = {
+  rows: CustomerRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  counts: Record<CustomerSegment, number>;
+};
+
+export type CustomerDetail = CustomerRow & {
+  usualAddress: string | null;
+  recent: { id: string; number: number; at: string; total: string; status: string }[];
+  note: string | null;
+};
+
+export const customersApi = {
+  list: (storeId: string, segment: CustomerSegment, q: string, page: number): Promise<CustomerList> => {
+    const params = new URLSearchParams({ segment, page: String(page) });
+    if (q !== '') params.set('q', q);
+    return api.get<CustomerList>(`/api/stores/${storeId}/customers?${params.toString()}`);
+  },
+  get: (storeId: string, key: string): Promise<{ customer: CustomerDetail }> =>
+    api.get<{ customer: CustomerDetail }>(`/api/stores/${storeId}/customers/${encodeURIComponent(key)}`),
+  setNote: (storeId: string, key: string, note: string): Promise<{ note: string | null }> =>
+    api.put<{ note: string | null }>(`/api/stores/${storeId}/customers/${encodeURIComponent(key)}/note`, { note }),
+  /** A plain link: the browser sends the session cookie and saves the file. */
+  exportUrl: (storeId: string): string => `/api/stores/${storeId}/customers/export`,
+};
+
+export type AnalyticsTab = 'summary' | 'orders' | 'revenue' | 'items' | 'payments' | 'delivery';
+export type AnalyticsRange = 7 | 14 | 30;
+
+export type MethodInfo = { key: string; name: string; kind: 'online' | 'offline' };
+
+export type RevenueData = {
+  dates: string[];
+  methods: MethodInfo[];
+  byDay: Record<string, Record<string, string>>;
+  revenue: string;
+  previousRevenue: string;
+  orders: number;
+  previousOrders: number;
+  refunded: string;
+  pendingNow: string;
+  paidOut: string;
+  automaticPayouts: number;
+  repeatShare: number | null;
+};
+
+export type OrdersAnalytics = {
+  dates: string[];
+  perDay: Record<string, number>;
+  total: number;
+  previousTotal: number;
+  deliveryShare: number | null;
+  turnedAway: number;
+  topReason: string | null;
+  acceptMinutes: number | null;
+  busiestHour: number | null;
+};
+
+export type ItemsAnalytics = {
+  items: { name: string; sold: number; revenue: string }[];
+  itemsSold: number;
+  bestSeller: string | null;
+  topEarner: string | null;
+  outOfStockNow: number;
+};
+
+export type PaymentsAnalytics = {
+  methods: (MethodInfo & { orders: number; revenue: string; successRate: number | null })[];
+  paidOnlineShare: number | null;
+  failedPayments: number;
+  retriedAfterFailure: number;
+  cashUnconfirmed: { orders: number; amount: string };
+  refunds: { count: number; amount: string };
+};
+
+export type DeliveryAnalytics = {
+  riders: { id: string; name: string; deliveries: number; avgMinutes: number | null; onTimeShare: number | null }[];
+  orderToDoorMinutes: number | null;
+  prepMinutes: number | null;
+  waitingForRiderMinutes: number | null;
+  returned: number;
+  topReturnReason: string | null;
+  etaMaxMinutes: number | null;
+};
+
+export type AnalyticsPayload =
+  | { tab: 'summary' | 'revenue'; data: RevenueData }
+  | { tab: 'orders'; data: OrdersAnalytics }
+  | { tab: 'items'; data: ItemsAnalytics }
+  | { tab: 'payments'; data: PaymentsAnalytics }
+  | { tab: 'delivery'; data: DeliveryAnalytics };
+
+export const analyticsApi = {
+  load: (storeId: string, tab: AnalyticsTab, range: AnalyticsRange): Promise<AnalyticsPayload & { range: number; from: string; to: string }> =>
+    api.get(`/api/stores/${storeId}/analytics/${tab}?range=${range}`),
+  exportUrl: (storeId: string, tab: AnalyticsTab, range: AnalyticsRange): string => `/api/stores/${storeId}/analytics/${tab}/export?range=${range}`,
+};

@@ -23,13 +23,18 @@ import { Alert, Button, SkeletonCard, Toast } from '../shared/ui/index.ts';
 import { dashboard as dashboardApi, notifications as notificationsApi } from './api.ts';
 import type { DashboardData, OrderAlert as AlertData } from './api.ts';
 import { CashReport } from './CashReport.tsx';
+import { Analytics } from './Analytics.tsx';
 import { Categories } from './Categories.tsx';
+import { Complaints } from './Complaints.tsx';
+import { Customers } from './Customers.tsx';
 import { Dashboard } from './Dashboard.tsx';
 import { NotificationsPanel } from './NotificationsPanel.tsx';
 import { OrderAlert } from './OrderAlert.tsx';
 import { Orders } from './Orders.tsx';
+import { Wallet } from './Wallet.tsx';
 import { ProductEditor } from './ProductEditor.tsx';
 import { Products } from './Products.tsx';
+import { Reviews } from './Reviews.tsx';
 import { MobileTabs, Sidebar } from './Sidebar.tsx';
 import { ShellProvider, useShell } from './ShellProvider.tsx';
 import type { ShellState } from './ShellProvider.tsx';
@@ -51,7 +56,12 @@ export type ConsoleView =
   | { kind: 'riders' }
   | { kind: 'products' }
   | { kind: 'product'; productId: string | null }
-  | { kind: 'categories' };
+  | { kind: 'categories' }
+  | { kind: 'money' }
+  | { kind: 'complaints' }
+  | { kind: 'reviews' }
+  | { kind: 'customers' }
+  | { kind: 'analytics' };
 
 /** The sidebar highlights the list while its editor is open: the editor is Products, one level down. */
 export function activeItem(view: ConsoleView): string {
@@ -233,6 +243,16 @@ function ConsoleFrame({ view, navigate }: { view: ConsoleView; navigate: (to: st
           <ProductEditor key={view.productId ?? 'new'} navigate={navigate} productId={view.productId} />
         ) : view.kind === 'categories' ? (
           <Categories />
+        ) : view.kind === 'money' ? (
+          <Wallet navigate={navigate} />
+        ) : view.kind === 'complaints' ? (
+          <Complaints navigate={navigate} />
+        ) : view.kind === 'reviews' ? (
+          <Reviews />
+        ) : view.kind === 'customers' ? (
+          <Customers navigate={navigate} />
+        ) : view.kind === 'analytics' ? (
+          <Analytics />
         ) : data === null ? (
           failure === null ? (
             <div className="flex flex-col gap-4">

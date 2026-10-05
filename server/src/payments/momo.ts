@@ -37,7 +37,11 @@ export type MomoConfig = {
   subscriptionKey: string;
   apiUser: string;
   apiKey: string;
+  /** Paying a merchant out is a different MTN product with its own subscription and API user. */
+  disbursement: { subscriptionKey: string; apiUser: string; apiKey: string };
 };
+
+export type Product = 'collection' | 'disbursement';
 
 /**
  * Read from the environment on each call rather than at module load.
@@ -57,7 +61,18 @@ export function momoConfig(): MomoConfig {
     subscriptionKey: process.env['MOMO_COLLECTION_SUBSCRIPTION_KEY'] ?? '',
     apiUser: process.env['MOMO_COLLECTION_API_USER'] ?? '',
     apiKey: process.env['MOMO_COLLECTION_API_KEY'] ?? '',
+    disbursement: {
+      subscriptionKey: process.env['MOMO_DISBURSEMENT_SUBSCRIPTION_KEY'] ?? '',
+      apiUser: process.env['MOMO_DISBURSEMENT_API_USER'] ?? '',
+      apiKey: process.env['MOMO_DISBURSEMENT_API_KEY'] ?? '',
+    },
   };
+}
+
+/** Whether a payout can be attempted at all. Checked BEFORE funds are reserved — see repositories/payouts.ts. */
+export function isDisbursementConfigured(config: MomoConfig = momoConfig()): boolean {
+  const d = config.disbursement;
+  return d.subscriptionKey !== '' && d.apiUser !== '' && d.apiKey !== '';
 }
 
 /** Whether a collection can be attempted at all. Part 9: where provider credentials live is still open. */
@@ -102,34 +117,43 @@ export function newReferenceId(): string {
 }
 
 type CachedToken = { token: string; expiresAt: number };
-let tokenCache: CachedToken | null = null;
+const tokenCache: Record<Product, CachedToken | null> = { collection: null, disbursement: null };
 
-async function token(config: MomoConfig): Promise<string> {
-  if (tokenCache !== null && tokenCache.expiresAt > Date.now() + 5_000) return tokenCache.token;
-  if (!isConfigured(config)) throw new MomoNotConfigured();
+function credentials(config: MomoConfig, product: Product): { subscriptionKey: string; apiUser: string; apiKey: string } {
+  return product === 'collection'
+    ? { subscriptionKey: config.subscriptionKey, apiUser: config.apiUser, apiKey: config.apiKey }
+    : config.disbursement;
+}
 
-  const basic = Buffer.from(`${config.apiUser}:${config.apiKey}`).toString('base64');
-  const res = await fetch(`${config.baseUrl}/collection/token/`, {
+async function token(config: MomoConfig, product: Product = 'collection'): Promise<string> {
+  const cached = tokenCache[product];
+  if (cached !== null && cached.expiresAt > Date.now() + 5_000) return cached.token;
+  if (product === 'collection' ? !isConfigured(config) : !isDisbursementConfigured(config)) throw new MomoNotConfigured();
+
+  const c = credentials(config, product);
+  const basic = Buffer.from(`${c.apiUser}:${c.apiKey}`).toString('base64');
+  const res = await fetch(`${config.baseUrl}/${product}/token/`, {
     method: 'POST',
-    headers: { Authorization: `Basic ${basic}`, 'Ocp-Apim-Subscription-Key': config.subscriptionKey },
+    headers: { Authorization: `Basic ${basic}`, 'Ocp-Apim-Subscription-Key': c.subscriptionKey },
   });
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`MoMo collection token request failed (${res.status}): ${body}`);
+    throw new Error(`MoMo ${product} token request failed (${res.status}): ${body}`);
   }
 
   const data = (await res.json()) as { access_token?: string; expires_in?: string | number };
   const value = data.access_token;
   if (typeof value !== 'string' || value === '') throw new Error('MoMo returned no access token');
   const ttl = Number(data.expires_in) || 3600;
-  tokenCache = { token: value, expiresAt: Date.now() + ttl * 1000 };
+  tokenCache[product] = { token: value, expiresAt: Date.now() + ttl * 1000 };
   return value;
 }
 
 /** Cleared between tests, and after a credential change. */
 export function clearTokenCache(): void {
-  tokenCache = null;
+  tokenCache.collection = null;
+  tokenCache.disbursement = null;
 }
 
 /**
@@ -203,4 +227,105 @@ export async function collectionStatus(
         ? String((data.reason as { message: unknown }).message)
         : null;
   return { status, reason };
+}
+
+// ---------------------------------------------------------------------------
+// Disbursements — paying a merchant out. Milestone 23.
+// ---------------------------------------------------------------------------
+
+/**
+ * A payout MoMo REFUSED, as opposed to one it never answered. The difference decides everything downstream:
+ * a refusal (HTTP 4xx — a number that is not registered, a malformed request) is definitive, so the money can
+ * go straight back to Available. A network failure or a 5xx is NOT: the request may have reached MTN and the
+ * response been lost, and returning the money then risks paying out twice. Those are left `processing` for
+ * the status re-read to decide.
+ */
+export class DisbursementRefused extends Error {
+  readonly status: number;
+  constructor(status: number, body: string) {
+    super(`MoMo refused the transfer (${status}): ${body}`);
+    this.name = 'DisbursementRefused';
+    this.status = status;
+  }
+}
+
+/**
+ * Pay a phone number. Returns when MoMo accepts the request (202); the outcome arrives later.
+ *
+ * `referenceId` is X-Reference-Id, MTN's own idempotency key, and the caller wrote it to momo_transactions
+ * BEFORE this call — so a repeat of this call for the same reference cannot pay twice.
+ */
+export async function transfer(
+  input: { amount: string; phone: string; referenceId: string; payerMessage?: string; payeeNote?: string },
+  config: MomoConfig = momoConfig(),
+): Promise<void> {
+  const access = await token(config, 'disbursement');
+  const callbackUrl =
+    config.callbackUrlBase === ''
+      ? undefined
+      : `${config.callbackUrlBase}/api/momo/callback/disbursement/${input.referenceId}`;
+
+  const res = await fetch(`${config.baseUrl}/disbursement/v1_0/transfer`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${access}`,
+      'Content-Type': 'application/json',
+      'X-Reference-Id': input.referenceId,
+      'X-Target-Environment': config.targetEnvironment,
+      'Ocp-Apim-Subscription-Key': config.disbursement.subscriptionKey,
+      ...(callbackUrl === undefined ? {} : { 'X-Callback-Url': callbackUrl }),
+    },
+    body: JSON.stringify({
+      amount: input.amount,
+      currency: config.currency,
+      externalId: input.referenceId,
+      payee: { partyIdType: 'MSISDN', partyId: normalizePhone(input.phone, config) },
+      payerMessage: (input.payerMessage ?? 'Vendlyfy payout').slice(0, 160),
+      payeeNote: (input.payeeNote ?? 'Vendlyfy payout').slice(0, 160),
+    }),
+  });
+
+  if (res.status === 202) return;
+  const body = await res.text().catch(() => '');
+  // 409 is "that reference already exists": the transfer WAS accepted earlier, so this is not a refusal.
+  if (res.status === 409) return;
+  if (res.status >= 400 && res.status < 500) throw new DisbursementRefused(res.status, body);
+  throw new Error(`MoMo transfer failed (${res.status}): ${body}`);
+}
+
+/** The real state of a payout, from MoMo's authenticated endpoint. `unknown` is a 404: it was never sent. */
+export async function transferStatus(
+  referenceId: string,
+  config: MomoConfig = momoConfig(),
+): Promise<{ status: MomoStatus | 'UNKNOWN'; reason: string | null }> {
+  const access = await token(config, 'disbursement');
+  const res = await fetch(`${config.baseUrl}/disbursement/v1_0/transfer/${referenceId}`, {
+    headers: {
+      Authorization: `Bearer ${access}`,
+      'X-Target-Environment': config.targetEnvironment,
+      'Ocp-Apim-Subscription-Key': config.disbursement.subscriptionKey,
+    },
+  });
+
+  if (res.status === 404) return { status: 'UNKNOWN', reason: null };
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`MoMo transfer status check failed (${res.status}): ${body}`);
+  }
+
+  const data = (await res.json()) as { status?: string; reason?: unknown };
+  const status: MomoStatus = data.status === 'SUCCESSFUL' || data.status === 'FAILED' ? data.status : 'PENDING';
+  const reason =
+    typeof data.reason === 'string'
+      ? data.reason
+      : typeof data.reason === 'object' && data.reason !== null && 'message' in data.reason
+        ? String((data.reason as { message: unknown }).message)
+        : null;
+  return { status, reason };
+}
+
+/** How long a paid order sits in Pending before the sweep moves it to Available. The legacy server's knob. */
+export function holdMinutes(): number {
+  const n = Number(process.env['MOMO_HOLD_MINUTES']);
+  return Number.isInteger(n) && n >= 0 ? n : 60;
 }

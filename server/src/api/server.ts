@@ -25,6 +25,7 @@ import { createApp, REQUIRED_PERMISSIONS } from './app.ts';
 import { assertDatabaseConfig, closePool, ping } from '../db/index.ts';
 import { assertSessionConfig } from '../auth/sessionToken.ts';
 import { assertPermissionsExist } from '../middleware/authorize.ts';
+import { startSettlementLoop, stopSettlementLoop } from '../jobs/settlement.ts';
 
 const PORT = Number(process.env.API_PORT ?? process.env.PORT ?? '5100');
 
@@ -54,6 +55,8 @@ async function main(): Promise<void> {
   }
 
   const app = createApp();
+  // Milestone 23: escrow release, automatic payouts, payout reconciliation. See jobs/settlement.ts.
+  startSettlementLoop();
   const server = app.listen(PORT, () => {
     console.log(`[api] listening on ${PORT} — Postgres, no supabase-js`);
   });
@@ -74,6 +77,7 @@ async function main(): Promise<void> {
     }, SHUTDOWN_GRACE_MS);
     // Do not let the timer itself keep the event loop alive.
     forceExit.unref();
+    stopSettlementLoop();
 
     server.close(() => {
       void closePool()

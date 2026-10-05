@@ -179,9 +179,15 @@ describe('GET /api/session', () => {
     assert.ok(manager, 'manager is in the map');
     // Auth's invite screen, verbatim: "accept and update orders, assign riders, edit
     // products and stock" — and "can't see payouts, the wallet or store settings".
+    //
+    // MILESTONE 24 ADDED THREE, and the sentence above does not mention them: answering complaints and reviews
+    // (`support.write`) and seeing customers (`customers.read`, `customers.write`). The nav has always shown
+    // Complaints, Reviews and Customers to every console role, so a manager who could not use them would have
+    // three dead items. The invite screen's copy under-describes the role now — a question for the designer,
+    // recorded in Part 9; the negatives below (no wallet, no payouts, no settings) are the half that matters.
     assert.deepEqual(
       [...manager.permissions].sort(),
-      ['orders.assign_rider', 'orders.read', 'orders.update', 'products.write', 'stock.write'],
+      ['customers.read', 'customers.write', 'orders.assign_rider', 'orders.read', 'orders.update', 'products.write', 'stock.write', 'support.write'],
     );
     assert.equal(manager.permissions.includes('wallet.read'), false);
     assert.equal(manager.permissions.includes('payouts.request'), false);

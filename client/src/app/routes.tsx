@@ -111,6 +111,11 @@ export function AppRoutes(): ReactNode {
         <Route path="/app/:store/products/new" element={<ConsoleRoute view="product" />} />
         <Route path="/app/:store/products/:productId" element={<ConsoleRoute view="product" />} />
         <Route path="/app/:store/categories" element={<ConsoleRoute view="categories" />} />
+        <Route path="/app/:store/money" element={<ConsoleRoute view="money" />} />
+        <Route path="/app/:store/complaints" element={<ConsoleRoute view="complaints" />} />
+        <Route path="/app/:store/reviews" element={<ConsoleRoute view="reviews" />} />
+        <Route path="/app/:store/customers" element={<ConsoleRoute view="customers" />} />
+        <Route path="/app/:store/analytics" element={<ConsoleRoute view="analytics" />} />
 
         {/* Same reasoning: 'rider' is reserved (V023), so this cannot collide with a storefront. */}
         <Route path="/rider/:store" element={<RiderRoute />} />

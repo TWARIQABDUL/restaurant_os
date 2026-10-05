@@ -148,6 +148,11 @@ async function deleteAppendOnlyAsOwner(stores: readonly string[]): Promise<void>
     await owner.query(`DELETE FROM order_events WHERE store_id = ANY($1::uuid[])`, [stores]);
     // A complaint is a thread: its evidence and its events go before it, and it goes before the order it is
     // about — `complaints_order_id_store_id_fkey` is what says so.
+    // Milestone 24: a refund REQUESTED from a complaint references it (refunds_complaint_same_store), so the refunds
+    // go first. The main teardown deletes them again later; this one only exists because complaints are deleted here.
+    // ONLY the ones that name a complaint and are not yet decided: an APPROVED refund is part of its order's record
+    // (orders.refunded_amount must equal their sum), and deleting one early makes the order's own check refuse.
+    await owner.query(`DELETE FROM refunds WHERE store_id = ANY($1::uuid[]) AND complaint_id IS NOT NULL AND status <> 'approved'`, [stores]);
     await owner.query(`DELETE FROM complaint_evidence WHERE store_id = ANY($1::uuid[])`, [stores]);
     await owner.query(`DELETE FROM complaint_events WHERE store_id = ANY($1::uuid[])`, [stores]);
     await owner.query(`DELETE FROM complaints WHERE store_id = ANY($1::uuid[])`, [stores]);
@@ -193,6 +198,15 @@ export async function cleanup(): Promise<void> {
     await tx.query(`DELETE FROM order_item_option_values WHERE order_item_id IN (SELECT id FROM order_items WHERE store_id = ANY($1::uuid[]))`, [stores]);
     await tx.query(`DELETE FROM order_items WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM momo_transactions WHERE store_id = ANY($1::uuid[])`, [stores]);
+    // Milestone 23: payouts. Disbursement attempts (above) reference their withdrawal, and a withdrawal holds its
+    // wallet (RESTRICT), so it goes between momo_transactions and wallets.
+    await tx.query(`DELETE FROM withdrawals WHERE store_id = ANY($1::uuid[])`, [stores]);
+    // And a fixture store the wallet suite verified: documents, checks and fields before the submission.
+    const kyc = `(SELECT id FROM kyc_submissions WHERE store_id = ANY($1::uuid[]))`;
+    await tx.query(`DELETE FROM kyc_checks WHERE submission_id IN ${kyc}`, [stores]);
+    await tx.query(`DELETE FROM kyc_extracted_fields WHERE submission_id IN ${kyc}`, [stores]);
+    await tx.query(`DELETE FROM kyc_documents WHERE submission_id IN ${kyc}`, [stores]);
+    await tx.query(`DELETE FROM kyc_submissions WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM refunds WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(`DELETE FROM notifications WHERE store_id = ANY($1::uuid[])`, [stores]);
     await tx.query(

@@ -73,21 +73,22 @@ export const NAV_GROUPS: readonly (readonly NavItem[])[] = [
       label: 'Complaints',
       icon: 'complaints',
       path: '/complaints',
-      built: false,
+      built: true,
+      needs: 'support.write',
       badge: 'complaints',
       milestone: 24,
     },
     { id: 'products', label: 'Products', icon: 'products', path: '/products', built: true, milestone: 22 },
-    { id: 'reviews', label: 'Reviews', icon: 'reviews', path: '/reviews', built: false, badge: 'reviews', milestone: 24 },
+    { id: 'reviews', label: 'Reviews', icon: 'reviews', path: '/reviews', built: true, needs: 'support.write', badge: 'reviews', milestone: 24 },
     { id: 'categories', label: 'Categories', icon: 'categories', path: '/categories', built: true, milestone: 22 },
     // The board points Inventory at the same screen as Products, because it is a view of it rather than a
     // place of its own. `Products`'s inline stock edit is one of the boards still outstanding (Part 9), so
     // this stays plain until there is a design to build.
     { id: 'inventory', label: 'Inventory', icon: 'inventory', path: '/products/stock', built: false, milestone: 22 },
-    { id: 'customers', label: 'Customers', icon: 'customers', path: '/customers', built: false, milestone: 24 },
+    { id: 'customers', label: 'Customers', icon: 'customers', path: '/customers', built: true, needs: 'customers.read', milestone: 24 },
   ],
   [
-    { id: 'money', label: 'Money', icon: 'money', path: '/money', built: false, needs: 'wallet.read', milestone: 23 },
+    { id: 'money', label: 'Money', icon: 'money', path: '/money', built: true, needs: 'wallet.read', milestone: 23 },
     {
       id: 'riders',
       label: 'Riders & cash',
@@ -114,7 +115,7 @@ export const NAV_GROUPS: readonly (readonly NavItem[])[] = [
       label: 'Analytics',
       icon: 'analytics',
       path: '/analytics',
-      built: false,
+      built: true,
       needs: 'wallet.read',
       milestone: 24,
     },
