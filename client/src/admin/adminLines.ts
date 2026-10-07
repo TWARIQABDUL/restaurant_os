@@ -1,9 +1,9 @@
 // client/src/admin/adminLines.ts — milestone 27. The words and rules of the admin console, with no React in them, so the render
 // gate calls them directly (lines.ts, walletLines.ts and the others give the reason).
 
-import type { Kpi, MerchantRow, Overview, Range } from './adminApi.ts';
+import type { Currency, DisputeDetail, DisputeItem, Kpi, MerchantRow, MethodDetail, MethodStatus, Overview, PayoutRow, PayoutTab, Range } from './adminApi.ts';
 
-export const NAV: readonly { label: string; items: readonly { id: string; label: string; path: string; icon: string; built: boolean; badge?: 'merchants' | 'kyc' }[] }[] = [
+export const NAV: readonly { label: string; items: readonly { id: string; label: string; path: string; icon: string; built: boolean; badge?: 'merchants' | 'kyc' | 'disputes' }[] }[] = [
   {
     label: 'Platform',
     items: [
@@ -16,10 +16,10 @@ export const NAV: readonly { label: string; items: readonly { id: string; label:
   {
     label: 'Money',
     items: [
-      { id: 'payments', label: 'Payment methods', path: '/admin/payments', icon: 'M2 6h20v12H2zM2 10h20M6 15h4', built: false },
-      { id: 'currencies', label: 'Currencies', path: '/admin/currencies', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 6v2M12 16v2', built: false },
-      { id: 'payouts', label: 'Payouts', path: '/admin/payouts', icon: 'M12 3v12M7 10l5 5 5-5M4 21h16', built: false },
-      { id: 'disputes', label: 'Refunds & disputes', path: '/admin/disputes', icon: 'M12 3l9 16H3zM12 10v4M12 17h.01', built: false },
+      { id: 'payments', label: 'Payment methods', path: '/admin/payments', icon: 'M2 6h20v12H2zM2 10h20M6 15h4', built: true },
+      { id: 'currencies', label: 'Currencies', path: '/admin/currencies', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 6v2M12 16v2', built: true },
+      { id: 'payouts', label: 'Payouts', path: '/admin/payouts', icon: 'M12 3v12M7 10l5 5 5-5M4 21h16', built: true },
+      { id: 'disputes', label: 'Refunds & disputes', path: '/admin/disputes', icon: 'M12 3l9 16H3zM12 10v4M12 17h.01', built: true, badge: 'disputes' },
     ],
   },
   {
@@ -156,3 +156,123 @@ export const CHECK_ICON: Record<string, { mark: string; tone: string; note: stri
 };
 
 export const FLAG_TONE: Record<'ok' | 'warn' | 'bad', string> = { ok: 'bg-status-success text-status-success-fg', warn: 'bg-status-warn text-status-warn-fg', bad: 'bg-status-danger text-status-danger-fg' };
+
+// ---------------------------------------------------------------------------
+// Part B — payouts, refunds & disputes, currencies, payment methods
+// ---------------------------------------------------------------------------
+
+export const rwf = (n: number | string): string => `${String(Math.round(Number(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} RWF`;
+
+export const PAYOUT_TAB_LABEL: Record<PayoutTab, string> = { problem: 'Failed', held: 'Held', live: 'In progress', done: 'Completed' };
+
+export const PAYOUT_STATUS: Record<PayoutRow['status'], { label: string; tone: string }> = {
+  failed: { label: 'Failed', tone: 'bg-status-danger text-status-danger-fg' },
+  held: { label: 'Held', tone: 'bg-status-warn text-status-warn-fg' },
+  processing: { label: 'Processing', tone: 'bg-status-info text-status-info-fg' },
+  completed: { label: 'Completed', tone: 'bg-status-success text-status-success-fg' },
+  rejected: { label: 'Rejected', tone: 'bg-status-neutral text-status-neutral-fg' },
+};
+
+/** "Today 08:00", "Yesterday 11:32", "5 Oct 08:00" — the board's own column, in the viewer's clock. */
+export function whenText(iso: string | null, now: Date = new Date()): string {
+  if (iso === null) return '—';
+  const d = new Date(iso);
+  const t = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const day = (x: Date): string => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  return day(d) === day(now) ? `Today ${t}` : day(d) === day(y) ? `Yesterday ${t}` : `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${t}`;
+}
+
+export const DISPUTE_TAB_LABEL = { refunds: 'Refunds', disputes: 'Disputes', closed: 'Closed' } as const;
+
+export const DISPUTE_BADGE: Record<DisputeItem['status'], { label: string; tone: string }> = {
+  open: { label: 'Needs decision', tone: 'bg-status-info text-status-info-fg' },
+  approved: { label: 'Refunded', tone: 'bg-status-success text-status-success-fg' },
+  queued: { label: 'Approved · waiting for funds', tone: 'bg-status-warn text-status-warn-fg' },
+  rejected: { label: 'Rejected', tone: 'bg-status-danger text-status-danger-fg' },
+};
+
+/** A dispute that is still open is "Escalated" on its own pile; a refund request is "Needs decision". */
+export const disputeBadge = (i: Pick<DisputeItem, 'kind' | 'status'>): { label: string; tone: string } =>
+  i.kind === 'dispute' && i.status === 'open' ? { label: 'Escalated', tone: 'bg-status-progress text-status-progress-fg' } : DISPUTE_BADGE[i.status];
+
+export const MESSAGE_TONE: Record<DisputeDetail['thread'][number]['side'], string> = {
+  customer: 'bg-ground',
+  store: 'bg-brand-tint',
+  platform: 'bg-status-progress',
+  rider: 'bg-status-warn',
+  system: 'bg-status-neutral',
+};
+
+/** Whether approving pays now, and the sentence under the wallet card that says so. */
+export function walletVerdict(available: string | number, amount: number): { short: boolean; note: string } {
+  const have = Number(available);
+  if (amount > have) {
+    return { short: true, note: `Not enough available: ${rwf(have)} of ${rwf(amount)}. If you approve, the refund waits and is taken as soon as the balance covers it. Payouts to the store pause until then.` };
+  }
+  return { short: false, note: 'Enough available to cover this now.' };
+}
+
+/** The line under the decision box — what pressing the button will do, in the board's words where they are true. */
+export function decisionNote(d: Pick<DisputeDetail, 'kind' | 'store' | 'order'>, approving: boolean, amount: number, total: number): string {
+  if (approving) {
+    const partial = amount > 0 && amount < total ? `Partial refund: ${rwf(amount)} of ${rwf(total)}. ` : '';
+    return `${partial}Deducted from ${d.store.name}’s available balance in one step and sent back to the customer’s ${d.order.payment === 'cash' ? 'cash' : 'MoMo'}. The store is told in the app.`;
+  }
+  return d.kind === 'dispute' ? 'The complaint closes as rejected. The customer or store can reopen it with new information.' : 'The store is told why. Nothing moves.';
+}
+
+export function decideLabel(d: Pick<DisputeDetail, 'kind'>, approving: boolean, short: boolean, amount: number): string {
+  if (!approving) return d.kind === 'dispute' ? 'Reject escalation' : 'Reject request';
+  return short ? 'Approve · take it when funds allow' : `Approve and refund ${amount > 0 ? rwf(amount) : ''}`.trim();
+}
+
+/** "1,000 RWF" in a currency's OWN rules — symbol, side, separator, decimals — optionally rounded as cash is. */
+export function formatCurrency(n: number, c: Pick<Currency, 'symbol' | 'position' | 'separator' | 'decimals' | 'rounding'>, cash = false): string {
+  let v = n;
+  if (cash && c.rounding > 0) v = Math.round(v / c.rounding) * c.rounding;
+  const parts = v.toFixed(c.decimals).split('.');
+  parts[0] = parts[0]!.replace(/\B(?=(\d{3})+(?!\d))/g, c.separator);
+  const num = parts.join(c.separator === '.' ? ',' : '.');
+  const sp = c.symbol.length > 1 ? ' ' : '';
+  return c.position === 'before' ? `${c.symbol}${sp}${num}` : `${num} ${c.symbol}`;
+}
+
+/** The sample amounts the preview uses — each currency's own scale, so "1,000" is never shown in dollars. */
+export const SAMPLE: Record<string, [number, number]> = { RWF: [3500, 1000], UGX: [9500, 3000], KES: [350, 100], TZS: [7000, 2500], BIF: [7500, 2500], USD: [2.4, 0.7] };
+
+export function currencyPreview(c: Pick<Currency, 'code' | 'symbol' | 'position' | 'separator' | 'decimals' | 'rounding'>): { price: string; sub: string; del: string; total: string; cash: string } {
+  const [price, del] = SAMPLE[c.code] ?? [3500, 1000];
+  const total = price * 2 + del + (c.decimals ? 0.03 : 17);
+  return { price: formatCurrency(price, c), sub: formatCurrency(price * 2, c), del: formatCurrency(del, c), total: formatCurrency(total, c), cash: formatCurrency(total, c, true) };
+}
+
+export const ROUNDING_LABEL = (n: number): string => (n === 0 ? 'Off' : `To ${n}`);
+
+/** What the conversion panel says about a currency's USD rate, and in what tone. */
+export function rateNote(c: Pick<Currency, 'code' | 'rateSource' | 'usdRate' | 'symbol' | 'position' | 'separator' | 'decimals' | 'rounding'>, typed: string): { text: string; tone: 'ok' | 'warn' | 'plain' } {
+  if (c.code === 'USD') return { text: 'USD is the reference currency for conversion.', tone: 'plain' };
+  const n = parseFloat(typed.replace(/,/g, ''));
+  if (c.rateSource === 'manual' && n > 0) {
+    const [price] = SAMPLE[c.code] ?? [3500, 0];
+    return { text: `A ${formatCurrency(price, c)} item shows “≈ $${(price / n).toFixed(2)}” to visitors using USD.`, tone: 'ok' };
+  }
+  if (c.rateSource === 'manual') return { text: 'Enter a rate to preview converted prices. Until then, no converted price is shown.', tone: 'warn' };
+  return { text: 'No rate feed is connected, so converted prices are not shown. Set the rate by hand to show them.', tone: 'warn' };
+}
+
+export const METHOD_BADGE: Record<MethodStatus, { label: string; tone: string }> = {
+  draft: { label: 'Draft', tone: 'bg-status-warn text-status-warn-fg' },
+  live: { label: 'Live', tone: 'bg-status-success text-status-success-fg' },
+  paused: { label: 'Paused', tone: 'bg-status-danger text-status-danger-fg' },
+};
+
+export const methodMeta = (m: { countries: string[]; currencies: string[] }): string => `${m.countries.length === 0 ? 'No country' : m.countries.join(' · ')} · ${m.currencies.length === 0 ? 'no currency' : m.currencies.join(', ')}`;
+
+export const readinessCount = (d: Pick<MethodDetail, 'readiness'>): { done: number; total: number } => ({ done: d.readiness.filter((r) => r.ok).length, total: d.readiness.length });
+
+export const CHECKOUT_PREVIEW_CASH = { short: 'CASH', name: 'Cash on delivery' } as const;
+
+export const thousands = (n: number | null): string => (n === null ? '' : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
+export const unthousands = (s: string): number | null => (s.trim() === '' ? null : Number(s.replace(/[^\d.]/g, '')));

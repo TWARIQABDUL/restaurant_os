@@ -60,9 +60,16 @@ import { Analytics } from '../src/console/Analytics.tsx';
 import { Settings } from '../src/console/Settings.tsx';
 import { Verify } from '../src/console/Verify.tsx';
 import { Admin, SoonPage } from '../src/admin/Admin.tsx';
+import type { AdminView } from '../src/admin/Admin.tsx';
 import type { CaseDetail, MerchantDetail, MerchantList, Me as AdminMe, Overview as AdminOverviewData, QueueItem } from '../src/admin/adminApi.ts';
 import { ageText, compactMoney, degradedNote, kpiDelta, kpiValue, overSla, rowBadge } from '../src/admin/adminLines.ts';
+import { Currencies as AdminCurrencies } from '../src/admin/Currencies.tsx';
+import { Disputes as AdminDisputes } from '../src/admin/Disputes.tsx';
 import { Kyc as AdminKyc } from '../src/admin/Kyc.tsx';
+import { PaymentMethods as AdminPaymentMethods } from '../src/admin/PaymentMethods.tsx';
+import { Payouts as AdminPayouts } from '../src/admin/Payouts.tsx';
+import type { Currency as AdminCurrency, DisputeDetail, DisputeItem, MethodDetail, MethodRow, PayoutsPage } from '../src/admin/adminApi.ts';
+import { currencyPreview, decideLabel, decisionNote, disputeBadge, formatCurrency, methodMeta, rateNote, readinessCount, rwf, walletVerdict, whenText } from '../src/admin/adminLines.ts';
 import { Merchants as AdminMerchants } from '../src/admin/Merchants.tsx';
 import { Overview as AdminOverview } from '../src/admin/Overview.tsx';
 import { BlockedView, CameraView, TipsView } from '../src/console/FaceCapture.tsx';
@@ -1835,7 +1842,7 @@ expect(cleanPrice('1,500 RWF') === '1500', 'a price is digits');
 
 // --- milestone 27: the admin console -------------------------------------------------------------------------------
 const ADMIN_ME: AdminMe = { id: 'u9', name: 'Grace Kamanzi', email: 'grace@vendlyfy.example', role: 'super_admin', permissions: ['merchants.read', 'kyc.review', 'stores.suspend', 'audit.read'] };
-const inAdmin = (active: string, node: ReactNode, view: 'overview' | 'merchants' | 'kyc' | 'soon' = 'overview'): ReactNode => (
+const inAdmin = (active: string, node: ReactNode, view: AdminView = 'overview'): ReactNode => (
   <Admin view={view} active={active} navigate={noop} initialMe={ADMIN_ME} initialBadges={{ merchants: 3, kyc: 2 }}>
     {() => node}
   </Admin>
@@ -1946,6 +1953,132 @@ expect(kpiDelta({ key: 'orders', value: 5, previous: 0, note: null }, 'week').te
 expect(ageText(0.2) === '12 min' && ageText(19) === '19 h' && ageText(72) === '3 d' && overSla(30) && !overSla(2), 'ages and the SLA');
 expect(degradedNote(OVERVIEW.providers) === 'Airtel Money is slow.' && degradedNote([]) === null, 'the degraded note names the provider');
 expect(rowBadge({ status: 'active', identity: 'in_review' }).label === 'Needs review' && rowBadge({ status: 'active', identity: 'approved' }).label === 'Live' && rowBadge({ status: 'suspended', identity: 'approved' }).label === 'Suspended', 'a live store waiting on its check reads as needing review');
+
+
+
+// --- milestone 27 part B: payouts, refunds & disputes, currencies, payment methods ---------------------------------
+const PAYOUTS_FAILED: PayoutsPage = {
+  tab: 'problem',
+  counts: { problem: 2, held: 2, live: 1, done: 5 },
+  kpis: { runTotal: 214_600_000, runStores: 1118, failed: 2, held: 2, holdMinutes: 60 },
+  rows: [
+    { id: 'w1', storeId: 's1', store: 'Inzu Threads', kind: 'Automatic', destination: 'MTN MoMo 078 ••• 2231', amount: 41000, at: new Date().toISOString(), status: 'failed', note: 'MoMo: account name doesn’t match. The money is back in the store’s Available balance.', canRetry: true },
+    { id: 'w2', storeId: 's2', store: 'Nyama & Co.', kind: 'Manual', destination: 'MTN MoMo 078 ••• 4412', amount: 50000, at: new Date(Date.now() - 86_400_000).toISOString(), status: 'failed', note: 'MoMo didn’t accept the transfer. The money is back in the store’s Available balance.', canRetry: true },
+  ],
+};
+const PAYOUTS_HELD: PayoutsPage = {
+  ...PAYOUTS_FAILED, tab: 'held',
+  rows: [
+    { id: 's2', storeId: 's2', store: 'Deals4U', kind: 'Held', destination: 'MTN MoMo 073 ••• 1180', amount: 86000, at: null, status: 'held', note: 'Store suspended. Held until it is reinstated.', canRetry: false },
+    { id: 's3', storeId: 's3', store: 'Kigali Tech Hub', kind: 'Held', destination: 'No payout account', amount: 410000, at: null, status: 'held', note: 'Identity not verified yet.', canRetry: false },
+  ],
+};
+const dItem = (kind: 'refund' | 'dispute', id: string, title: string, status: DisputeItem['status'] = 'open'): DisputeItem => ({ kind, id, title, store: 'Nyama & Co.', storeId: 's1', order: 1020, customer: 'Pacifique I.', ageHours: 0.7, status });
+const D_REFUND: DisputeDetail = {
+  kind: 'refund', id: 'r1', title: 'Refund request · 5,000 RWF', status: 'open', store: { id: 's1', name: 'Nyama & Co.' },
+  order: { id: 'o1', number: 1020, items: [{ label: '2× Chicken burger', amount: '7000' }, { label: '1× Fries', amount: '1500' }, { label: '1× Salad', amount: '3500' }], total: '12000', refunded: '0', payment: 'mtn_momo', line: 'Delivered 2 Oct by Claude H. · mtn momo' },
+  customer: 'Pacifique I.', requested: '5000', maxRefund: '12000.00', wallet: { available: '184500', pending: '42000' }, history: '612 orders · 3 refunds in 90 days · no open dispute',
+  thread: [{ who: 'Nyama & Co. (Aline)', side: 'store', at: new Date().toISOString(), text: 'Item missing. The salad and fries weren’t packed; refunding those.' }], evidence: [], closedNote: null, refundBlocked: null,
+};
+const D_DISPUTE: DisputeDetail = {
+  ...D_REFUND, kind: 'dispute', id: 'c1', title: 'Escalated · Wrong item', requested: '6000', maxRefund: '6000.00', wallet: { available: '1500', pending: '0' },
+  thread: [
+    { who: 'Customer', side: 'customer', at: new Date().toISOString(), text: 'I ordered a brochette platter and got a veggie wrap.' },
+    { who: 'Nyama & Co.', side: 'store', at: new Date().toISOString(), text: 'Rejected: our packing photo shows the platter.' },
+    { who: 'Nyama & Co. escalated', side: 'store', at: new Date().toISOString(), text: 'We disagree on what was delivered. Please check the rider photo.' },
+  ],
+  evidence: [{ label: 'Customer photo · wrap in bag', side: 'customer' }, { label: 'Store packing photo', side: 'store' }],
+};
+const D_UNPAID: DisputeDetail = { ...D_DISPUTE, refundBlocked: 'This order was cash on delivery and the cash was never confirmed as collected, so there is no money in the wallet to refund.' };
+const D_DONE: DisputeDetail = { ...D_REFUND, status: 'approved', closedNote: 'Refunded 5,000 RWF from Nyama & Co.’s wallet.' };
+const CUR = (code: string, name: string, over: Partial<AdminCurrency> = {}): AdminCurrency => ({ code, name, symbol: code, position: 'after', decimals: 0, separator: ',', rounding: 50, enabled: true, isDefault: false, rateSource: 'feed', usdRate: null, rateUpdatedAt: null, tag: 'Uganda', usage: '18 stores', lockedReason: null, ...over });
+const CURRENCIES: AdminCurrency[] = [
+  CUR('RWF', 'Rwandan franc', { isDefault: true, tag: 'Default · Rwanda', usage: '1,261 stores', lockedReason: 'The default currency is always on.' }),
+  CUR('UGX', 'Ugandan shilling', { position: 'before', rounding: 500 }),
+  CUR('KES', 'Kenyan shilling', { symbol: 'KSh', position: 'before', rounding: 10, tag: 'Kenya', usage: '5 stores', rateSource: 'manual', usdRate: 129 }),
+  CUR('TZS', 'Tanzanian shilling', { enabled: false, tag: 'Tanzania · not launched', usage: 'Not in use', symbol: 'TSh', position: 'before', rounding: 100 }),
+  CUR('USD', 'US dollar', { symbol: '$', position: 'before', decimals: 2, rounding: 0, tag: 'Display and cards only', usage: 'Payments only' }),
+];
+const MROW = (key: string, name: string, short: string, status: MethodRow['status'], over: Partial<MethodRow> = {}): MethodRow => ({ key, name, short, kind: 'online', status, countries: ['RW'], currencies: ['RWF'], ...over });
+const M_LIST: MethodRow[] = [MROW('mpesa', 'M-Pesa', 'M-PESA', 'draft', { countries: [], currencies: [] }), MROW('mtn_momo', 'MTN MoMo', 'MTN', 'live', { countries: ['RW', 'UG'], currencies: ['RWF', 'UGX'] }), MROW('airtel_money', 'Airtel Money', 'AIRTEL', 'live'), MROW('cash', 'Cash on delivery', 'CASH', 'live', { kind: 'offline' }), MROW('bank', 'Bank transfer', 'BANK', 'paused')];
+const mdet = (r: MethodRow, over: Partial<MethodDetail> = {}): MethodDetail => ({
+  ...r, provider: 'Safaricom Daraja API', webhook: 'https://api.example.test/hooks/mpesa', customerLabel: r.name, customerHint: 'Approve with your PIN', incidentNote: null,
+  limits: r.currencies.map((c) => ({ currency: c, min: 100, max: 2000000 })), stores: 1184, health: { rate: 98.9, attempts: 120 },
+  readiness: [{ key: 'countries', label: 'Available somewhere', ok: r.countries.length > 0, sub: r.countries.join(' · ') || 'Pick at least one country' }, { key: 'currencies', label: 'Can charge in a currency', ok: r.currencies.length > 0, sub: r.currencies.join(', ') || 'Pick at least one currency' }, { key: 'words', label: 'Checkout wording written', ok: true, sub: 'A name and a hint customers will read' }, { key: 'provider', label: 'Provider named', ok: true, sub: 'Safaricom Daraja API' }, { key: 'webhook', label: 'Webhook address set', ok: true, sub: 'https://api.example.test/hooks/mpesa' }],
+  history: [{ at: new Date().toISOString(), who: 'Grace Kamanzi', what: 'Edited M-Pesa: countries, currencies' }],
+  catalogue: { countries: [{ code: 'RW', name: 'Rwanda', enabled: true }, { code: 'UG', name: 'Uganda', enabled: true }, { code: 'KE', name: 'Kenya', enabled: false }], currencies: [{ code: 'RWF', enabled: true }, { code: 'UGX', enabled: true }, { code: 'TZS', enabled: false }] },
+  ...over,
+});
+
+const moneyParts: readonly (readonly [string, ReactNode])[] = [
+  ['Admin · payouts, failed', inAdmin('payouts', <AdminPayouts initial={PAYOUTS_FAILED} />, 'payouts')],
+  ['Admin · payouts, held', inAdmin('payouts', <AdminPayouts initial={PAYOUTS_HELD} initialTab="held" />, 'payouts')],
+  ['Admin · payouts, nothing', inAdmin('payouts', <AdminPayouts initial={{ ...PAYOUTS_FAILED, rows: [], counts: { problem: 0, held: 0, live: 0, done: 0 }, kpis: { ...PAYOUTS_FAILED.kpis, failed: 0, held: 0 } }} />, 'payouts')],
+  ['Admin · refunds, a request to decide', inAdmin('disputes', <AdminDisputes initialQueue={{ items: [dItem('refund', 'r1', 'Refund request · 5,000 RWF')], counts: { refunds: 1, disputes: 1, closed: 3 } }} initialDetail={D_REFUND} />, 'disputes')],
+  ['Admin · refunds, a partial amount the wallet covers', inAdmin('disputes', <AdminDisputes initialQueue={{ items: [dItem('refund', 'r1', 'Refund request · 5,000 RWF')], counts: { refunds: 1, disputes: 1, closed: 3 } }} initialDetail={D_REFUND} initialAmount="3000" />, 'disputes')],
+  ['Admin · a dispute the wallet cannot cover', inAdmin('disputes', <AdminDisputes initialTab="disputes" initialQueue={{ items: [dItem('dispute', 'c1', 'Escalated · Wrong item')], counts: { refunds: 0, disputes: 1, closed: 0 } }} initialDetail={D_DISPUTE} initialAmount="6000" />, 'disputes')],
+  ['Admin · a dispute on an order nobody paid for', inAdmin('disputes', <AdminDisputes initialTab="disputes" initialQueue={{ items: [dItem('dispute', 'c1', 'Escalated · Wrong item')], counts: { refunds: 0, disputes: 1, closed: 0 } }} initialDetail={D_UNPAID} />, 'disputes')],
+  ['Admin · rejecting a request', inAdmin('disputes', <AdminDisputes initialQueue={{ items: [dItem('refund', 'r1', 'Refund request · 5,000 RWF')], counts: { refunds: 1, disputes: 0, closed: 0 } }} initialDetail={D_REFUND} initialChoice="reject" />, 'disputes')],
+  ['Admin · a decided refund', inAdmin('disputes', <AdminDisputes initialTab="closed" initialQueue={{ items: [dItem('refund', 'r1', 'Refund request · 5,000 RWF', 'approved')], counts: { refunds: 0, disputes: 0, closed: 1 } }} initialDetail={D_DONE} />, 'disputes')],
+  ['Admin · nothing to decide', inAdmin('disputes', <AdminDisputes initialQueue={{ items: [], counts: { refunds: 0, disputes: 0, closed: 0 } }} />, 'disputes')],
+  ['Admin · currencies, the default', inAdmin('currencies', <AdminCurrencies initial={CURRENCIES} />, 'currencies')],
+  ['Admin · currencies, a dollar', inAdmin('currencies', <AdminCurrencies initial={CURRENCIES} initialSelected="USD" />, 'currencies')],
+  ['Admin · currencies, a manual rate', inAdmin('currencies', <AdminCurrencies initial={CURRENCIES} initialSelected="KES" />, 'currencies')],
+  ['Admin · payment methods, a draft', inAdmin('payments', <AdminPaymentMethods initialList={M_LIST} initialDetail={mdet(M_LIST[0]!, { stores: 0, health: { rate: null, attempts: 0 }, customerHint: 'Approve with your M-Pesa PIN' })} />, 'payments')],
+  ['Admin · payment methods, live and struggling', inAdmin('payments', <AdminPaymentMethods initialList={M_LIST} initialDetail={mdet(M_LIST[2]!, { health: { rate: 91.2, attempts: 40 }, incidentNote: 'Slow approvals since 13:10. Checkout warns customers it may take longer.', stores: 903 })} />, 'payments')],
+  ['Admin · payment methods, pausing', inAdmin('payments', <AdminPaymentMethods initialList={M_LIST} initialDetail={mdet(M_LIST[1]!)} initialConfirmPause />, 'payments')],
+  ['Admin · payment methods, paused', inAdmin('payments', <AdminPaymentMethods initialList={M_LIST} initialDetail={mdet(M_LIST[4]!, { stores: 0 })} />, 'payments')],
+];
+const moneyHtml: string[] = [];
+for (const [name, node] of moneyParts) {
+  const html = render(name, node);
+  allHtml += html;
+  moneyHtml.push(html);
+}
+const moneyAt = (i: number): string => moneyHtml[i]!.replace(/<[^>]+>/g, ' ').replaceAll('&amp;', '&').replaceAll('&#x27;', "'").replace(/\s+/g, ' ');
+expect(moneyHtml.length === moneyParts.length, 'every part-B admin part rendered');
+
+expect(moneyAt(0).includes('Automatic runs and manual withdrawals, across every store.') && moneyAt(0).includes('Failed (2)') && moneyAt(0).includes('Held (2)') && moneyAt(0).includes('In progress (1)') && moneyAt(0).includes('Completed'), 'payouts: the four piles with their counts');
+expect(moneyAt(0).includes('Retry') && !moneyAt(0).includes('Reject') && moneyAt(0).includes('back in the store’s Available balance'), 'a failed payout can be retried, and says the money is already back — there is nothing to reject');
+expect(moneyAt(0).includes('214,600,000 RWF') && moneyAt(0).includes('1118 stores paid') && moneyAt(0).includes('60 min'), 'the headline figures');
+expect(moneyAt(1).includes('Identity not verified yet.') && moneyAt(1).includes('Store suspended.') && !moneyAt(1).includes('Retry'), 'held stores say why and cannot be retried');
+expect(moneyAt(2).includes('Nothing here.'), 'an empty pile');
+
+expect(moneyAt(3).includes('Refunds & disputes') && moneyAt(3).includes('Refunds (1)') && moneyAt(3).includes('Disputes (1)') && moneyAt(3).includes('Closed (3)') && moneyAt(3).includes('Needs decision'), 'refunds: the three tabs');
+expect(moneyAt(3).includes('Store wallet') && moneyAt(3).includes('184,500 RWF') && moneyAt(3).includes('Enough available to cover this now.') && moneyAt(3).includes('Approve and refund 5,000 RWF'), 'the wallet beside the decision, and what the button will do');
+expect(moneyAt(3).includes('Item missing. The salad and fries weren’t packed') && moneyAt(3).includes('612 orders · 3 refunds in 90 days'), 'the store’s request and history');
+expect(moneyAt(4).includes('Partial refund: 3,000 RWF of 12,000 RWF.'), 'a partial amount says so');
+expect(moneyAt(5).includes('Not enough available: 1,500 RWF of 6,000 RWF') && moneyAt(5).includes('Payouts to the store pause until then.') && moneyAt(5).includes('Approve · take it when funds allow') && moneyAt(5).includes('Complaint thread') && moneyAt(5).includes('Escalated'), 'a dispute the wallet cannot cover is approved and waits, and the screen says what that does');
+expect(moneyAt(5).includes('Customer photo · wrap in bag') && moneyAt(5).includes('Refund the customer') && moneyAt(5).includes('Reject the escalation'), 'evidence and the dispute’s own choices');
+expect(moneyAt(6).includes('This can’t be refunded.') && moneyAt(6).includes('cash was never confirmed as collected'), 'an unpaid order says why it cannot be refunded');
+expect(moneyAt(7).includes('Reject request') && moneyHtml[7]!.includes('Why? Shared with the store') && moneyAt(7).includes('The store is told why. Nothing moves.') && !moneyAt(7).includes('Refund amount'), 'rejecting asks for a reason and no amount');
+expect(moneyAt(8).includes('Refunded 5,000 RWF from Nyama & Co.’s wallet.') && !moneyAt(8).includes('Decision'), 'a decided item is read-only');
+expect(moneyAt(9).includes('All caught up.'), 'nothing to decide');
+expect(!moneyHtml.slice(3, 10).some((h) => h.includes('Reopen')) && !moneyAt(3).includes('SMS'), 'no reopen, no SMS promise');
+
+expect(moneyAt(10).includes('How money is shown, rounded and converted across every store.') && moneyAt(10).includes('Default · Rwanda') && moneyAt(10).includes('Can’t be switched off: The default currency is always on.') && moneyAt(10).includes('Save RWF'), 'currencies: the table, the default and why it is locked');
+expect(moneyAt(10).includes('3,500 RWF') && moneyAt(10).includes('To 50') && moneyAt(10).includes('Cash due') && moneyAt(10).includes('Cash on delivery') === false, 'the preview is in the currency’s own format and rounds only the cash line');
+expect(moneyAt(11).includes('$ 2.40') === false && moneyAt(11).includes('$2.40') && moneyAt(11).includes('USD is the reference currency for conversion.'), 'a dollar shows cents and no conversion to itself');
+expect(moneyAt(12).includes('1 USD equals') === false || moneyAt(12).includes('Set manually'), 'the conversion panel');
+expect(moneyAt(12).includes('≈ $') , 'a manual rate previews a converted price');
+expect(!moneyAt(10).includes('Publish changes') && !moneyAt(10).includes('Add currency'), 'no staging and no add-currency, which are not built');
+
+expect(moneyAt(13).includes('Payment methods') && moneyAt(13).includes('What customers can pay with, where, and in which currency.') && moneyAt(13).includes('Ready to publish?') && moneyAt(13).includes('3 of 5 done') && moneyAt(13).includes('Publish · 2 steps left'), 'payment methods: a draft with its derived checklist');
+expect(moneyAt(13).includes('Where it’s available') && moneyAt(13).includes('Greyed-out currencies aren’t turned on yet.') && moneyAt(13).includes('Approve with your M-Pesa PIN') && moneyAt(13).includes('Cash on delivery'), 'countries, currencies and the checkout preview');
+expect(!moneyAt(13).includes('Run sandbox test payment') && !moneyAt(13).includes('Rotate') && moneyAt(13).includes('aren’t managed here yet'), 'the vault and the test payment are not pretended');
+expect(moneyAt(14).includes('Health') && moneyAt(14).includes('91.2%') && moneyAt(14).includes('903') && moneyAt(14).includes('Slow approvals since 13:10.') && moneyAt(14).includes('Pause this method'), 'a live method: health, stores and the incident note');
+expect(moneyAt(15).includes('Pause MTN MoMo everywhere?') && moneyAt(15).includes('Payments already in progress still complete.'), 'pausing asks first');
+expect(moneyAt(16).includes('Paused') && moneyAt(16).includes('Turn back on'), 'a paused method');
+
+expect(rwf(5000) === '5,000 RWF' && whenText(null) === '—' && whenText(new Date(2026, 9, 7, 8, 0).toISOString(), new Date(2026, 9, 7, 18, 0)) === 'Today 08:00' && whenText(new Date(2026, 9, 6, 11, 32).toISOString(), new Date(2026, 9, 7, 18, 0)) === 'Yesterday 11:32', 'money and times');
+expect(walletVerdict('1500', 6000).short && !walletVerdict('6000', 6000).short, 'a wallet covers an amount up to and including its balance');
+expect(disputeBadge({ kind: 'dispute', status: 'open' }).label === 'Escalated' && disputeBadge({ kind: 'refund', status: 'open' }).label === 'Needs decision' && disputeBadge({ kind: 'refund', status: 'queued' }).label === 'Approved · waiting for funds', 'badges');
+expect(decideLabel({ kind: 'refund' }, true, false, 5000) === 'Approve and refund 5,000 RWF' && decideLabel({ kind: 'dispute' }, false, false, 0) === 'Reject escalation' && decisionNote(D_REFUND, true, 3000, 12000).includes('Partial refund'), 'the button and its sentence');
+expect(formatCurrency(1234567, CURRENCIES[0]!) === '1,234,567 RWF' && formatCurrency(2.4, CURRENCIES[4]!) === '$2.40' && formatCurrency(1234, { symbol: 'FBu', position: 'after', separator: ' ', decimals: 0, rounding: 100 }) === '1 234 FBu', 'a currency formats by its own rules');
+expect(formatCurrency(3517, CURRENCIES[0]!, true) === '3,500 RWF' && formatCurrency(3517, CURRENCIES[0]!) === '3,517 RWF', 'cash rounding applies only when asked');
+expect(currencyPreview(CURRENCIES[0]!).cash === '8,000 RWF' && currencyPreview(CURRENCIES[0]!).total === '8,017 RWF', 'the board’s own 8,017 example rounds to 8,000 for cash');
+expect(rateNote(CURRENCIES[2]!, '129').text.includes('≈ $') && rateNote(CURRENCIES[1]!, '').tone === 'warn' && rateNote(CURRENCIES[4]!, '').tone === 'plain', 'rate notes');
+expect(methodMeta(M_LIST[0]!) === 'No country · no currency' && methodMeta(M_LIST[1]!) === 'RW · UG · RWF, UGX' && readinessCount(mdet(M_LIST[0]!)).done === 3, 'method summaries and readiness');
 
 
 // --- Settings: the rules that live outside the JSX ---------------------------------

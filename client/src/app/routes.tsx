@@ -24,7 +24,11 @@ import { Onboarding } from '../onboarding/Onboarding.tsx';
 import { Admin, SoonPage } from '../admin/Admin.tsx';
 import type { AdminView } from '../admin/Admin.tsx';
 import { NAV } from '../admin/adminLines.ts';
+import { Currencies } from '../admin/Currencies.tsx';
+import { Disputes } from '../admin/Disputes.tsx';
 import { Kyc } from '../admin/Kyc.tsx';
+import { PaymentMethods } from '../admin/PaymentMethods.tsx';
+import { Payouts } from '../admin/Payouts.tsx';
 import { Merchants } from '../admin/Merchants.tsx';
 import { Overview as AdminOverview } from '../admin/Overview.tsx';
 import { Console } from '../console/Console.tsx';
@@ -112,7 +116,7 @@ function AdminRoute({ view, active }: { view: AdminView; active: string }): Reac
   const unbuilt = NAV.flatMap((g) => g.items).find((i) => i.id === (params['section'] ?? active));
   return (
     <Admin view={view} active={view === 'soon' ? (unbuilt?.id ?? '') : active} navigate={go}>
-      {() => (view === 'overview' ? <AdminOverview /> : view === 'merchants' ? <Merchants /> : view === 'kyc' ? <Kyc /> : <SoonPage label={unbuilt?.label ?? 'This screen'} />)}
+      {() => (view === 'overview' ? <AdminOverview /> : view === 'merchants' ? <Merchants /> : view === 'kyc' ? <Kyc /> : view === 'payouts' ? <Payouts /> : view === 'disputes' ? <Disputes /> : view === 'currencies' ? <Currencies /> : view === 'payments' ? <PaymentMethods /> : <SoonPage label={unbuilt?.label ?? 'This screen'} />)}
     </Admin>
   );
 }
@@ -134,6 +138,10 @@ export function AppRoutes(): ReactNode {
         <Route path="/admin" element={<AdminRoute view="overview" active="overview" />} />
         <Route path="/admin/merchants" element={<AdminRoute view="merchants" active="merchants" />} />
         <Route path="/admin/kyc" element={<AdminRoute view="kyc" active="kyc" />} />
+        <Route path="/admin/payouts" element={<AdminRoute view="payouts" active="payouts" />} />
+        <Route path="/admin/disputes" element={<AdminRoute view="disputes" active="disputes" />} />
+        <Route path="/admin/currencies" element={<AdminRoute view="currencies" active="currencies" />} />
+        <Route path="/admin/payments" element={<AdminRoute view="payments" active="payments" />} />
         <Route path="/admin/:section" element={<AdminRoute view="soon" active="" />} />
 
         {/* The console, BEFORE the storefront's /:store — react-router prefers the more specific path either

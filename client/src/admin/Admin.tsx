@@ -15,16 +15,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { ApiFailure, api } from '../app/api.ts';
 import { Alert, Button, Spinner } from '../shared/ui/index.ts';
-import { adminApi } from './adminApi.ts';
+import { adminApi, adminMoneyApi } from './adminApi.ts';
 import type { Me } from './adminApi.ts';
 import { NAV, initial } from './adminLines.ts';
 
-export type AdminView = 'overview' | 'merchants' | 'kyc' | 'soon';
+export type AdminView = 'overview' | 'merchants' | 'kyc' | 'payouts' | 'disputes' | 'currencies' | 'payments' | 'soon';
 
 type AdminContextValue = {
   me: Me;
   navigate: (to: string) => void;
-  badges: { merchants: number; kyc: number };
+  badges: { merchants: number; kyc: number; disputes: number };
   refreshBadges: () => void;
 };
 
@@ -44,17 +44,17 @@ type Props = {
   children: (me: Me) => ReactNode;
   /** The render gate's seam: effects do not run in static markup. */
   initialMe?: Me;
-  initialBadges?: { merchants: number; kyc: number };
+  initialBadges?: { merchants: number; kyc: number; disputes?: number };
 };
 
 export function Admin({ active, navigate, children, initialMe, initialBadges }: Props): ReactNode {
   const [me, setMe] = useState<Me | null>(initialMe ?? null);
   const [state, setState] = useState<'loading' | 'ready' | 'refused' | 'failed'>(initialMe === undefined ? 'loading' : 'ready');
-  const [badges, setBadges] = useState(initialBadges ?? { merchants: 0, kyc: 0 });
+  const [badges, setBadges] = useState<{ merchants: number; kyc: number; disputes: number }>({ merchants: 0, kyc: 0, disputes: 0, ...initialBadges });
 
   const refreshBadges = useCallback((): void => {
-    void Promise.all([adminApi.queue(), adminApi.merchants({ tab: 'pending', q: '', industry: '', plan: '' })])
-      .then(([q, m]) => setBadges({ kyc: q.queue.length, merchants: m.counts.pending }))
+    void Promise.all([adminApi.queue(), adminApi.merchants({ tab: 'pending', q: '', industry: '', plan: '' }), adminMoneyApi.disputes('refunds').catch(() => null)])
+      .then(([q, m, d]) => setBadges({ kyc: q.queue.length, merchants: m.counts.pending, disputes: d === null ? 0 : d.counts.refunds + d.counts.disputes }))
       .catch(() => undefined);
   }, []);
 

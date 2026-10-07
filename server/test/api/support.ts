@@ -153,11 +153,16 @@ async function deleteAppendOnlyAsOwner(stores: readonly string[]): Promise<void>
     // ONLY the ones that name a complaint and are not yet decided: an APPROVED refund is part of its order's record
     // (orders.refunded_amount must equal their sum), and deleting one early makes the order's own check refuse.
     await owner.query(`DELETE FROM refunds WHERE store_id = ANY($1::uuid[]) AND complaint_id IS NOT NULL AND status <> 'approved'`, [stores]);
+    // Milestone 27: a platform decision on an ESCALATED complaint leaves an APPROVED refund that names it. The refund stays — it is
+    // part of its order's record — so it lets go of the complaint instead, which is the one thing that has to be gone first.
+    await owner.query(`UPDATE refunds SET complaint_id = NULL WHERE store_id = ANY($1::uuid[]) AND complaint_id IS NOT NULL AND status = 'approved'`, [stores]);
     await owner.query(`DELETE FROM complaint_evidence WHERE store_id = ANY($1::uuid[])`, [stores]);
     await owner.query(`DELETE FROM complaint_events WHERE store_id = ANY($1::uuid[])`, [stores]);
     await owner.query(`DELETE FROM complaints WHERE store_id = ANY($1::uuid[])`, [stores]);
     await owner.query(`DELETE FROM wallet_ledger WHERE store_id = ANY($1::uuid[])`, [stores]);
-    await owner.query(`DELETE FROM audit_log WHERE store_id = ANY($1::uuid[])`, [stores]);
+    // Milestone 27: a platform admin's configuration changes (a currency, a payment method) name no store, so they are found by who
+    // made them — the fixture platform user's id begins with the fixtures' own prefix, which nothing real does.
+    await owner.query(`DELETE FROM audit_log WHERE store_id = ANY($1::uuid[]) OR actor_id::text LIKE 'eeeeeeee-%'`, [stores]);
 
     await owner.query('ALTER TABLE complaint_evidence ENABLE TRIGGER complaint_evidence_no_update');
     await owner.query('ALTER TABLE complaint_events ENABLE TRIGGER complaint_events_no_update');

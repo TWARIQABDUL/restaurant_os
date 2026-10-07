@@ -105,3 +105,116 @@ export const adminApi = {
   decide: (id: string, outcome: 'approve' | 'reject' | 'redo', note: string, part?: 'front' | 'back' | 'video'): Promise<CaseDetail> =>
     api.post<CaseDetail>(`/api/admin/kyc/${id}/decision`, { outcome, ...(note === '' ? {} : { note }), ...(part === undefined ? {} : { part }) }),
 };
+
+// ---------------------------------------------------------------------------
+// Part B — money and configuration
+// ---------------------------------------------------------------------------
+
+export type PayoutTab = 'problem' | 'held' | 'live' | 'done';
+
+export type PayoutRow = {
+  id: string;
+  storeId: string;
+  store: string;
+  kind: 'Automatic' | 'Manual' | 'Held';
+  destination: string;
+  amount: number;
+  at: string | null;
+  status: 'failed' | 'held' | 'processing' | 'completed' | 'rejected';
+  note: string;
+  canRetry: boolean;
+};
+
+export type PayoutsPage = {
+  tab: PayoutTab;
+  rows: PayoutRow[];
+  counts: Record<PayoutTab, number>;
+  kpis: { runTotal: number; runStores: number; failed: number; held: number; holdMinutes: number };
+};
+
+export type DisputeTab = 'refunds' | 'disputes' | 'closed';
+export type DisputeKind = 'refund' | 'dispute';
+
+export type DisputeItem = {
+  kind: DisputeKind;
+  id: string;
+  title: string;
+  store: string;
+  storeId: string;
+  order: number;
+  customer: string;
+  ageHours: number;
+  status: 'open' | 'approved' | 'queued' | 'rejected';
+};
+
+export type DisputeDetail = {
+  kind: DisputeKind;
+  id: string;
+  title: string;
+  status: DisputeItem['status'];
+  store: { id: string; name: string };
+  order: { id: string; number: number; items: { label: string; amount: string }[]; total: string; refunded: string; payment: string; line: string };
+  customer: string;
+  requested: string;
+  maxRefund: string;
+  wallet: { available: string; pending: string };
+  history: string;
+  thread: { who: string; side: 'customer' | 'store' | 'platform' | 'rider' | 'system'; at: string; text: string }[];
+  evidence: { label: string; side: string }[];
+  closedNote: string | null;
+  refundBlocked: string | null;
+};
+
+export type Currency = {
+  code: string;
+  name: string;
+  symbol: string;
+  position: 'before' | 'after';
+  decimals: 0 | 2;
+  separator: ',' | ' ' | '.';
+  rounding: 0 | 10 | 50 | 100 | 500;
+  enabled: boolean;
+  isDefault: boolean;
+  rateSource: 'feed' | 'manual';
+  usdRate: number | null;
+  rateUpdatedAt: string | null;
+  tag: string;
+  usage: string;
+  lockedReason: string | null;
+};
+
+export type CurrencyPatch = Partial<{ symbol: string; position: string; decimals: number; separator: string; rounding: number; enabled: boolean; rateSource: string; usdRate: number | null }>;
+
+export type MethodStatus = 'draft' | 'live' | 'paused';
+export type MethodRow = { key: string; name: string; short: string; kind: 'online' | 'offline'; status: MethodStatus; countries: string[]; currencies: string[] };
+export type MethodDetail = MethodRow & {
+  provider: string | null;
+  webhook: string | null;
+  customerLabel: string;
+  customerHint: string;
+  incidentNote: string | null;
+  limits: { currency: string; min: number | null; max: number | null }[];
+  stores: number;
+  health: { rate: number | null; attempts: number };
+  readiness: { key: string; label: string; ok: boolean; sub: string }[];
+  history: { at: string; who: string; what: string }[];
+  catalogue: { countries: { code: string; name: string; enabled: boolean }[]; currencies: { code: string; enabled: boolean }[] };
+};
+export type MethodPatch = Partial<{ countries: string[]; currencies: { code: string; min: number | null; max: number | null }[]; customerLabel: string; customerHint: string; incidentNote: string | null }>;
+
+export const adminMoneyApi = {
+  payouts: (tab: PayoutTab): Promise<PayoutsPage> => api.get<PayoutsPage>(`/api/admin/payouts?tab=${tab}`),
+  retry: (id: string): Promise<{ withdrawalId: string; replay: boolean }> => api.post<{ withdrawalId: string; replay: boolean }>(`/api/admin/payouts/${id}/retry`),
+
+  disputes: (tab: DisputeTab): Promise<{ items: DisputeItem[]; counts: Record<DisputeTab, number> }> => api.get<{ items: DisputeItem[]; counts: Record<DisputeTab, number> }>(`/api/admin/disputes?tab=${tab}`),
+  dispute: (kind: DisputeKind, id: string): Promise<DisputeDetail> => api.get<DisputeDetail>(`/api/admin/disputes/${kind}/${id}`),
+  decide: (kind: DisputeKind, id: string, d: { outcome: 'approve' | 'reject'; note: string; amount?: string }): Promise<DisputeDetail> => api.post<DisputeDetail>(`/api/admin/disputes/${kind}/${id}/decision`, d),
+
+  currencies: (): Promise<{ currencies: Currency[] }> => api.get<{ currencies: Currency[] }>('/api/admin/currencies'),
+  saveCurrency: (code: string, patch: CurrencyPatch): Promise<Currency> => api.put<Currency>(`/api/admin/currencies/${code}`, patch),
+
+  methods: (): Promise<{ methods: MethodRow[] }> => api.get<{ methods: MethodRow[] }>('/api/admin/payment-methods'),
+  method: (key: string): Promise<MethodDetail> => api.get<MethodDetail>(`/api/admin/payment-methods/${key}`),
+  saveMethod: (key: string, patch: MethodPatch): Promise<MethodDetail> => api.put<MethodDetail>(`/api/admin/payment-methods/${key}`, patch),
+  setMethodStatus: (key: string, action: 'publish' | 'pause' | 'resume'): Promise<MethodDetail> => api.post<MethodDetail>(`/api/admin/payment-methods/${key}/${action}`),
+};

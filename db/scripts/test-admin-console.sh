@@ -70,5 +70,13 @@ refuses "and it is back to being held by the identity gate alone" "not been veri
 equals "the function still carries V012's two other holds" "t" \
     "SELECT (prosrc LIKE '%store_is_verified%' AND prosrc LIKE '%queued%') FROM pg_proc WHERE proname = 'request_withdrawal'"
 
+step "The two platform permissions the configuration screens ask for (V031)"
+equals "super_admin holds both" "currencies.manage|payment_methods.manage" \
+    "SELECT string_agg(permission, '|' ORDER BY permission) FROM role_permissions WHERE scope = 'platform' AND role = 'super_admin' AND permission IN ('payment_methods.manage','currencies.manage')"
+equals "and no store role holds either — a merchant, however senior, cannot switch a provider off for everyone" "0" \
+    "SELECT count(*) FROM role_permissions WHERE scope = 'store' AND permission IN ('payment_methods.manage','currencies.manage')"
+refuses "a store role cannot be granted a platform permission by mistake" "role_permissions" \
+    "INSERT INTO role_permissions (scope, role, permission) VALUES ('platform', 'owner', 'currencies.manage')"
+
 printf '\n%s\n' "$PASSED passed, $FAILED failed."
 [ "$FAILED" -eq 0 ]
