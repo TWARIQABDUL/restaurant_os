@@ -11,6 +11,7 @@
 // a thirteenth value, and a 2px difference on one button is a cheaper loss than a token nobody reuses.
 
 import type { ReactNode } from 'react';
+import { api } from '../app/api.ts';
 import { MOBILE_TABS, NAV_GROUPS, hrefFor, iconPath, maySee } from './nav.ts';
 import type { BadgeKey, NavIcon } from './nav.ts';
 import { useShell } from './ShellProvider.tsx';
@@ -204,6 +205,17 @@ export function Sidebar({ active, unread, onOpenNotifications, navigate }: Props
             <span className="text-[12px] text-muted">{me.role === null ? 'Staff' : ROLE_LABELS[me.role] ?? me.role}</span>
           </span>
         </div>
+        {/* DELETE /api/session clears the cookie; it is unauthenticated on purpose, so an expired session can still clean
+            itself up. A full navigation, not a router push: nothing from this person's session should survive in memory. */}
+        <button
+          type="button"
+          onClick={() => {
+            void api.delete('/api/session').catch(() => undefined).finally(() => window.location.assign('/signin'));
+          }}
+          className="flex h-10 items-center justify-center rounded-control text-caption font-semibold text-ink-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          Sign out
+        </button>
       </div>
     </nav>
   );

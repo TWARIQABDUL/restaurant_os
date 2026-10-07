@@ -21,6 +21,12 @@ import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from '
 import type { ReactNode } from 'react';
 import { AuthPage } from '../auth/AuthPage.tsx';
 import { Onboarding } from '../onboarding/Onboarding.tsx';
+import { Admin, SoonPage } from '../admin/Admin.tsx';
+import type { AdminView } from '../admin/Admin.tsx';
+import { NAV } from '../admin/adminLines.ts';
+import { Kyc } from '../admin/Kyc.tsx';
+import { Merchants } from '../admin/Merchants.tsx';
+import { Overview as AdminOverview } from '../admin/Overview.tsx';
 import { Console } from '../console/Console.tsx';
 import type { ConsoleView } from '../console/Console.tsx';
 import { Rider } from '../rider/Rider.tsx';
@@ -94,6 +100,23 @@ function RiderRoute(): ReactNode {
   return <Rider slug={slug} navigate={(to) => navigate(to)} />;
 }
 
+/**
+ * The Vendlyfy team's console (milestone 27). `/admin` is where Auth sends the team after the two-step code. `admin` is a
+ * reserved slug (V001), so none of these can collide with a storefront. Destinations not built yet share one honest page
+ * inside the same frame, with their own sidebar item highlighted, instead of the storefront's "No shop at this address".
+ */
+function AdminRoute({ view, active }: { view: AdminView; active: string }): ReactNode {
+  const navigate = useNavigate();
+  const params = useParams();
+  const go = (to: string): void => void navigate(to);
+  const unbuilt = NAV.flatMap((g) => g.items).find((i) => i.id === (params['section'] ?? active));
+  return (
+    <Admin view={view} active={view === 'soon' ? (unbuilt?.id ?? '') : active} navigate={go}>
+      {() => (view === 'overview' ? <AdminOverview /> : view === 'merchants' ? <Merchants /> : view === 'kyc' ? <Kyc /> : <SoonPage label={unbuilt?.label ?? 'This screen'} />)}
+    </Admin>
+  );
+}
+
 function SignupRoute(): ReactNode {
   const navigate = useNavigate();
   return <Onboarding navigate={(to) => navigate(to)} />;
@@ -108,6 +131,10 @@ export function AppRoutes(): ReactNode {
         <Route path="/invite/:token" element={<AuthPage />} />
         {/* Milestone 26: a stranger becomes a merchant. `signup` is reserved at the column (V001), so it cannot be a store. */}
         <Route path="/signup" element={<SignupRoute />} />
+        <Route path="/admin" element={<AdminRoute view="overview" active="overview" />} />
+        <Route path="/admin/merchants" element={<AdminRoute view="merchants" active="merchants" />} />
+        <Route path="/admin/kyc" element={<AdminRoute view="kyc" active="kyc" />} />
+        <Route path="/admin/:section" element={<AdminRoute view="soon" active="" />} />
 
         {/* The console, BEFORE the storefront's /:store — react-router prefers the more specific path either
             way, and V001 refuses `app` as a slug at the column, so the two cannot collide. */}

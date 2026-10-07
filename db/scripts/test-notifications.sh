@@ -109,15 +109,17 @@ accepts "the fixtures" \
 verify_store "Nyama & Co." "${S1}" "${ALINE}" "${VENDLY}"
 
 # =============================================================================
-step "The eight the board draws, plus V022's order_cancelled, all seeded"
+step "The eight the board draws, plus V022's order_cancelled and V029's two identity decisions, all seeded"
 # =============================================================================
 # Nine, not eight, since milestone 20: order_cancelled is a different sentence from order_declined — a
 # cancellation after acceptance, not a decline before it — so V022 added a ninth row rather than reusing one.
-equals "nine types, all active" "9|9" \
+equals "eleven types, all active" "11|11" \
     "SELECT count(*) || '|' || count(*) FILTER (WHERE is_active) FROM notification_types"
 equals "exactly one of them raises the alert, and it is the new order" "order_placed" \
     "SELECT code FROM notification_types WHERE is_alert"
-equals "the two money ones do not reach a manager" "identity_verified|payout_sent" \
+# V029 added identity_retake and identity_rejected, both for owners and admins: an identity decision is about the person who owns
+# the money, and "can't see payouts, the wallet or store settings" is what Auth promised a manager.
+equals "the money ones and the identity ones do not reach a manager" "identity_rejected|identity_retake|identity_verified|payout_sent" \
     "SELECT string_agg(code,'|' ORDER BY code) FROM notification_types
       WHERE NOT ('manager' = ANY (visible_to_roles))"
 equals "no type reaches a rider's inbox" "0" \

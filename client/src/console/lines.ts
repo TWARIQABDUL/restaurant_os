@@ -164,6 +164,12 @@ export function notificationLine(n: Notification, currency: CurrencyFormat): Not
     case 'identity_verified':
       return line('Identity verified', 'Payouts are unlocked', 'id');
 
+    case 'identity_retake':
+      return line('One photo needs retaking', 'Open your identity check to see which', 'id');
+
+    case 'identity_rejected':
+      return line('We couldn’t verify your identity', 'Open your identity check to see why', 'id');
+
     default:
       // A type this build does not know. The code is readable enough to act on — `order_returned` reads as
       // "Order returned" — and the row still leads somewhere, because the route came from the database.

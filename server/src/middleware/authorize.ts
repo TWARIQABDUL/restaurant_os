@@ -175,11 +175,19 @@ export function requireStorePermission(permission: string): RequestHandler {
   return guard(storeIdFromParams, permission);
 }
 
-// THERE IS NO requirePlatformPermission HERE, and its absence is deliberate. `guard()`
-// would support it in one line — `guard(() => null, 'kyc.review')` — but no route in this
-// app needs it until the admin console at milestone 27, and an untested branch in the file
-// that decides who may do what is worse than three lines somebody has to write later.
-// Milestone 27 adds it together with the escalation tests for the platform scope.
+/**
+ * Requires a PLATFORM permission — 'kyc.review', 'stores.suspend', 'audit.read' — which names no store.
+ *
+ * This was deliberately absent until the admin console (milestone 27) existed to need it: "an untested branch in the file
+ * that decides who may do what is worse than three lines somebody has to write later". It arrives with its escalation
+ * tests (test/api/admin.test.ts), and it is the same `guard()` the store routes use, with nothing in the path to resolve:
+ * loadAuthContext() with no store yields the platform role's permissions and NO store permissions, so a store owner
+ * holding `wallet.read` everywhere they work still gets a 403 here, and a platform admin gets no merchant-console access
+ * from this guard either — the two scopes cannot be confused by a route mounted under the wrong prefix.
+ */
+export function requirePlatformPermission(permission: string): RequestHandler {
+  return guard(() => null, permission);
+}
 
 /**
  * Authenticates and loads the caller's context without requiring any permission.

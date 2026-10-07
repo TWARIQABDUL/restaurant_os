@@ -59,6 +59,12 @@ import { storeLookVariables, storeThemeVariables } from '../src/styles/store-the
 import { Analytics } from '../src/console/Analytics.tsx';
 import { Settings } from '../src/console/Settings.tsx';
 import { Verify } from '../src/console/Verify.tsx';
+import { Admin, SoonPage } from '../src/admin/Admin.tsx';
+import type { CaseDetail, MerchantDetail, MerchantList, Me as AdminMe, Overview as AdminOverviewData, QueueItem } from '../src/admin/adminApi.ts';
+import { ageText, compactMoney, degradedNote, kpiDelta, kpiValue, overSla, rowBadge } from '../src/admin/adminLines.ts';
+import { Kyc as AdminKyc } from '../src/admin/Kyc.tsx';
+import { Merchants as AdminMerchants } from '../src/admin/Merchants.tsx';
+import { Overview as AdminOverview } from '../src/admin/Overview.tsx';
 import { BlockedView, CameraView, TipsView } from '../src/console/FaceCapture.tsx';
 import type { KycStatus } from '../src/console/kycApi.ts';
 import { BLUR_BELOW, GLARE_ABOVE, PROMPTS, RETENTION_LINE, glareShare, outcomeCopy, partRow, photoChecks, pickVideoType, promptAt, retakePartOf, sentLine, sharpness } from '../src/console/kycLines.ts';
@@ -1824,6 +1830,122 @@ expect(accountProblem({ name: 'Aline', email: 'nope', phone: '', password: 'a-lo
 expect(businessReady('Nyama', 'food', true) && !businessReady('N', 'food', true) && !businessReady('Nyama', null, true) && !businessReady('Nyama', 'food', false), 'the first step needs a name, a type and a free address');
 expect(whatFor(null).product === 'Your product' && whatFor(OTHER).category === 'General' && whatFor('made-up').sets.length > 0, 'a type the board never drew still gets a sensible example');
 expect(cleanPrice('1,500 RWF') === '1500', 'a price is digits');
+
+
+
+// --- milestone 27: the admin console -------------------------------------------------------------------------------
+const ADMIN_ME: AdminMe = { id: 'u9', name: 'Grace Kamanzi', email: 'grace@vendlyfy.example', role: 'super_admin', permissions: ['merchants.read', 'kyc.review', 'stores.suspend', 'audit.read'] };
+const inAdmin = (active: string, node: ReactNode, view: 'overview' | 'merchants' | 'kyc' | 'soon' = 'overview'): ReactNode => (
+  <Admin view={view} active={active} navigate={noop} initialMe={ADMIN_ME} initialBadges={{ merchants: 3, kyc: 2 }}>
+    {() => node}
+  </Admin>
+);
+const OVERVIEW: AdminOverviewData = {
+  range: 'today',
+  kpis: [
+    { key: 'sales', value: 18_400_000, previous: 17_360_000, note: null },
+    { key: 'orders', value: 2318, previous: 2229, note: null },
+    { key: 'stores', value: 1284, previous: null, note: '9 new in this period' },
+    { key: 'signups', value: 14, previous: 10, note: '3 awaiting review' },
+    { key: 'payment', value: 96.8, previous: 98.0, note: null },
+  ],
+  queue: [
+    { kind: 'identity', title: '3 stores waiting for verification', sub: 'Ubwiza Beauty, Kigali Tech Hub, Isoko Fresh · ID and face video uploaded', ageHours: 19, count: 3 },
+    { kind: 'payout', title: 'Payout failed · Inzu Threads', sub: 'MoMo: account name doesn’t match', ageHours: 6, count: 1 },
+    { kind: 'disputes', title: '4 open disputes', sub: 'Oldest: complaint #188 · Nyama & Co.', ageHours: 52, count: 4 },
+    { kind: 'template', title: 'Pharmacy template in draft', sub: 'Ready for review before it’s offered at sign-up', ageHours: 72, count: 1 },
+  ],
+  providers: [
+    { key: 'mtn_momo', name: 'MTN MoMo', short: 'MTN', rate: 98.9, attempts: 120, status: 'operational', note: null },
+    { key: 'airtel_money', name: 'Airtel Money', short: 'AIRTEL', rate: 91.2, attempts: 40, status: 'degraded', note: null },
+    { key: 'mpesa', name: 'M-Pesa', short: 'M-PESA', rate: null, attempts: 0, status: 'paused', note: null },
+  ],
+  industries: [{ name: 'Food & drinks', amount: 7_500_000, share: 0.41 }, { name: 'Fashion', amount: 3_500_000, share: 0.19 }, { name: 'Other', amount: 700_000, share: 0.04 }],
+  activity: [
+    { at: new Date(2026, 8, 23, 14, 2).toISOString(), who: 'Grace Kamanzi', what: 'Approved identity · Claudine Mukamana' },
+    { at: new Date(2026, 8, 23, 12, 15).toISOString(), who: 'Grace Kamanzi', what: 'Suspended Deals4U · counterfeit goods' },
+  ],
+};
+const mrow = (id: string, name: string, status: 'pending' | 'active' | 'suspended', identity: MerchantDetail['identity'], over: Partial<MerchantDetail> = {}): MerchantDetail => ({
+  id, slug: name.toLowerCase().replace(/[^a-z]+/g, '-'), name, status, identity, identityCaseId: identity === 'in_review' ? 'k1' : null, owner: { name: 'Claudine Mukamana', phone: '078 455 1209' }, industry: 'Beauty', plan: 'starter', sales30: 0, createdAt: new Date().toISOString(),
+  orders: 0, openDisputes: 0, suspension: null, payout: 'MTN MoMo 078 ••• 1209',
+  checks: [{ key: 'identity', label: 'Owner’s identity', state: identity === 'approved' ? 'ok' : 'warn', note: identity === 'approved' ? 'Verified' : 'Waiting for your decision' }, { key: 'payout', label: 'Payout account', state: 'ok', note: 'MTN MoMo · manual' }, { key: 'methods', label: 'Payment methods', state: 'ok', note: '2 connected' }],
+  ...over,
+});
+const M_PENDING = mrow('m1', 'Ubwiza Beauty', 'active', 'in_review');
+const M_LIVE = mrow('m2', 'Nyama & Co.', 'active', 'approved', { sales30: 3_900_000, orders: 612, openDisputes: 1, plan: 'growth', industry: 'Food & drinks' });
+const M_SUSPENDED = mrow('m3', 'Deals4U', 'suspended', 'approved', { suspension: { reason: 'prohibited or counterfeit goods', note: null, at: new Date().toISOString(), by: 'Grace Kamanzi' } });
+const mlist = (rows: MerchantDetail[], counts = { pending: 3, active: 1282, suspended: 11 }): MerchantList => ({ rows, hasMore: false, counts, filters: { industries: [{ key: 'food', name: 'Food & drinks' }, { key: 'beauty', name: 'Beauty' }], plans: [{ key: 'starter', name: 'Starter' }, { key: 'growth', name: 'Growth' }] } });
+const KYC_QUEUE: QueueItem[] = [
+  { id: 'k1', reference: 5521, owner: 'Claudine Mukamana', store: 'Ubwiza Beauty', storeId: 'm1', documentType: 'national_id', ageHours: 19, flag: { tone: 'ok', label: 'Ready to decide' } },
+  { id: 'k2', reference: 5522, owner: 'Olivier Habimana', store: 'Kigali Tech Hub', storeId: 'm4', documentType: 'national_id', ageHours: 30, flag: { tone: 'bad', label: 'ID used by another store' } },
+  { id: 'k3', reference: 5523, owner: 'Jean Bosco Nkurunziza', store: 'Isoko Fresh', storeId: 'm5', documentType: 'passport', ageHours: 2, flag: { tone: 'warn', label: 'ID number not entered' } },
+];
+const KYC_CASE: CaseDetail = {
+  id: 'k1', reference: 5521, status: 'in_review', storeId: 'm1', storeName: 'Ubwiza Beauty', storeSlug: 'ubwiza', owner: 'Claudine Mukamana', documentType: 'national_id', submittedAt: new Date().toISOString(), decisionNote: null,
+  documents: [{ part: 'face_video', contentType: 'video/webm', byteSize: 900000, purged: false, outcome: null }, { part: 'id_back', contentType: 'image/jpeg', byteSize: 400000, purged: false, outcome: null }, { part: 'id_front', contentType: 'image/jpeg', byteSize: 410000, purged: false, outcome: null }],
+  checks: [
+    { code: 'document_genuine', label: 'Document looks genuine', by: 'reviewer', state: 'pass', note: 'Looks right' },
+    { code: 'face_in_view', label: 'Face in view for all 5 s', by: 'reviewer', state: 'open', note: 'Your call' },
+    { code: 'liveness', label: 'Live person', by: 'reviewer', state: 'warn', note: 'Unsure' },
+    { code: 'face_matches_document', label: 'Face matches ID photo', by: 'reviewer', state: 'open', note: 'Your call' },
+    { code: 'name_matches_account', label: 'Name on the ID is the name on the account', by: 'computed', state: 'pass', note: 'Same words' },
+    { code: 'not_used_by_another_store', label: 'Not used by another store', by: 'computed', state: 'fail', note: 'Also on Kigali Tech Hub' },
+  ],
+  fields: { fullName: 'MUKAMANA Claudine', accountName: 'Claudine Mukamana', dateOfBirth: '1994-03-14', expiresOn: '2031-06-01', idNumberMasked: '1199 ••••••• 3018', hasIdNumber: true },
+};
+
+const adminParts: readonly (readonly [string, ReactNode])[] = [
+  ['Admin · overview', inAdmin('overview', <AdminOverview initial={OVERVIEW} />)],
+  ['Admin · overview, quiet', inAdmin('overview', <AdminOverview initialRange="week" initial={{ ...OVERVIEW, range: 'week', queue: [], providers: [{ key: 'mtn_momo', name: 'MTN MoMo', short: 'MTN', rate: null, attempts: 0, status: 'quiet', note: null }], industries: [], activity: [], kpis: OVERVIEW.kpis.map((k) => ({ ...k, value: k.key === 'payment' ? null : 0, previous: 0 })) }} />)],
+  ['Admin · merchants, needs review', inAdmin('merchants', <AdminMerchants initialList={mlist([M_PENDING])} initialDetail={M_PENDING} />, 'merchants')],
+  ['Admin · merchants, live', inAdmin('merchants', <AdminMerchants initialTab="active" initialList={mlist([M_LIVE, M_PENDING])} initialDetail={M_LIVE} />, 'merchants')],
+  ['Admin · merchants, suspended', inAdmin('merchants', <AdminMerchants initialTab="suspended" initialList={mlist([M_SUSPENDED])} initialDetail={M_SUSPENDED} />, 'merchants')],
+  ['Admin · merchants, suspend dialog', inAdmin('merchants', <AdminMerchants initialTab="active" initialList={mlist([M_LIVE])} initialDetail={M_LIVE} initialConfirm="suspend" />, 'merchants')],
+  ['Admin · merchants, none', inAdmin('merchants', <AdminMerchants initialList={mlist([], { pending: 0, active: 0, suspended: 0 })} />, 'merchants')],
+  ['Admin · identity checks, a case', inAdmin('kyc', <AdminKyc initialQueue={KYC_QUEUE} initialCase={KYC_CASE} />, 'kyc')],
+  ['Admin · identity checks, photos shown and number revealed', inAdmin('kyc', <AdminKyc initialQueue={KYC_QUEUE} initialCase={KYC_CASE} initialShown initialRevealed="1199470048213018" />, 'kyc')],
+  ['Admin · identity checks, a deleted video on a decided case', inAdmin('kyc', <AdminKyc initialQueue={[]} initialCase={{ ...KYC_CASE, status: 'approved', decisionNote: null, documents: KYC_CASE.documents.map((d) => (d.part === 'face_video' ? { ...d, purged: true } : d)) }} initialShown />, 'kyc')],
+  ['Admin · identity checks, all caught up', inAdmin('kyc', <AdminKyc initialQueue={[]} />, 'kyc')],
+  ['Admin · a screen not built yet', inAdmin('payouts', <SoonPage label="Payouts" />, 'soon')],
+];
+const adminHtml: string[] = [];
+for (const [name, node] of adminParts) {
+  const html = render(name, node);
+  allHtml += html;
+  adminHtml.push(html);
+}
+const adminAt = (i: number): string => adminHtml[i]!.replace(/<[^>]+>/g, ' ').replaceAll('&amp;', '&').replaceAll('&#x27;', "'").replace(/\s+/g, ' ');
+expect(adminHtml.length === adminParts.length, 'every admin part rendered');
+expect(adminAt(0).includes('Platform overview') && adminAt(0).includes('Needs review') && adminAt(0).includes('Payment providers') && adminAt(0).includes('Sales by industry') && adminAt(0).includes('Recent admin activity'), 'the overview\'s five panels');
+expect(adminAt(0).includes('18.4M RWF') && adminAt(0).includes('+6% vs yesterday') && adminAt(0).includes('96.8%') && adminAt(0).includes('−1.2 pts vs yesterday'), 'figures and deltas are computed, with the sign the board uses');
+expect(adminAt(0).includes('Airtel Money') && adminAt(0).includes('Degraded') && adminAt(0).includes('may take longer'), 'a slow provider is called out, and what customers see');
+expect(!adminAt(0).includes('Cards') && !adminAt(0).includes('SMS receipts') && !adminAt(0).includes('Flagged payment'), 'nothing the system does not produce is drawn');
+expect(adminAt(1).includes('All caught up.') && adminAt(1).includes('No traffic') && adminAt(1).includes('No paid orders yet.') && adminAt(1).includes('Nothing recorded yet.'), 'every panel has an empty state');
+expect(adminAt(0).includes('Identity checks') && adminAt(0).includes('Admin team & roles') && adminAt(0).includes('Platform settings') && adminHtml[0]!.includes('aria-disabled="true"'), 'the sidebar lists all thirteen and greys what is not built');
+expect(adminAt(0).includes('Grace Kamanzi') && adminAt(0).includes('Super admin') && adminAt(0).includes('Sign out'), 'who is signed in');
+expect(adminAt(2).includes('Needs review') && adminAt(2).includes('Verification') && adminAt(2).includes('Review identity') && !adminAt(2).includes('Approve and go live'), 'a store waiting on its identity check hands over to the review');
+expect(adminAt(3).includes('Open store') && adminAt(3).includes('Suspend store') && !adminAt(3).includes('View as merchant'), 'a live store: open it or suspend it — and no impersonation promise');
+expect(adminAt(4).includes('Suspended:') && adminAt(4).includes('counterfeit goods') && adminAt(4).includes('Reinstate store') && adminAt(4).includes('payouts are held'), 'a suspended store says why and what is held');
+expect(adminAt(5).includes('Suspend Nyama & Co.?') && adminAt(5).includes('Documents unclear or don’t match') && adminAt(5).includes('Keep as is') && adminAt(5).includes('Internal note'), 'the suspend dialog\'s reasons are the board\'s four');
+expect(adminAt(6).includes('Nothing here') && adminAt(6).includes('No merchants match this view.'), 'no merchants');
+expect(adminAt(7).includes('Identity checks') && adminAt(7).includes('ID used by another store') && adminAt(7).includes('Ready to decide') && adminAt(7).includes('Show photos') && adminAt(7).includes('Viewing is recorded in the audit log.'), 'the queue, its flags, and the honest note about viewing');
+expect(!adminHtml[7]!.includes('<img') && !adminHtml[7]!.includes('<video src'), 'photos are not loaded until somebody asks — each load is an audit entry');
+expect(adminAt(7).includes('Two are worked out by the system; four are your own call.') && adminAt(7).includes('System') && adminAt(7).includes('Also on Kigali Tech Hub') && adminAt(7).includes('Unsure'), 'who made each check');
+expect(adminAt(7).includes('Show full ID number') && adminAt(7).includes('recorded in the audit log, with your reason') && !adminAt(7).includes('1199470048213018'), 'the number is masked until asked for');
+expect(adminHtml[8]!.includes('/api/admin/kyc/k1/documents/id_front') && adminHtml[8]!.includes('<video') && adminAt(8).includes('1199470048213018'), 'once asked, the photos load from the audited route and the number shows');
+expect(adminAt(9).includes('Deleted') && adminAt(9).includes('This check is approved.'), 'a deleted video says so, and a decided case is read-only');
+expect(adminAt(7).includes('Approve identity') && adminAt(7).includes('Ask them to redo…') && adminAt(7).includes('Send request') && adminAt(7).includes('Reject') && adminAt(7).includes('The face video is deleted automatically as soon as you decide.'), 'the decision panel, with the retention line that is true');
+expect(!adminAt(7).includes('[RETENTION PERIOD]') && !adminAt(7).includes('SMS'), 'no placeholder, no SMS');
+expect(adminAt(10).includes('All caught up.'), 'an empty queue');
+expect(adminAt(11).includes('This screen isn’t built yet.') && adminAt(11).includes('Payouts'), 'a not-yet screen is an honest page');
+
+expect(compactMoney(18_400_000) === '18.4M RWF' && compactMoney(121_000_000) === '121M RWF' && compactMoney(640_000) === '640K RWF' && compactMoney(900) === '900 RWF', 'headline money');
+expect(kpiValue({ key: 'payment', value: null, previous: null, note: null }) === '—' && kpiValue({ key: 'orders', value: 2318, previous: 0, note: null }) === '2,318', 'a missing figure is a dash, never 0%');
+expect(kpiDelta({ key: 'orders', value: 5, previous: 0, note: null }, 'week').text === 'New vs the 7 days before' && kpiDelta({ key: 'sales', value: 0, previous: 0, note: null }, 'today').text === 'No change', 'no division by zero');
+expect(ageText(0.2) === '12 min' && ageText(19) === '19 h' && ageText(72) === '3 d' && overSla(30) && !overSla(2), 'ages and the SLA');
+expect(degradedNote(OVERVIEW.providers) === 'Airtel Money is slow.' && degradedNote([]) === null, 'the degraded note names the provider');
+expect(rowBadge({ status: 'active', identity: 'in_review' }).label === 'Needs review' && rowBadge({ status: 'active', identity: 'approved' }).label === 'Live' && rowBadge({ status: 'suspended', identity: 'approved' }).label === 'Suspended', 'a live store waiting on its check reads as needing review');
 
 
 // --- Settings: the rules that live outside the JSX ---------------------------------

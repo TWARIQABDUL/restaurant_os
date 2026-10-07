@@ -55,6 +55,7 @@ export async function dueAutomaticPayouts(storeIds: readonly string[] | null = n
         AND w.available_balance > 0
         AND store_local(ps.store_id, now())::time >= ps.automatic_at
         AND store_is_verified(ps.store_id)
+        AND (SELECT status FROM stores WHERE id = ps.store_id) = 'active'
         AND ($1::uuid[] IS NULL OR ps.store_id = ANY($1::uuid[]))
         AND NOT EXISTS (
           SELECT 1 FROM withdrawals wd
