@@ -23,12 +23,17 @@ import { AuthPage } from '../auth/AuthPage.tsx';
 import { Onboarding } from '../onboarding/Onboarding.tsx';
 import { Admin, SoonPage } from '../admin/Admin.tsx';
 import type { AdminView } from '../admin/Admin.tsx';
-import { NAV } from '../admin/adminLines.ts';
+import { AdminOrders } from '../admin/AdminOrders.tsx';
+import { AdminSettings } from '../admin/AdminSettings.tsx';
+import { AuditLog } from '../admin/AuditLog.tsx';
 import { Currencies } from '../admin/Currencies.tsx';
 import { Disputes } from '../admin/Disputes.tsx';
 import { Kyc } from '../admin/Kyc.tsx';
 import { PaymentMethods } from '../admin/PaymentMethods.tsx';
 import { Payouts } from '../admin/Payouts.tsx';
+import { Plans } from '../admin/Plans.tsx';
+import { Team } from '../admin/Team.tsx';
+import { Templates } from '../admin/Templates.tsx';
 import { Merchants } from '../admin/Merchants.tsx';
 import { Overview as AdminOverview } from '../admin/Overview.tsx';
 import { Console } from '../console/Console.tsx';
@@ -106,17 +111,30 @@ function RiderRoute(): ReactNode {
 
 /**
  * The Vendlyfy team's console (milestone 27). `/admin` is where Auth sends the team after the two-step code. `admin` is a
- * reserved slug (V001), so none of these can collide with a storefront. Destinations not built yet share one honest page
- * inside the same frame, with their own sidebar item highlighted, instead of the storefront's "No shop at this address".
+ * reserved slug (V001), so none of these can collide with a storefront. An address that matches none of them gets the console's own
+ * "nothing here" inside the same frame, instead of the storefront's "No shop at this address".
  */
 function AdminRoute({ view, active }: { view: AdminView; active: string }): ReactNode {
   const navigate = useNavigate();
-  const params = useParams();
   const go = (to: string): void => void navigate(to);
-  const unbuilt = NAV.flatMap((g) => g.items).find((i) => i.id === (params['section'] ?? active));
+  const screens: Partial<Record<AdminView, ReactNode>> = {
+    overview: <AdminOverview />,
+    merchants: <Merchants />,
+    kyc: <Kyc />,
+    payouts: <Payouts />,
+    disputes: <Disputes />,
+    currencies: <Currencies />,
+    payments: <PaymentMethods />,
+    orders: <AdminOrders />,
+    audit: <AuditLog />,
+    settings: <AdminSettings navigate={go} />,
+    team: <Team />,
+    plans: <Plans />,
+    industries: <Templates />,
+  };
   return (
-    <Admin view={view} active={view === 'soon' ? (unbuilt?.id ?? '') : active} navigate={go}>
-      {() => (view === 'overview' ? <AdminOverview /> : view === 'merchants' ? <Merchants /> : view === 'kyc' ? <Kyc /> : view === 'payouts' ? <Payouts /> : view === 'disputes' ? <Disputes /> : view === 'currencies' ? <Currencies /> : view === 'payments' ? <PaymentMethods /> : <SoonPage label={unbuilt?.label ?? 'This screen'} />)}
+    <Admin view={view} active={active} navigate={go}>
+      {() => screens[view] ?? <SoonPage label="Page not found" />}
     </Admin>
   );
 }
@@ -142,6 +160,12 @@ export function AppRoutes(): ReactNode {
         <Route path="/admin/disputes" element={<AdminRoute view="disputes" active="disputes" />} />
         <Route path="/admin/currencies" element={<AdminRoute view="currencies" active="currencies" />} />
         <Route path="/admin/payments" element={<AdminRoute view="payments" active="payments" />} />
+        <Route path="/admin/orders" element={<AdminRoute view="orders" active="orders" />} />
+        <Route path="/admin/audit" element={<AdminRoute view="audit" active="audit" />} />
+        <Route path="/admin/settings" element={<AdminRoute view="settings" active="settings" />} />
+        <Route path="/admin/team" element={<AdminRoute view="team" active="team" />} />
+        <Route path="/admin/plans" element={<AdminRoute view="plans" active="plans" />} />
+        <Route path="/admin/industries" element={<AdminRoute view="industries" active="industries" />} />
         <Route path="/admin/:section" element={<AdminRoute view="soon" active="" />} />
 
         {/* The console, BEFORE the storefront's /:store — react-router prefers the more specific path either

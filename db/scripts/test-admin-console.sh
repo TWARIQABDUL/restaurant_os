@@ -78,5 +78,29 @@ equals "and no store role holds either — a merchant, however senior, cannot sw
 refuses "a store role cannot be granted a platform permission by mistake" "role_permissions" \
     "INSERT INTO role_permissions (scope, role, permission) VALUES ('platform', 'owner', 'currencies.manage')"
 
+step "The team roles, and the settings table (V032)"
+equals "the platform has four roles" "finance|super_admin|support|verification" \
+    "SELECT string_agg(DISTINCT role, '|' ORDER BY role) FROM role_permissions WHERE scope = 'platform'"
+equals "only super_admin may make a teammate" "super_admin" \
+    "SELECT string_agg(role, '|') FROM role_permissions WHERE scope = 'platform' AND permission = 'platform_members.create'"
+equals "only super_admin reads the audit log" "super_admin" \
+    "SELECT string_agg(role, '|') FROM role_permissions WHERE scope = 'platform' AND permission = 'audit.read'"
+equals "a verification person reviews identity and sees stores — and nothing that moves money" "merchants.read|kyc.review" \
+    "SELECT string_agg(permission, '|' ORDER BY permission DESC) FROM role_permissions WHERE scope = 'platform' AND role = 'verification'"
+equals "finance holds every money permission support lacks" "currencies.manage|payment_methods.manage|payouts.process|plans.manage" \
+    "SELECT string_agg(permission, '|' ORDER BY permission) FROM role_permissions WHERE scope = 'platform' AND role = 'finance'
+        AND permission NOT IN (SELECT permission FROM role_permissions WHERE scope = 'platform' AND role = 'support')
+        AND permission NOT IN ('merchants.read', 'refunds.approve', 'disputes.resolve')"
+refuses "a platform role cannot be given to a store member" "role_permissions_scope_role_coherent" \
+    "INSERT INTO role_permissions (scope, role, permission) VALUES ('store', 'finance', 'orders.read')"
+refuses "and a team member's role must be one of the four" "platform_members_role_values" \
+    "INSERT INTO users (id, scope, email, password_hash, name) VALUES ('bbbbbbbb-5000-4000-8000-000000000001', 'platform', 'x@example.com', 'h', 'X');
+     INSERT INTO platform_members (user_id, role) VALUES ('bbbbbbbb-5000-4000-8000-000000000001', 'janitor')"
+equals "the three platform settings are seeded, with the defaults the code used to hold" "automatic_payout_at=\"08:00\"|hold_minutes=60|payout_mode_default=\"manual\"" \
+    "SELECT string_agg(key || '=' || value::text, '|' ORDER BY key) FROM platform_settings"
+refuses "a setting's key is a plain name" "platform_settings_key_format" \
+    "INSERT INTO platform_settings (key, value) VALUES ('Not A Key', '1')"
+accepts "and a setting can be edited" "UPDATE platform_settings SET value = '90' WHERE key = 'hold_minutes'"
+
 printf '\n%s\n' "$PASSED passed, $FAILED failed."
 [ "$FAILED" -eq 0 ]

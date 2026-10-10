@@ -63,6 +63,14 @@ import { Admin, SoonPage } from '../src/admin/Admin.tsx';
 import type { AdminView } from '../src/admin/Admin.tsx';
 import type { CaseDetail, MerchantDetail, MerchantList, Me as AdminMe, Overview as AdminOverviewData, QueueItem } from '../src/admin/adminApi.ts';
 import { ageText, compactMoney, degradedNote, kpiDelta, kpiValue, overSla, rowBadge } from '../src/admin/adminLines.ts';
+import { AdminOrders } from '../src/admin/AdminOrders.tsx';
+import { AdminSettings } from '../src/admin/AdminSettings.tsx';
+import { AuditLog } from '../src/admin/AuditLog.tsx';
+import { Plans as AdminPlans } from '../src/admin/Plans.tsx';
+import { Team as AdminTeam } from '../src/admin/Team.tsx';
+import { Templates as AdminTemplates } from '../src/admin/Templates.tsx';
+import type { AdminOrder, AuditRow, Plan, SettingsPage, TeamPage, TemplateDetail, TemplateSummary } from '../src/admin/adminApi.ts';
+import { HEALTH_DOT, holdNote, mayOpen, orderAge, paymentText, planValue, parseField, startingPassword, templateMeta, NAV } from '../src/admin/adminLines.ts';
 import { Currencies as AdminCurrencies } from '../src/admin/Currencies.tsx';
 import { Disputes as AdminDisputes } from '../src/admin/Disputes.tsx';
 import { Kyc as AdminKyc } from '../src/admin/Kyc.tsx';
@@ -1841,7 +1849,7 @@ expect(cleanPrice('1,500 RWF') === '1500', 'a price is digits');
 
 
 // --- milestone 27: the admin console -------------------------------------------------------------------------------
-const ADMIN_ME: AdminMe = { id: 'u9', name: 'Grace Kamanzi', email: 'grace@vendlyfy.example', role: 'super_admin', permissions: ['merchants.read', 'kyc.review', 'stores.suspend', 'audit.read'] };
+const ADMIN_ME: AdminMe = { id: 'u9', name: 'Grace Kamanzi', email: 'grace@vendlyfy.example', role: 'super_admin', permissions: ['merchants.read', 'kyc.review', 'stores.suspend', 'audit.read', 'refunds.approve', 'disputes.resolve', 'payouts.process', 'payment_methods.manage', 'currencies.manage', 'plans.manage', 'templates.manage', 'platform_settings.manage', 'platform_members.create'] };
 const inAdmin = (active: string, node: ReactNode, view: AdminView = 'overview'): ReactNode => (
   <Admin view={view} active={active} navigate={noop} initialMe={ADMIN_ME} initialBadges={{ merchants: 3, kyc: 2 }}>
     {() => node}
@@ -1929,7 +1937,7 @@ expect(adminAt(0).includes('18.4M RWF') && adminAt(0).includes('+6% vs yesterday
 expect(adminAt(0).includes('Airtel Money') && adminAt(0).includes('Degraded') && adminAt(0).includes('may take longer'), 'a slow provider is called out, and what customers see');
 expect(!adminAt(0).includes('Cards') && !adminAt(0).includes('SMS receipts') && !adminAt(0).includes('Flagged payment'), 'nothing the system does not produce is drawn');
 expect(adminAt(1).includes('All caught up.') && adminAt(1).includes('No traffic') && adminAt(1).includes('No paid orders yet.') && adminAt(1).includes('Nothing recorded yet.'), 'every panel has an empty state');
-expect(adminAt(0).includes('Identity checks') && adminAt(0).includes('Admin team & roles') && adminAt(0).includes('Platform settings') && adminHtml[0]!.includes('aria-disabled="true"'), 'the sidebar lists all thirteen and greys what is not built');
+expect(adminAt(0).includes('Identity checks') && adminAt(0).includes('Admin team & roles') && adminAt(0).includes('Platform settings') && adminAt(0).includes('Audit log') && adminAt(0).includes('All orders') && !adminHtml[0]!.includes('aria-disabled="true"'), 'a super admin sees all thirteen destinations, none greyed — every one is built');
 expect(adminAt(0).includes('Grace Kamanzi') && adminAt(0).includes('Super admin') && adminAt(0).includes('Sign out'), 'who is signed in');
 expect(adminAt(2).includes('Needs review') && adminAt(2).includes('Verification') && adminAt(2).includes('Review identity') && !adminAt(2).includes('Approve and go live'), 'a store waiting on its identity check hands over to the review');
 expect(adminAt(3).includes('Open store') && adminAt(3).includes('Suspend store') && !adminAt(3).includes('View as merchant'), 'a live store: open it or suspend it — and no impersonation promise');
@@ -1945,7 +1953,7 @@ expect(adminAt(9).includes('Deleted') && adminAt(9).includes('This check is appr
 expect(adminAt(7).includes('Approve identity') && adminAt(7).includes('Ask them to redo…') && adminAt(7).includes('Send request') && adminAt(7).includes('Reject') && adminAt(7).includes('The face video is deleted automatically as soon as you decide.'), 'the decision panel, with the retention line that is true');
 expect(!adminAt(7).includes('[RETENTION PERIOD]') && !adminAt(7).includes('SMS'), 'no placeholder, no SMS');
 expect(adminAt(10).includes('All caught up.'), 'an empty queue');
-expect(adminAt(11).includes('This screen isn’t built yet.') && adminAt(11).includes('Payouts'), 'a not-yet screen is an honest page');
+expect(adminAt(11).includes('There’s nothing here.') && adminAt(11).includes('your role doesn’t include it'), 'an address that is nothing says so, inside the console');
 
 expect(compactMoney(18_400_000) === '18.4M RWF' && compactMoney(121_000_000) === '121M RWF' && compactMoney(640_000) === '640K RWF' && compactMoney(900) === '900 RWF', 'headline money');
 expect(kpiValue({ key: 'payment', value: null, previous: null, note: null }) === '—' && kpiValue({ key: 'orders', value: 2318, previous: 0, note: null }) === '2,318', 'a missing figure is a dash, never 0%');
@@ -2079,6 +2087,124 @@ expect(formatCurrency(3517, CURRENCIES[0]!, true) === '3,500 RWF' && formatCurre
 expect(currencyPreview(CURRENCIES[0]!).cash === '8,000 RWF' && currencyPreview(CURRENCIES[0]!).total === '8,017 RWF', 'the board’s own 8,017 example rounds to 8,000 for cash');
 expect(rateNote(CURRENCIES[2]!, '129').text.includes('≈ $') && rateNote(CURRENCIES[1]!, '').tone === 'warn' && rateNote(CURRENCIES[4]!, '').tone === 'plain', 'rate notes');
 expect(methodMeta(M_LIST[0]!) === 'No country · no currency' && methodMeta(M_LIST[1]!) === 'RW · UG · RWF, UGX' && readinessCount(mdet(M_LIST[0]!)).done === 3, 'method summaries and readiness');
+
+
+
+// --- milestone 27 part C: audit log, all orders, platform settings, admin team, plans, industry templates ----------------
+const AT = (h: number, m: number): string => new Date(2026, 9, 7, h, m).toISOString();
+const AUDIT: AuditRow[] = [
+  { sequence: 12, at: AT(14, 21), who: 'Olive Mukeshimana', role: 'verification', category: 'sensitive', what: 'Revealed full ID number · Claudine Mukamana', store: 'Ubwiza Beauty', detail: ['reason: matching RDB record', 'Reason: “matching RDB record”', 'IP 41.186.4.2'] },
+  { sequence: 11, at: AT(14, 2), who: 'Grace Kamanzi', role: 'super_admin', category: 'store', what: 'Approved identity · Claudine Mukamana', store: 'Ubwiza Beauty', detail: [] },
+  { sequence: 10, at: AT(12, 40), who: 'Diane Uwimana', role: 'finance', category: 'money', what: 'Refunded 3,000 RWF · order #1019 · Nyama & Co.', store: 'Nyama & Co.', detail: ['Fries were missing.'] },
+  { sequence: 9, at: AT(9, 30), who: 'Grace Kamanzi', role: 'super_admin', category: 'config', what: 'Published Fashion template v5 · new stores only', store: null, detail: [] },
+  { sequence: 8, at: AT(8, 58), who: 'Grace Kamanzi', role: 'super_admin', category: 'access', what: 'Added Samuel Rugamba to the team · Support', store: null, detail: [] },
+];
+const ORDERS: AdminOrder[] = [
+  { id: 'o1', number: 1031, store: 'Nyama & Co.', storeId: 's1', customer: 'Aimable K.', total: 8500, paymentMethod: 'mtn_momo', paymentStatus: 'paid', status: 'pending', flag: null, ageMinutes: 2, cursor: 'c1' },
+  { id: 'o2', number: 742, store: 'Inzu Threads', storeId: 's2', customer: 'Alice M.', total: 18000, paymentMethod: 'mtn_momo', paymentStatus: 'paid', status: 'pending', flag: 'No reply in 22 min', ageMinutes: 22, cursor: 'c2' },
+  { id: 'o3', number: 212, store: 'Kigali Tech Hub', storeId: 's3', customer: 'Eric H.', total: 72000, paymentMethod: 'mtn_momo', paymentStatus: 'paid', status: 'delivered', flag: 'In dispute', ageMinutes: 2880, cursor: 'c3' },
+  { id: 'o4', number: 1027, store: 'Nyama & Co.', storeId: 's1', customer: 'Pacifique I.', total: 12500, paymentMethod: 'cash', paymentStatus: 'unpaid', status: 'delivered', flag: 'Cash not confirmed', ageMinutes: 2900, cursor: 'c4' },
+];
+const SETTINGS: SettingsPage = {
+  settings: { payoutModeDefault: 'automatic', holdMinutes: 60, automaticPayoutAt: '08:00' }, limits: { holdMin: 5, holdMax: 10080 },
+  health: [
+    { name: 'API', detail: 'Responding', state: 'ok' }, { name: 'MTN MoMo', detail: '98.9% success · 120 payments', state: 'ok' }, { name: 'Airtel Money', detail: '91.2% success · 40 payments', state: 'warn' },
+    { name: 'SMS gateway', detail: 'Not connected yet', state: 'off' }, { name: 'Email', detail: 'Not connected yet', state: 'off' }, { name: 'Payout scheduler', detail: 'Last run 08:00 · 2 failures in 24 h', state: 'warn' },
+  ],
+};
+const TEAMPAGE: TeamPage = {
+  roles: ['super_admin', 'support', 'finance', 'verification'],
+  members: [
+    { userId: 'u9', name: 'Grace Kamanzi', email: 'grace@vendlyfy.example', role: 'super_admin', joinedAt: AT(8, 0), addedBy: null },
+    { userId: 'u10', name: 'Patrick Nsengimana', email: 'patrick@vendlyfy.example', role: 'support', joinedAt: AT(8, 0), addedBy: 'Grace Kamanzi' },
+    { userId: 'u11', name: 'Diane Uwimana', email: 'diane@vendlyfy.example', role: 'finance', joinedAt: AT(8, 0), addedBy: 'Grace Kamanzi' },
+  ],
+  matrix: [
+    { label: 'See stores, orders and customers', roles: { super_admin: true, support: true, finance: true, verification: true } },
+    { label: 'Retry failed payouts', roles: { super_admin: true, support: false, finance: true, verification: false } },
+    { label: 'Manage the admin team', roles: { super_admin: true, support: false, finance: false, verification: false } },
+  ],
+};
+const PLANS: Plan[] = [
+  { key: 'starter', name: 'Starter', isDefault: true, stores: 1041, monthlyPrice: null, paymentFeePercent: null, withdrawalFee: null, currency: 'RWF', staffAccountLimit: 3 },
+  { key: 'growth', name: 'Growth', isDefault: false, stores: 243, monthlyPrice: 15000, paymentFeePercent: 2.5, withdrawalFee: 300, currency: 'RWF', staffAccountLimit: null },
+];
+const TLIST: TemplateSummary[] = [
+  { key: 'food', name: 'Food & drinks', accent: '#1D6B47', stores: 412, liveVersion: 4, hasDraft: false },
+  { key: 'pharmacy', name: 'Pharmacy', accent: '#2F6570', stores: 0, liveVersion: null, hasDraft: true },
+  { key: 'fashion', name: 'Fashion', accent: '#1F437F', stores: 236, liveVersion: 5, hasDraft: false },
+];
+const TFOOD: TemplateDetail = {
+  ...TLIST[0]!, version: 4, state: 'live', words: { product: 'Menu items', catalog: 'Menu', category: 'Sections', option: 'Extras' }, modules: ['delivery', 'modifiers', 'pickup', 'table'],
+  attributes: [{ name: 'Size', pick: 'one' }, { name: 'Extras', pick: 'several', priced: true }], steps: [{ key: 'new', label: 'New' }, { key: 'preparing', label: 'Preparing' }, { key: 'ready', label: 'Ready' }, { key: 'delivered', label: 'Delivered' }], flags: [],
+  catalogue: { modules: [{ key: 'modifiers', label: 'Priced extras (modifiers)' }, { key: 'delivery', label: 'Delivery' }, { key: 'pickup', label: 'Pickup' }, { key: 'table', label: 'Table ordering (QR)' }, { key: 'rx', label: 'Prescription flag' }] },
+};
+const TPHARMA: TemplateDetail = { ...TFOOD, ...TLIST[1]!, version: 1, state: 'draft', words: { product: 'Medicines', catalog: 'Shop', category: 'Sections', option: 'Pack sizes' }, modules: ['delivery', 'pickup', 'rx'], steps: [{ key: 'new', label: 'New' }, { key: 'pharmacist_check', label: 'Pharmacist check' }, { key: 'ready', label: 'Ready' }], flags: [{ key: 'prescription_required', label: 'Prescription required', description: 'Shows an Rx badge on the product card and adds a photo-upload step at checkout.' }] };
+
+const opsParts: readonly (readonly [string, ReactNode])[] = [
+  ['Admin · audit log', inAdmin('audit', <AuditLog initial={{ rows: AUDIT, hasMore: true }} />, 'audit')],
+  ['Admin · audit log, one open and verified', inAdmin('audit', <AuditLog initial={{ rows: AUDIT, hasMore: false }} initialOpen={12} initialVerified={{ ok: true, entries: 1204, breaks: 0 }} />, 'audit')],
+  ['Admin · audit log, tampered', inAdmin('audit', <AuditLog initial={{ rows: AUDIT, hasMore: false }} initialVerified={{ ok: false, entries: 1204, breaks: 2 }} />, 'audit')],
+  ['Admin · audit log, empty', inAdmin('audit', <AuditLog initial={{ rows: [], hasMore: false }} />, 'audit')],
+  ['Admin · all orders', inAdmin('orders', <AdminOrders initial={{ rows: ORDERS, hasMore: true, counts: { today: 2318, attention: 4 } }} />, 'orders')],
+  ['Admin · all orders, none', inAdmin('orders', <AdminOrders initial={{ rows: [], hasMore: false, counts: { today: 0, attention: 0 } }} />, 'orders')],
+  ['Admin · platform settings', inAdmin('settings', <AdminSettings initial={SETTINGS} />, 'settings')],
+  ['Admin · team', inAdmin('team', <AdminTeam initial={TEAMPAGE} />, 'team')],
+  ['Admin · team, adding and a fresh account', inAdmin('team', <AdminTeam initial={TEAMPAGE} initialAdding initialCreated={{ name: 'Samuel Rugamba', email: 'samuel@vendlyfy.example', password: 'Kd7mQp3xWz8nRt' }} />, 'team')],
+  ['Admin · plans', inAdmin('plans', <AdminPlans initial={PLANS} />, 'plans')],
+  ['Admin · plans, editing', inAdmin('plans', <AdminPlans initial={PLANS} initialEditing="starter" />, 'plans')],
+  ['Admin · templates, a live one', inAdmin('industries', <AdminTemplates initialList={TLIST} initialDetail={TFOOD} />, 'industries')],
+  ['Admin · templates, a draft with a product flag', inAdmin('industries', <AdminTemplates initialList={TLIST} initialDetail={TPHARMA} initialRollout="all" />, 'industries')],
+];
+const opsHtml: string[] = [];
+for (const [name, node] of opsParts) {
+  const html = render(name, node);
+  allHtml += html;
+  opsHtml.push(html);
+}
+const opsAt = (i: number): string => opsHtml[i]!.replace(/<[^>]+>/g, ' ').replaceAll('&amp;', '&').replaceAll('&#x27;', "'").replace(/\s+/g, ' ');
+expect(opsHtml.length === opsParts.length, 'every part-C admin part rendered');
+
+expect(opsAt(0).includes('Audit log') && opsAt(0).includes('Every admin action and every sensitive view. Entries can’t be edited or deleted, including by super admins.') && opsAt(0).includes('Verify the log') && opsAt(0).includes('Older entries'), 'audit: the board’s words, and a way to prove them');
+expect(opsAt(0).includes('Sensitive view') && opsAt(0).includes('Money') && opsAt(0).includes('Revealed full ID number · Claudine Mukamana') && opsAt(0).includes('Sensitive views') && opsAt(0).includes('Access'), 'audit: types and filters');
+expect(!opsAt(0).includes('Export CSV'), 'no export, which would be a bulk disclosure with no entry of its own');
+expect(opsAt(1).includes('Reason: “matching RDB record”') && opsAt(1).includes('IP 41.186.4.2') && opsAt(1).includes('Entry #12 · verification'), 'an open entry shows its reason, address and number');
+expect(opsAt(1).includes('The log is intact — 1,204 entries, each one hashed into the next.'), 'a verified log says so');
+expect(opsAt(2).includes('The log has been tampered with: 2 broken links in 1,204 entries.'), 'a broken log says so plainly');
+expect(opsAt(3).includes('Nothing recorded for this view.'), 'an empty log');
+
+expect(opsAt(4).includes('Every store, read-only. Act through refunds, disputes or the store itself.') && opsAt(4).includes('All today · 2,318') && opsAt(4).includes('Needs attention (4)') && opsAt(4).includes('Cash unpaid') && opsAt(4).includes('Not finished'), 'orders: the board’s filters, with counts');
+expect(opsAt(4).includes('No reply in 22 min') && opsAt(4).includes('In dispute') && opsAt(4).includes('Cash not confirmed') && opsAt(4).includes('MoMo · paid') && opsAt(4).includes('Cash · unpaid') && opsAt(4).includes('Older orders'), 'orders: why each needs attention, in words');
+expect(opsAt(4).includes('2 d') && opsAt(4).includes('2 min') && !opsAt(4).includes('Export CSV'), 'ages');
+expect(opsAt(5).includes('No orders match. Try another filter or search.'), 'no orders');
+
+expect(opsAt(6).includes('Defaults for every store. Changes are logged and only super admins can save.') && opsAt(6).includes('Money defaults') && opsAt(6).includes('Health'), 'settings: the board’s two panels');
+expect(opsAt(6).includes('Automatic payouts') && opsAt(6).includes('Manual withdrawals') && opsAt(6).includes('Hold period after payment') && opsAt(6).includes('Automatic payout time'), 'settings: the three defaults');
+expect(opsAt(6).includes('SMS gateway') && opsAt(6).includes('Not connected') && opsAt(6).includes('Check') && !opsAt(6).includes('Card processor'), 'health: only what is measured, and unconnected things are not green');
+expect(opsAt(6).includes('Which currencies stores may sell in is set in') && !opsAt(6).includes('RWF is always on'), 'the currency chips live in Currencies, not here twice');
+
+expect(opsAt(7).includes('Everyone at Vendlyfy who can open this console. Two-step sign-in is required for all.') && opsAt(7).includes('What each role can do') && opsAt(7).includes('Super admin') && opsAt(7).includes('Verification'), 'team: the board’s words and the matrix');
+expect(opsAt(7).includes('(you)') && opsAt(7).includes('Patrick Nsengimana') && opsAt(7).includes('Remove') && opsHtml[7]!.includes('aria-label="Role for Patrick Nsengimana"'), 'team: you cannot change or remove yourself, others can be');
+expect(opsHtml[7]!.includes('aria-label="Can"') && opsHtml[7]!.includes('aria-label="Cannot"'), 'the matrix is readable without colour');
+expect(!opsAt(7).includes('View as merchant') && !opsAt(7).includes('Last seen'), 'no permission or column the system does not have');
+expect(opsAt(8).includes('Starting password') && opsAt(8).includes('Samuel Rugamba can sign in now.') && opsAt(8).includes('Kd7mQp3xWz8nRt') && opsAt(8).includes('It won’t be shown again.'), 'a new teammate gets a one-time starting password');
+
+expect(opsAt(9).includes('Plans & fees') && opsAt(9).includes('Not decided') && opsAt(9).includes('Unlimited') && opsAt(9).includes('1,041 stores') && opsAt(9).includes('15000 RWF') && opsAt(9).includes('2.5 %'), 'plans: an undecided price is a word, not a zero; a decided one shows');
+expect(opsAt(9).includes('Not built yet:') && opsAt(9).includes('per-plan features'), 'plans: says what is not there');
+expect(opsAt(10).includes('They are not told automatically.') && opsAt(10).includes('Save Starter') && opsAt(10).includes('Empty is unlimited.') && opsHtml[10]!.includes('placeholder="Not decided"'), 'plans: editing warns that stores are not notified, and an empty field is allowed');
+
+expect(opsAt(11).includes('Industry templates') && opsAt(11).includes('412 stores') && opsAt(11).includes('Not offered yet') && opsAt(11).includes('v4 · live') && opsAt(11).includes('Save draft') && opsAt(11).includes('Publish'), 'templates: list, version and actions');
+expect(opsAt(11).includes('Words merchants and customers see') && opsAt(11).includes('Modules turned on by default') && opsAt(11).includes('Suggested attributes') && opsAt(11).includes('Order steps') && opsAt(11).includes('When you publish'), 'templates: the board’s five panels');
+expect(opsAt(11).includes('New stores only') && opsAt(11).includes('Also update 412 existing stores') && opsAt(11).includes('Make a change and save a draft'), 'templates: the rollout choice, and why Publish is off');
+expect(opsAt(12).includes('v1 · draft') && opsAt(12).includes('Product flag: Prescription required') && opsAt(12).includes('Pharmacist check') && opsAt(12).includes('Also update existing stores'), 'templates: a draft with a product flag and its own step');
+expect(!opsAt(11).includes('New template'), 'no new-template button — a business type is a decision before it is a form');
+
+expect(mayOpen(['audit.read'], ['audit.read', 'kyc.review']) && !mayOpen(['audit.read'], ['merchants.read']) && mayOpen(['refunds.approve', 'disputes.resolve'], ['disputes.resolve']), 'a destination opens on any one of its permissions');
+expect(NAV.flatMap((g) => g.items).length === 13 && NAV.flatMap((g) => g.items).every((i) => i.built && i.needs.length > 0), 'thirteen destinations, all built, each naming what it needs');
+expect(orderAge(5) === '5 min' && orderAge(90) === '2 h' && orderAge(2880) === '2 d' && paymentText({ paymentMethod: 'cash', paymentStatus: 'unpaid' }).paid === false && paymentText({ paymentMethod: 'mtn_momo', paymentStatus: 'refunded' }).text === 'MoMo · refunded', 'order ages and payment pills');
+expect(holdNote(10).warn && holdNote(2000).warn && !holdNote(60).warn, 'hold-period warnings');
+expect(HEALTH_DOT.off.label === 'Not connected' && planValue(null) === 'Not decided' && planValue(null, true) === 'Unlimited' && planValue(3000) === '3000' && parseField('') === null && parseField('1,500') === 1500, 'plan and health helpers');
+expect(/^(?=.*\d)[A-Za-z0-9]{14}$/.test(startingPassword()) && templateMeta({ stores: 1, liveVersion: 1 }) === '1 store' && templateMeta({ stores: 0, liveVersion: null }) === 'Not offered yet', 'a starting password and template summaries');
 
 
 // --- Settings: the rules that live outside the JSX ---------------------------------

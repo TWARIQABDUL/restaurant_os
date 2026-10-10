@@ -21,6 +21,7 @@
 import { badRequest, conflict, db, withTransaction } from '../db/index.ts';
 import type { Queryable, Tx } from '../db/index.ts';
 import * as momo from '../payments/momo.ts';
+import * as platformSettings from './platformSettings.ts';
 
 export type Destination = {
   methodKey: string;
@@ -41,16 +42,18 @@ export async function destination(storeId: string, on: Queryable = db): Promise<
 }
 
 /** The time of day automatic payouts go, until Settings (milestone 25) lets the merchant choose. The board says 08:00. */
+/** The floor used if platform_settings has no row (it is seeded, so this is a bug's fallback). The live value is the setting's. */
 export const DEFAULT_AUTOMATIC_AT = '08:00';
 
 export async function setMode(storeId: string, mode: 'manual' | 'automatic', tx: Tx): Promise<boolean> {
+  const at = (await platformSettings.read(tx)).automaticPayoutAt;
   // The table's own CHECK says automatic needs a time and manual must have none, so both are set together.
   const r = await tx.query(
     `UPDATE store_payout_settings
         SET settlement_mode = $2,
             automatic_at = CASE WHEN $2 = 'automatic' THEN COALESCE(automatic_at, $3::time) ELSE NULL END
       WHERE store_id = $1`,
-    [storeId, mode, DEFAULT_AUTOMATIC_AT],
+    [storeId, mode, at],
   );
   return (r.rowCount ?? 0) > 0;
 }

@@ -951,7 +951,10 @@ export interface PlansRow {
 
 /** `platform_members.role`, from its CHECK constraint. */
 export type PlatformMembersRole =
-  | 'super_admin';
+  | 'super_admin'
+  | 'support'
+  | 'finance'
+  | 'verification';
 
 /** `platform_members.user_scope`, from its CHECK constraint. */
 export type PlatformMembersUserScope =
@@ -966,6 +969,16 @@ export interface PlatformMembersRow {
   role: PlatformMembersRole;
   created_by: string | null;
   created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * Defaults every store inherits. Seeded, edited from the admin console, each change an audit entry. The code that reads a key validates its value.
+ */
+export interface PlatformSettingsRow {
+  key: string;
+  value: unknown;
+  updated_by: string | null;
   updated_at: Date;
 }
 
@@ -1716,6 +1729,7 @@ export interface Database {
   plan_features: PlanFeaturesRow;
   plans: PlansRow;
   platform_members: PlatformMembersRow;
+  platform_settings: PlatformSettingsRow;
   product_categories: ProductCategoriesRow;
   product_flags: ProductFlagsRow;
   product_images: ProductImagesRow;
@@ -1798,6 +1812,7 @@ export const TABLE_NAMES = [
   'plan_features',
   'plans',
   'platform_members',
+  'platform_settings',
   'product_categories',
   'product_flags',
   'product_images',

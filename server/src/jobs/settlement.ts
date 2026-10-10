@@ -21,8 +21,8 @@
 // logged and skipped — the sweep is the platform's, and one merchant's hold must not stall every other's money.
 
 import { db, sqlstate, withTransaction } from '../db/index.ts';
-import { holdMinutes } from '../payments/momo.ts';
 import * as payouts from '../repositories/payouts.ts';
+import * as platformSettings from '../repositories/platformSettings.ts';
 
 export type SweepResult = {
   released: number;
@@ -33,7 +33,7 @@ export type SweepResult = {
 
 export async function releaseEscrow(): Promise<{ released: number; refundsPaid: number }> {
   return withTransaction(async (tx) => {
-    const released = await tx.query(`SELECT released_order_id FROM release_eligible_orders($1)`, [holdMinutes()]);
+    const released = await tx.query(`SELECT released_order_id FROM release_eligible_orders($1)`, [await platformSettings.holdMinutes(tx)]);
     const settled = await tx.query(`SELECT settled_refund_id FROM settle_queued_refunds()`);
     return { released: released.rows.length, refundsPaid: settled.rows.length };
   });

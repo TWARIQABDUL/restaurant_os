@@ -10,6 +10,7 @@
 
 import { badRequest, conflict, db, notFound } from '../db/index.ts';
 import type { Queryable, Tx } from '../db/index.ts';
+import * as platformSettings from './platformSettings.ts';
 
 const MONEY = /^\d{1,8}(\.\d{1,2})?$/;
 const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -262,10 +263,14 @@ export async function setPayoutDestination(storeId: string, methodKey: string, p
   }
 
   const previous = await tx.query<{ payout_phone: string }>(`SELECT payout_phone FROM store_payout_settings WHERE store_id = $1 FOR UPDATE`, [storeId]);
+  // A store's FIRST payout destination starts it in the platform's default mode (Platform settings); every later change keeps whatever
+  // the owner chose since, which is why the conflict branch does not touch the mode.
+  const defaults = await platformSettings.read(tx);
+  const automatic = defaults.payoutModeDefault === 'automatic';
   await tx.query(
-    `INSERT INTO store_payout_settings (store_id, payout_method_key, payout_phone, settlement_mode) VALUES ($1, $2, $3, 'manual')
+    `INSERT INTO store_payout_settings (store_id, payout_method_key, payout_phone, settlement_mode, automatic_at) VALUES ($1, $2, $3, $4, $5::time)
      ON CONFLICT (store_id) DO UPDATE SET payout_method_key = EXCLUDED.payout_method_key, payout_phone = EXCLUDED.payout_phone`,
-    [storeId, methodKey, phone.trim()],
+    [storeId, methodKey, phone.trim(), automatic ? 'automatic' : 'manual', automatic ? defaults.automaticPayoutAt : null],
   );
   return { previousPhone: previous.rows[0]?.payout_phone ?? null };
 }

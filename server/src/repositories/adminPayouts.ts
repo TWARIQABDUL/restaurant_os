@@ -13,6 +13,7 @@
 import { conflict, db, notFound, withTransaction } from '../db/index.ts';
 import type { Queryable } from '../db/index.ts';
 import * as payouts from './payouts.ts';
+import * as platformSettings from './platformSettings.ts';
 
 export type PayoutTab = 'problem' | 'held' | 'live' | 'done';
 export const PAYOUT_TABS: readonly PayoutTab[] = ['problem', 'held', 'live', 'done'];
@@ -104,7 +105,7 @@ export async function page(tab: PayoutTab, on: Queryable = db): Promise<PayoutsP
     tab,
     rows,
     counts: { problem: Number(c.failed), held: Number(c.held), live: Number(c.live), done: Number(c.done) },
-    kpis: { runTotal: Number(run.total), runStores: Number(run.stores), failed: Number(c.failed), held: Number(c.held), holdMinutes: Number(process.env['MOMO_HOLD_MINUTES']) || 60 },
+    kpis: { runTotal: Number(run.total), runStores: Number(run.stores), failed: Number(c.failed), held: Number(c.held), holdMinutes: await platformSettings.holdMinutes(on) },
   };
 }
 

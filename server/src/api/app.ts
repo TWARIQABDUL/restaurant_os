@@ -30,6 +30,7 @@ import { storeKycRoutes } from '../routes/storeKyc.ts';
 import onboardingRoutes from '../routes/onboarding.ts';
 import adminRoutes from '../routes/admin.ts';
 import adminMoneyRoutes from '../routes/adminMoney.ts';
+import adminOpsRoutes from '../routes/adminOps.ts';
 import storefrontConfigRoutes from '../routes/storefrontConfig.ts';
 import storefrontThemeRoutes from '../routes/storefrontTheme.ts';
 import storefrontStoreRoutes from '../routes/storefrontStore.ts';
@@ -101,6 +102,11 @@ export const REQUIRED_PERMISSIONS = [
   'disputes.resolve',
   'payment_methods.manage',
   'currencies.manage',
+  // Milestone 27 part C.
+  'plans.manage',
+  'templates.manage',
+  'platform_settings.manage',
+  'platform_members.create',
 ] as const;
 
 export function createApp(): Express {
@@ -166,6 +172,7 @@ export function createApp(): Express {
   // Milestone 27: the Vendlyfy team. Every route names a PLATFORM permission; none is reachable by a store role. See the router's header.
   app.use('/api/admin', adminRoutes);
   app.use('/api/admin', adminMoneyRoutes);
+  app.use('/api/admin', adminOpsRoutes);
 
   // THE STORE IS IN THE PATH. Not in a header, not in the body, and with no fallback to
   // "the first active store" — the three things the old resolveTenant() did. The guard

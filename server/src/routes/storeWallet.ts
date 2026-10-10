@@ -31,7 +31,7 @@ import { authOf, isUuid, requireStorePermission, storeIdOf } from '../middleware
 import * as money from '../repositories/money.ts';
 import * as payouts from '../repositories/payouts.ts';
 import * as riders from '../repositories/riders.ts';
-import { holdMinutes } from '../payments/momo.ts';
+import * as platformSettings from '../repositories/platformSettings.ts';
 import { withTransaction } from '../db/index.ts';
 
 // TWO ROUTERS, not two routes on one. They are mounted at different paths —
@@ -62,7 +62,7 @@ walletRouter.get(
     // the guard's read and this one.
     if (wallet === null) throw notFound('That store no longer exists.');
 
-    const summary = await money.summary(storeId, holdMinutes());
+    const summary = await money.summary(storeId, await platformSettings.holdMinutes());
     const dest = await payouts.destination(storeId);
     const roster = await riders.roster(storeId);
     const debts = await riders.carriedOver(storeId);
@@ -79,7 +79,7 @@ walletRouter.get(
       nextRelease: summary?.nextRelease ?? null,
       identity: summary?.identity ?? 'not_started',
       refundsOwed: summary?.refundsOwed ?? '0.00',
-      holdMinutes: holdMinutes(),
+      holdMinutes: await platformSettings.holdMinutes(),
       // "Cash with riders" is what riders SAY they carry — physical cash in a pocket is a fact about reports,
       // the same choice milestone 21 made for the roster.
       cashWithRiders: roster.reduce((sum, r) => sum + Number(r.cashCarried), 0).toFixed(2),
@@ -109,7 +109,7 @@ walletRouter.get(
       ...(limit === null ? {} : { limit }),
       before,
       beforeId: isUuid(beforeId) ? beforeId : null,
-      holdMinutes: holdMinutes(),
+      holdMinutes: await platformSettings.holdMinutes(),
     });
     res.setHeader('Cache-Control', 'no-store');
     res.json({ activity: page.items, nextCursor: page.nextCursor });

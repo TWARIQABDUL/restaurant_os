@@ -124,29 +124,7 @@ export async function overview(range: Range, on: Queryable = db): Promise<Overvi
     queue.push({ kind: 'template', title: `${drafts.rows[0].name} template in draft`, sub: 'Ready for review before it’s offered at sign-up', ageHours: Number(drafts.rows[0].age_h), count: 1 });
   }
 
-  const hour = await on.query<{ key: string; name: string; short_name: string; status: string; incident_note: string | null; ok: string; total: string }>(
-    `SELECT pm.key, pm.name, pm.short_name, pm.status, pm.incident_note,
-            (count(t.id) FILTER (WHERE t.status = 'successful'))::text AS ok,
-            (count(t.id) FILTER (WHERE t.status IN ('successful', 'failed')))::text AS total
-       FROM payment_methods pm
-       LEFT JOIN momo_transactions t ON t.payment_method_key = pm.key AND t.direction = 'collection' AND t.created_at >= now() - interval '1 hour'
-      WHERE pm.kind = 'online'
-      GROUP BY pm.key, pm.name, pm.short_name, pm.status, pm.incident_note, pm.position
-      ORDER BY pm.position`,
-  );
-  const providers: Overview['providers'] = hour.rows.map((r) => {
-    const total = Number(r.total);
-    const rate = total === 0 ? null : (Number(r.ok) / total) * 100;
-    return {
-      key: r.key,
-      name: r.name,
-      short: r.short_name,
-      rate,
-      attempts: total,
-      status: r.status !== 'live' ? 'paused' : rate === null ? 'quiet' : rate < 95 ? 'degraded' : 'operational',
-      note: r.incident_note,
-    };
-  });
+  const providers = await providerHealth(on);
 
   const ind = await on.query<{ name: string; amount: string }>(
     `SELECT COALESCE(t.name, 'Other') AS name, COALESCE(sum(o.total_amount), 0)::text AS amount
@@ -162,6 +140,36 @@ export async function overview(range: Range, on: Queryable = db): Promise<Overvi
   );
 
   return { range, kpis, queue, providers, industries, activity: log.rows.map((r) => ({ at: r.created_at.toISOString(), who: r.actor_label, what: r.summary })) };
+}
+
+
+export type ProviderHealth = Overview['providers'][number];
+
+/** Collections that finished (one way or the other) in the last hour, per online payment method. Shared with Platform settings' Health panel. */
+export async function providerHealth(on: Queryable = db): Promise<ProviderHealth[]> {
+  const hour = await on.query<{ key: string; name: string; short_name: string; status: string; incident_note: string | null; ok: string; total: string }>(
+    `SELECT pm.key, pm.name, pm.short_name, pm.status, pm.incident_note,
+            (count(t.id) FILTER (WHERE t.status = 'successful'))::text AS ok,
+            (count(t.id) FILTER (WHERE t.status IN ('successful', 'failed')))::text AS total
+       FROM payment_methods pm
+       LEFT JOIN momo_transactions t ON t.payment_method_key = pm.key AND t.direction = 'collection' AND t.created_at >= now() - interval '1 hour'
+      WHERE pm.kind = 'online'
+      GROUP BY pm.key, pm.name, pm.short_name, pm.status, pm.incident_note, pm.position
+      ORDER BY pm.position`,
+  );
+  return hour.rows.map((r) => {
+    const total = Number(r.total);
+    const rate = total === 0 ? null : (Number(r.ok) / total) * 100;
+    return {
+      key: r.key,
+      name: r.name,
+      short: r.short_name,
+      rate,
+      attempts: total,
+      status: r.status !== 'live' ? 'paused' : rate === null ? 'quiet' : rate < 95 ? 'degraded' : 'operational',
+      note: r.incident_note,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

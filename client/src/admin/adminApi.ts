@@ -218,3 +218,75 @@ export const adminMoneyApi = {
   saveMethod: (key: string, patch: MethodPatch): Promise<MethodDetail> => api.put<MethodDetail>(`/api/admin/payment-methods/${key}`, patch),
   setMethodStatus: (key: string, action: 'publish' | 'pause' | 'resume'): Promise<MethodDetail> => api.post<MethodDetail>(`/api/admin/payment-methods/${key}/${action}`),
 };
+
+// ---------------------------------------------------------------------------
+// Part C — audit, orders, settings, team, plans, templates
+// ---------------------------------------------------------------------------
+
+export type AuditCategory = 'sensitive' | 'money' | 'store' | 'config' | 'access';
+export type AuditRow = { sequence: number; at: string; who: string; role: string | null; category: AuditCategory; what: string; store: string | null; detail: string[] };
+
+export type OrderFilter = 'today' | 'open' | 'attention' | 'cash';
+export type AdminOrder = {
+  id: string; number: number; store: string; storeId: string; customer: string; total: number; paymentMethod: string; paymentStatus: string; status: string;
+  flag: string | null; ageMinutes: number; cursor: string;
+};
+
+export type PlatformSettings = { payoutModeDefault: 'manual' | 'automatic'; holdMinutes: number; automaticPayoutAt: string };
+export type Health = { name: string; detail: string; state: 'ok' | 'warn' | 'off' };
+export type SettingsPage = { settings: PlatformSettings; health: Health[]; limits: { holdMin: number; holdMax: number } };
+
+export type TeamRole = 'super_admin' | 'support' | 'finance' | 'verification';
+export type TeamMember = { userId: string; name: string; email: string; role: TeamRole; joinedAt: string; addedBy: string | null };
+export type TeamPage = { members: TeamMember[]; roles: TeamRole[]; matrix: { label: string; roles: Record<TeamRole, boolean> }[] };
+
+export type Plan = { key: string; name: string; isDefault: boolean; stores: number; monthlyPrice: number | null; paymentFeePercent: number | null; withdrawalFee: number | null; currency: string; staffAccountLimit: number | null };
+export type PlanPatch = { monthlyPrice: number | null; paymentFeePercent: number | null; withdrawalFee: number | null; staffAccountLimit: number | null };
+
+export type TemplateSummary = { key: string; name: string; accent: string; stores: number; liveVersion: number | null; hasDraft: boolean };
+export type Attribute = { name: string; pick: 'one' | 'several'; priced?: boolean };
+export type Words = { product: string; catalog: string; category: string; option: string };
+export type TemplateDetail = TemplateSummary & {
+  version: number;
+  state: 'draft' | 'live';
+  words: Words;
+  modules: string[];
+  attributes: Attribute[];
+  steps: { key: string; label: string }[];
+  flags: { key: string; label: string; description: string }[];
+  catalogue: { modules: { key: string; label: string }[] };
+};
+export type TemplateEdit = { words: Words; modules: string[]; attributes: Attribute[] };
+
+export const adminOpsApi = {
+  audit: (category: AuditCategory | null, before: number | null): Promise<{ rows: AuditRow[]; hasMore: boolean }> => {
+    const p = new URLSearchParams();
+    if (category !== null) p.set('category', category);
+    if (before !== null) p.set('before', String(before));
+    return api.get<{ rows: AuditRow[]; hasMore: boolean }>(`/api/admin/audit?${p.toString()}`);
+  },
+  verifyAudit: (): Promise<{ ok: boolean; entries: number; breaks: number }> => api.post<{ ok: boolean; entries: number; breaks: number }>('/api/admin/audit/verify'),
+
+  orders: (q: { filter: OrderFilter; q: string; before: string | null }): Promise<{ rows: AdminOrder[]; hasMore: boolean; counts: { today: number; attention: number } }> => {
+    const p = new URLSearchParams({ filter: q.filter });
+    if (q.q !== '') p.set('q', q.q);
+    if (q.before !== null) p.set('before', q.before);
+    return api.get<{ rows: AdminOrder[]; hasMore: boolean; counts: { today: number; attention: number } }>(`/api/admin/orders?${p.toString()}`);
+  },
+
+  settings: (): Promise<SettingsPage> => api.get<SettingsPage>('/api/admin/settings'),
+  saveSettings: (patch: Partial<PlatformSettings>): Promise<SettingsPage> => api.put<SettingsPage>('/api/admin/settings', patch),
+
+  team: (): Promise<TeamPage> => api.get<TeamPage>('/api/admin/team'),
+  addMember: (m: { name: string; email: string; role: TeamRole; password: string }): Promise<TeamPage> => api.post<TeamPage>('/api/admin/team', m),
+  setRole: (id: string, role: TeamRole): Promise<TeamPage> => api.put<TeamPage>(`/api/admin/team/${id}`, { role }),
+  removeMember: (id: string): Promise<TeamPage> => api.delete<TeamPage>(`/api/admin/team/${id}`),
+
+  plans: (): Promise<{ plans: Plan[] }> => api.get<{ plans: Plan[] }>('/api/admin/plans'),
+  savePlan: (key: string, patch: PlanPatch): Promise<Plan> => api.put<Plan>(`/api/admin/plans/${key}`, patch),
+
+  templates: (): Promise<{ templates: TemplateSummary[] }> => api.get<{ templates: TemplateSummary[] }>('/api/admin/templates'),
+  template: (key: string): Promise<TemplateDetail> => api.get<TemplateDetail>(`/api/admin/templates/${key}`),
+  saveTemplate: (key: string, edit: TemplateEdit): Promise<TemplateDetail> => api.put<TemplateDetail>(`/api/admin/templates/${key}`, edit),
+  publishTemplate: (key: string, rollout: 'new' | 'all'): Promise<{ template: TemplateDetail; updated: number }> => api.post<{ template: TemplateDetail; updated: number }>(`/api/admin/templates/${key}/publish`, { rollout }),
+};

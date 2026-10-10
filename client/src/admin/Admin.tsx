@@ -17,9 +17,9 @@ import { ApiFailure, api } from '../app/api.ts';
 import { Alert, Button, Spinner } from '../shared/ui/index.ts';
 import { adminApi, adminMoneyApi } from './adminApi.ts';
 import type { Me } from './adminApi.ts';
-import { NAV, initial } from './adminLines.ts';
+import { NAV, initial, mayOpen } from './adminLines.ts';
 
-export type AdminView = 'overview' | 'merchants' | 'kyc' | 'payouts' | 'disputes' | 'currencies' | 'payments' | 'soon';
+export type AdminView = 'overview' | 'merchants' | 'kyc' | 'payouts' | 'disputes' | 'currencies' | 'payments' | 'orders' | 'audit' | 'settings' | 'team' | 'plans' | 'industries' | 'soon';
 
 type AdminContextValue = {
   me: Me;
@@ -53,8 +53,13 @@ export function Admin({ active, navigate, children, initialMe, initialBadges }: 
   const [badges, setBadges] = useState<{ merchants: number; kyc: number; disputes: number }>({ merchants: 0, kyc: 0, disputes: 0, ...initialBadges });
 
   const refreshBadges = useCallback((): void => {
-    void Promise.all([adminApi.queue(), adminApi.merchants({ tab: 'pending', q: '', industry: '', plan: '' }), adminMoneyApi.disputes('refunds').catch(() => null)])
-      .then(([q, m, d]) => setBadges({ kyc: q.queue.length, merchants: m.counts.pending, disputes: d === null ? 0 : d.counts.refunds + d.counts.disputes }))
+    // Each badge is its own question and its own permission: a support person has no identity queue, and that must not blank the others.
+    void Promise.all([
+      adminApi.queue().then((q) => q.queue.length).catch(() => 0),
+      adminApi.merchants({ tab: 'pending', q: '', industry: '', plan: '' }).then((m) => m.counts.pending).catch(() => 0),
+      adminMoneyApi.disputes('refunds').then((d) => d.counts.refunds + d.counts.disputes).catch(() => 0),
+    ])
+      .then(([kyc, merchants, disputes]) => setBadges({ kyc, merchants, disputes }))
       .catch(() => undefined);
   }, []);
 
@@ -124,7 +129,7 @@ export function Admin({ active, navigate, children, initialMe, initialBadges }: 
             {NAV.map((group) => (
               <div key={group.label} className="flex shrink-0 gap-1 border-ink-raised py-1 lg:flex-col lg:border-t lg:py-2">
                 <span className="px-3 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-disabled max-lg:hidden">{group.label}</span>
-                {group.items.map((item) => {
+                {group.items.filter((item) => mayOpen(item.needs, me.permissions)).map((item) => {
                   const current = item.id === active;
                   const badge = item.badge === undefined ? 0 : badges[item.badge];
                   const row = `flex h-10 shrink-0 items-center gap-3 rounded-control px-3 text-[14px] font-semibold no-underline ${current ? 'bg-ink-raised text-white' : item.built ? 'text-on-ink-muted' : 'text-disabled'}`;
@@ -169,12 +174,13 @@ export function Admin({ active, navigate, children, initialMe, initialBadges }: 
   );
 }
 
+/** A screen the sidebar does not list — a mistyped address, or one this role cannot open. Says so, and leaves the way out in the sidebar. */
 export function SoonPage({ label }: { label: string }): ReactNode {
   return (
     <div className="flex max-w-[560px] flex-col gap-3">
       <h1 className="m-0 font-display text-[28px]">{label}</h1>
-      <Alert tone="info" headline="This screen isn’t built yet.">
-        <span>It’s drawn, and it’s next in the admin console’s build. Everything in the sidebar that isn’t greyed out works.</span>
+      <Alert tone="info" headline="There’s nothing here.">
+        <span>Pick something from the sidebar. If you expected a screen that isn’t listed, your role doesn’t include it.</span>
       </Alert>
     </div>
   );
