@@ -25,6 +25,20 @@
 // the browser safe, and it is enforced by `tsc -p packages/core`, not by this comment.
 
 export {
+  CUSTOMER_MESSAGES,
+  CUSTOMER_TEMPLATES,
+  MESSAGE_LABEL,
+  SMS_LIMIT,
+  SMS_ONLY_MESSAGES,
+  SMS_TEMPLATES,
+  emailColours,
+  isCustomerMessage,
+  renderCustomerEmail,
+  renderEmailHtml,
+  renderSms,
+  sampleContext,
+  senderId,
+  smsFit,
   CARD_TREATMENTS,
   DEFAULT_DESIGN,
   HARMONIES,
@@ -85,3 +99,4 @@ export type {
   Vocabulary,
   WordKey,
 } from '../../../packages/core/src/index.ts';
+export type { CustomerEmail, CustomerMessage, EmailColours, EmailOrder, MessageContext, MessageKey, SmsOnlyMessage } from '../../../packages/core/src/index.ts';

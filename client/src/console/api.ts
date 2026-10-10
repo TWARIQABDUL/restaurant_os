@@ -25,6 +25,9 @@ export type ConsoleStore = {
   country: string;
   /** The store's own IANA zone, from V021. Every time the console prints is formatted in it. */
   timeZone: string;
+  /** The contact line a printed receipt and the QR poster carry — null until the owner fills in Settings → Store details. */
+  address: string | null;
+  phone: string | null;
   currency: CurrencyFormat;
 };
 

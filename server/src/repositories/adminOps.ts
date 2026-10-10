@@ -11,6 +11,7 @@
 import { db } from '../db/index.ts';
 import type { Queryable } from '../db/index.ts';
 import { providerHealth } from './admin.ts';
+import { queueState, templateLabel } from './messaging.ts';
 
 // ---------------------------------------------------------------------------
 // Audit log
@@ -144,7 +145,14 @@ export async function health(on: Queryable = db): Promise<Health[]> {
       state: p.status === 'degraded' ? 'warn' : p.status === 'operational' ? 'ok' : 'off',
     });
   }
-  out.push({ name: 'SMS gateway', detail: 'Not connected yet', state: 'off' }, { name: 'Email', detail: 'Not connected yet', state: 'off' });
+  // The outbox is the truth about messaging: a configured transport means messages are leaving; none means they are WAITING, and how many.
+  const q = await queueState(on);
+  const line = (c: 'sms' | 'email', name: string): Health => {
+    const s = q[c];
+    if (s.configured) return { name, detail: s.queued === 0 ? 'Development transport · nothing waiting' : `Development transport · ${s.queued} waiting`, state: s.queued > 20 ? 'warn' : 'ok' };
+    return { name, detail: s.queued === 0 ? 'No provider connected · nothing waiting' : `No provider connected · ${s.queued} ${s.queued === 1 ? 'message' : 'messages'} waiting${s.oldestMinutes === null ? '' : `, oldest ${s.oldestMinutes} min`}`, state: 'off' };
+  };
+  out.push(line('sms', 'SMS gateway'), line('email', 'Email'));
 
   const run = (await on.query<{ last: Date | null; failed: string; today: string }>(
     `SELECT max(requested_at) AS last,
@@ -159,4 +167,21 @@ export async function health(on: Queryable = db): Promise<Health[]> {
     state: off ? 'off' : Number(run.failed) > 0 ? 'warn' : 'ok',
   });
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Messages: what is waiting, and what went (or did not)
+// ---------------------------------------------------------------------------
+
+export type MessageRow = { id: string; at: string; channel: 'sms' | 'email'; template: string; label: string; audience: string; recipient: string; store: string | null; status: string; error: string | null; provider: string | null };
+
+/** "250781110001" → "250 ••• 0001", "aline@nyama.rw" → "a•••@nyama.rw": enough to recognise your own, not enough to read a stranger's. */
+const mask = (r: string): string => (r.includes('@') ? `${r.slice(0, 1)}•••${r.slice(r.indexOf('@'))}` : r.length < 7 ? '•••' : `${r.slice(0, 3)} ••• ${r.slice(-4)}`);
+
+export async function messages(on: Queryable = db): Promise<{ queue: Awaited<ReturnType<typeof queueState>>; recent: MessageRow[] }> {
+  const r = await on.query<{ id: string; queued_at: Date; channel: 'sms' | 'email'; template: string; audience: string; recipient: string; store: string | null; status: string; last_error: string | null; provider: string | null }>(
+    `SELECT m.id, m.queued_at, m.channel, m.template, m.audience, m.recipient, s.name AS store, m.status, m.last_error, m.provider
+       FROM message_outbox m LEFT JOIN stores s ON s.id = m.store_id ORDER BY m.queued_at DESC, m.id LIMIT 30`,
+  );
+  return { queue: await queueState(on), recent: r.rows.map((x) => ({ id: x.id, at: x.queued_at.toISOString(), channel: x.channel, template: x.template, label: templateLabel(x.template), audience: x.audience, recipient: mask(x.recipient), store: x.store, status: x.status, error: x.last_error, provider: x.provider })) };
 }

@@ -63,7 +63,16 @@ import { Admin, SoonPage } from '../src/admin/Admin.tsx';
 import type { AdminView } from '../src/admin/Admin.tsx';
 import type { CaseDetail, MerchantDetail, MerchantList, Me as AdminMe, Overview as AdminOverviewData, QueueItem } from '../src/admin/adminApi.ts';
 import { ageText, compactMoney, degradedNote, kpiDelta, kpiValue, overSla, rowBadge } from '../src/admin/adminLines.ts';
+import { AdminMessages } from '../src/admin/AdminMessages.tsx';
 import { AdminOrders } from '../src/admin/AdminOrders.tsx';
+import { ItemGonePage, NoStorePage, NotFoundPage, ServerErrorPage, SuspendedPage, newReference } from '../src/app/errorPages.tsx';
+import { MobileLook, HARMONY_LABEL, STYLE_GROUPS, SWATCHES } from '../src/console/MobileLook.tsx';
+import { MobileMore } from '../src/console/MobileMore.tsx';
+import { ExportOrders, estimate, exportUrl, MAX_ROWS } from '../src/console/ExportOrders.tsx';
+import { esc, posterHtml, qrSvg, receiptHtml, receiptStamp } from '../src/console/printables.ts';
+import { MORE_GROUPS } from '../src/console/nav.ts';
+import { CUSTOMER_MESSAGES, SMS_ONLY_MESSAGES, SMS_LIMIT, renderSms, sampleContext as sampleMessageContext, smsFit as smsFitOf, emailColours as emailColoursOf } from '../src/app/core.ts';
+import { SAMPLE_STORES, OUTBOX_STATUS } from '../src/admin/adminLines.ts';
 import { AdminSettings } from '../src/admin/AdminSettings.tsx';
 import { AuditLog } from '../src/admin/AuditLog.tsx';
 import { Plans as AdminPlans } from '../src/admin/Plans.tsx';
@@ -790,6 +799,8 @@ const CONSOLE_SHELL: ShellContextValue = {
     status: 'active',
     country: 'RW',
     timeZone: 'Africa/Kigali',
+    address: 'KG 7 Ave, Kimihurura',
+    phone: '078 812 3456',
     currency: CURRENCY,
   },
   me: {
@@ -1937,7 +1948,7 @@ expect(adminAt(0).includes('18.4M RWF') && adminAt(0).includes('+6% vs yesterday
 expect(adminAt(0).includes('Airtel Money') && adminAt(0).includes('Degraded') && adminAt(0).includes('may take longer'), 'a slow provider is called out, and what customers see');
 expect(!adminAt(0).includes('Cards') && !adminAt(0).includes('SMS receipts') && !adminAt(0).includes('Flagged payment'), 'nothing the system does not produce is drawn');
 expect(adminAt(1).includes('All caught up.') && adminAt(1).includes('No traffic') && adminAt(1).includes('No paid orders yet.') && adminAt(1).includes('Nothing recorded yet.'), 'every panel has an empty state');
-expect(adminAt(0).includes('Identity checks') && adminAt(0).includes('Admin team & roles') && adminAt(0).includes('Platform settings') && adminAt(0).includes('Audit log') && adminAt(0).includes('All orders') && !adminHtml[0]!.includes('aria-disabled="true"'), 'a super admin sees all thirteen destinations, none greyed — every one is built');
+expect(adminAt(0).includes('Identity checks') && adminAt(0).includes('Admin team & roles') && adminAt(0).includes('Platform settings') && adminAt(0).includes('Audit log') && adminAt(0).includes('All orders') && !adminHtml[0]!.includes('aria-disabled="true"'), 'a super admin sees every destination, none greyed — every one is built');
 expect(adminAt(0).includes('Grace Kamanzi') && adminAt(0).includes('Super admin') && adminAt(0).includes('Sign out'), 'who is signed in');
 expect(adminAt(2).includes('Needs review') && adminAt(2).includes('Verification') && adminAt(2).includes('Review identity') && !adminAt(2).includes('Approve and go live'), 'a store waiting on its identity check hands over to the review');
 expect(adminAt(3).includes('Open store') && adminAt(3).includes('Suspend store') && !adminAt(3).includes('View as merchant'), 'a live store: open it or suspend it — and no impersonation promise');
@@ -2200,11 +2211,117 @@ expect(opsAt(12).includes('v1 · draft') && opsAt(12).includes('Product flag: Pr
 expect(!opsAt(11).includes('New template'), 'no new-template button — a business type is a decision before it is a form');
 
 expect(mayOpen(['audit.read'], ['audit.read', 'kyc.review']) && !mayOpen(['audit.read'], ['merchants.read']) && mayOpen(['refunds.approve', 'disputes.resolve'], ['disputes.resolve']), 'a destination opens on any one of its permissions');
-expect(NAV.flatMap((g) => g.items).length === 13 && NAV.flatMap((g) => g.items).every((i) => i.built && i.needs.length > 0), 'thirteen destinations, all built, each naming what it needs');
+expect(NAV.flatMap((g) => g.items).length === 14 && NAV.flatMap((g) => g.items).every((i) => i.built && i.needs.length > 0), 'fourteen destinations, all built, each naming what it needs');
 expect(orderAge(5) === '5 min' && orderAge(90) === '2 h' && orderAge(2880) === '2 d' && paymentText({ paymentMethod: 'cash', paymentStatus: 'unpaid' }).paid === false && paymentText({ paymentMethod: 'mtn_momo', paymentStatus: 'refunded' }).text === 'MoMo · refunded', 'order ages and payment pills');
 expect(holdNote(10).warn && holdNote(2000).warn && !holdNote(60).warn, 'hold-period warnings');
 expect(HEALTH_DOT.off.label === 'Not connected' && planValue(null) === 'Not decided' && planValue(null, true) === 'Unlimited' && planValue(3000) === '3000' && parseField('') === null && parseField('1,500') === 1500, 'plan and health helpers');
 expect(/^(?=.*\d)[A-Za-z0-9]{14}$/.test(startingPassword()) && templateMeta({ stores: 1, liveVersion: 1 }) === '1 store' && templateMeta({ stores: 0, liveVersion: null }) === 'Not offered yet', 'a starting password and template summaries');
+
+
+
+// --- milestone 28: error pages, the phone's More and Store look, print and export, message templates ---------------------
+const ERR_NOOP = noop;
+const withPerms = (perms: string[], role: 'owner' | 'manager', node: ReactNode): ReactNode => (
+  <ShellContext.Provider value={{ ...CONSOLE_SHELL, me: { ...CONSOLE_SHELL.me, role, permissions: perms }, may: (p: string) => perms.includes(p), badges: { orders: 3, complaints: 2, reviews: 1, notifications: 3 } }}>{node}</ShellContext.Provider>
+);
+const OWNER_PERMS = ['orders.read', 'orders.update', 'orders.assign_rider', 'wallet.read', 'settings.write', 'products.write', 'support.write', 'customers.read', 'customers.write'];
+const MANAGER_PERMS = ['orders.read', 'orders.update', 'orders.assign_rider', 'products.write'];
+const RECEIPT_ORDER = {
+  number: 1026, placedAt: new Date(Date.UTC(2026, 8, 23, 11, 58)).toISOString(), fulfilment: 'delivery' as const, customer: 'Grace I.', address: 'KG 541 St, Kacyiru',
+  lines: [{ quantity: 2, productName: 'Chicken burger', variantLabel: '', optionLabels: ['extra sauce'], lineTotal: '7000' }, { quantity: 1, productName: 'Fries', variantLabel: 'Large', optionLabels: [], lineTotal: '2000' }, { quantity: 2, productName: '<script>alert(1)</script>', variantLabel: '', optionLabels: [], lineTotal: '3000' }],
+  total: '12000', paymentMethod: 'cash', paymentStatus: 'unpaid' as const, riderName: 'Eric',
+};
+const RECEIPT = receiptHtml({ store: { name: 'Nyama & Co.', address: 'KG 7 Ave, Kimihurura', phone: '078 812 3456', slug: 'nyama' }, host: 'vendlyfy.example', order: RECEIPT_ORDER, timeZone: 'Africa/Kigali', currencyCode: 'RWF' });
+const POSTER = posterHtml({ store: { name: 'Nyama & Co.', address: null, phone: '078 812 3456', slug: 'nyama' }, host: 'vendlyfy.example', hours: 'Mon–Sun 10:00–22:00', brand: '#C6F432', onBrand: '#17160F' }, qrSvg('https://vendlyfy.example/nyama'));
+
+const m28Parts: readonly (readonly [string, ReactNode])[] = [
+  ['Error · an item that is gone, inside a store', <ItemGonePage key="e1" storeName="Nyama & Co." mark="N" catalogWord="Menu" onMenu={ERR_NOOP} />],
+  ['Error · 500', <ServerErrorPage key="e2" reference="ERR-7F3A-21C9" onRetry={ERR_NOOP} />],
+  ['Error · store not found, with a suggestion', <NoStorePage key="e3" slug="nyamaa" suggestion="nyama" onGo={ERR_NOOP} onStart={ERR_NOOP} asked="vendlyfy.example/nyamaa" />],
+  ['Error · store not found, no suggestion', <NoStorePage key="e4" slug="qqqqqq" suggestion={null} onGo={ERR_NOOP} onStart={ERR_NOOP} />],
+  ['Error · suspended', <SuspendedPage key="e5" asked="vendlyfy.example/deals4u" />],
+  ['Error · a page that is not a page', <NotFoundPage key="e6" onHome={ERR_NOOP} />],
+  ['More · an owner', withPerms(OWNER_PERMS, 'owner', <MobileMore navigate={noop} onOpenNotifications={noop} />)],
+  ['More · an owner, switching stores', withPerms(OWNER_PERMS, 'owner', <MobileMore navigate={noop} onOpenNotifications={noop} initialSwitching />)],
+  ['More · a manager', withPerms(MANAGER_PERMS, 'manager', <MobileMore navigate={noop} onOpenNotifications={noop} />)],
+  ['Store look · colours', inConsole(<MobileLook navigate={noop} initial={{ inputs: DEFAULT_INPUTS, design: DEFAULT_DESIGN }} />)],
+  ['Store look · style', inConsole(<MobileLook navigate={noop} initialTab="style" initial={{ inputs: KICKS, design: DEFAULT_DESIGN }} />)],
+  ['Store look · more', inConsole(<MobileLook navigate={noop} initialTab="full" initial={{ inputs: RUN, design: DEFAULT_DESIGN }} />)],
+  ['Export orders · setup', inConsole(<ExportOrders storeId="s1" open onClose={noop} initialRows={540} initialCols={['items', 'customer', 'phone', 'payment']} />)],
+  ['Export orders · too many', inConsole(<ExportOrders storeId="s1" open onClose={noop} initialRows={45000} />)],
+  ['Export orders · done', inConsole(<ExportOrders storeId="s1" open onClose={noop} initialRows={540} initialCols={['customer', 'phone']} initialDone />)],
+  ['Messages · a customer template', inAdmin('messages', <AdminMessages initial={{ queue: { sms: { queued: 12, oldestMinutes: 4, configured: false }, email: { queued: 3, oldestMinutes: 4, configured: false } }, recent: [{ id: 'm1', at: AT(14, 2), channel: 'sms', template: 'approved', label: 'Order accepted', audience: 'customer', recipient: '250 ••• 0001', store: 'Nyama & Co.', status: 'queued', error: null, provider: null }, { id: 'm2', at: AT(14, 1), channel: 'email', template: 'confirm', label: 'Order received', audience: 'customer', recipient: 'unknown', store: 'Nyama & Co.', status: 'skipped', error: 'No email address on file.', provider: null }, { id: 'm3', at: AT(13, 50), channel: 'sms', template: 'payoutFail', label: 'Payout failed', audience: 'merchant', recipient: '250 ••• 1001', store: 'Inzu Threads', status: 'sent', error: null, provider: 'log' }] }} />, 'messages')],
+  ['Messages · an SMS-only template on a light brand', inAdmin('messages', <AdminMessages initialKey="riderJob" initialStore="run" initial={{ queue: { sms: { queued: 0, oldestMinutes: null, configured: true }, email: { queued: 0, oldestMinutes: null, configured: true } }, recent: [] }} />, 'messages')],
+  ['Messages · a customer template on a light brand', inAdmin('messages', <AdminMessages initialKey="delivered" initialStore="run" initial={{ queue: { sms: { queued: 0, oldestMinutes: null, configured: false }, email: { queued: 0, oldestMinutes: null, configured: false } }, recent: [] }} />, 'messages')],
+];
+const m28Html: string[] = [];
+for (const [name, node] of m28Parts) {
+  const html = render(name, node);
+  allHtml += html;
+  m28Html.push(html);
+}
+const m28At = (i: number): string => m28Html[i]!.replace(/<[^>]+>/g, ' ').replaceAll('&amp;', '&').replaceAll('&#x27;', "'").replaceAll('&quot;', '"').replace(/\s+/g, ' ');
+expect(m28Html.length === m28Parts.length, 'every milestone-28 part rendered');
+
+// ErrorPages.dc.html's four, in its words — with the two sentences that would have promised something untrue left out.
+expect(m28At(0).includes('404') && m28At(0).includes('That item isn’t on the menu any more') && m28At(0).includes('Everything available today is on the menu.') && m28At(0).includes('See the menu'), 'a gone item, in the store’s own word for its catalog');
+expect(m28Html[0]!.includes('bg-store-primary') && !m28Html[1]!.includes('bg-store-primary'), 'inside a store the page wears the store’s look; the 500 does not');
+expect(m28At(1).includes('Something went wrong on our side') && m28At(1).includes('Your cart and any payment are safe. Nothing was charged twice.') && m28At(1).includes('Try again') && m28At(1).includes('Reference ERR-7F3A-21C9'), 'the 500, with a reference');
+expect(m28At(2).includes('We can’t find a store at this address') && m28At(2).includes('Did you mean') && m28At(2).includes('nyama') && m28At(2).includes('Start your own store') && m28At(2).includes('vendlyfy.example/nyamaa'), 'store not found, with a near miss');
+expect(m28At(3).includes('Check the spelling of “qqqqqq”') && !m28At(3).includes('Did you mean'), 'and without one it does not invent one');
+expect(m28At(4).includes('This store isn’t taking orders right now') && m28At(4).includes('your order and any refund are still being handled') && m28At(4).includes('Contact Vendlyfy support'), 'a suspended store');
+expect(!m28At(4).includes('SMS') && !m28At(4).includes('Check an order') && !/counterfeit|fraud|reason/i.test(m28At(4)), 'no SMS is promised, and nothing about why is shown to a customer');
+expect(m28At(5).includes('We can’t find that page'), 'a path that is not a page');
+expect(/^ERR-[0-9A-F]{4}-[0-9A-F]{4}$/.test(newReference()) && newReference(() => 0) === 'ERR-0000-0000' && newReference(() => 0.999999) === 'ERR-FFFF-FFFF', 'references are ERR-XXXX-XXXX, random and uppercase hex');
+
+// More: the sidebar's rest, by role.
+expect(m28At(6).includes('Work') && m28At(6).includes('Notifications') && m28At(6).includes('Complaints') && m28At(6).includes('Reviews') && m28At(6).includes('Riders & cash') && m28At(6).includes('Money'), 'More: Work');
+expect(m28At(6).includes('Categories') && m28At(6).includes('Customers') && m28At(6).includes('Analytics') && m28At(6).includes('Store look') && m28At(6).includes('Identity check') && m28At(6).includes('Settings') && m28At(6).includes('Sign out'), 'More: Store, Account and Sign out');
+expect(m28At(6).includes('Nyama & Co.') && m28At(6).includes('Switch') && m28At(6).includes('Owner'), 'More: the store card, with a switch because there is another store');
+expect(m28At(7).includes('Inzu Threads'), 'More: the other store, once opened');
+expect(!m28At(8).includes('Money') && !m28At(8).includes('Settings') && !m28At(8).includes('Complaints') && !m28At(8).includes('Customers') && !m28At(8).includes('Identity check') && m28At(8).includes('Notifications') && m28At(8).includes('Categories'), 'More: a manager is not shown what they cannot open, and keeps what they can');
+expect(m28At(8).includes('Manager') , 'More: the role is named');
+expect(MOBILE_TABS.every((t) => t.built) && MOBILE_TABS.map((t) => t.id).join() === 'dashboard,orders,products,store-design,more', 'the phone’s bar is complete: Home, Orders, Products, Store, More');
+expect(MORE_GROUPS.map((g) => g.label).join() === 'Work,Store,Account', 'the board’s three groups');
+
+// Store look on a phone.
+expect(m28At(9).includes('Store look') && m28At(9).includes('Publish') && m28At(9).includes('Readability') && m28At(9).includes('Brand colour') && m28At(9).includes('Second colour · Vendlyfy picks') && m28At(9).includes('Contrast') && m28At(9).includes('One family'), 'Store look: colours tab');
+expect(SWATCHES.length === 8 && Object.values(HARMONY_LABEL).length === 4, 'eight swatches and four harmonies');
+expect(m28Html[9]!.includes('--store-primary:'), 'the preview is the real storefront component, themed');
+expect(m28At(10).includes('Mood') && m28At(10).includes('Shape') && m28At(10).includes('Headings') && m28At(10).includes('Cards') && m28At(10).includes('Raised') && m28At(10).includes('Classic') && STYLE_GROUPS.length === 4, 'Store look: style tab, with the engine’s four fonts');
+expect(m28At(11).includes('The full studio, with logo colours, your own second colour and every readability score, is on a bigger screen.') && m28At(11).includes('Open the full studio'), 'Store look: the phone says what it leaves out');
+
+// Printing.
+expect(RECEIPT.includes('NYAMA &amp; CO.') && RECEIPT.includes('KG 7 Ave, Kimihurura · 078 812 3456') && RECEIPT.includes('Order #1026') && RECEIPT.includes('TOTAL RWF') && RECEIPT.includes('12,000') && RECEIPT.includes('Cash on delivery') && RECEIPT.includes('UNPAID') && RECEIPT.includes('Rider: Eric') && RECEIPT.includes('vendlyfy.example/nyama'), 'the receipt carries the board’s lines');
+expect(RECEIPT.includes('23/09/26 13:58'), 'and its time is the STORE’s clock (Kigali is UTC+2), not the printing device’s');
+expect(RECEIPT.includes('+ extra sauce') && RECEIPT.includes('Fries · Large') && RECEIPT.includes('7,000'), 'options and variants appear, prices are grouped');
+expect(!RECEIPT.includes('<script>') && RECEIPT.includes('&lt;script&gt;'), 'a product named like a script is text on the receipt, never a script');
+expect(RECEIPT.includes('@page{size:80mm auto') && !/#[0-9A-Fa-f]{6}/.test(RECEIPT), '80 mm thermal, black and white only — no brand colour');
+expect(receiptStamp(new Date(Date.UTC(2026, 8, 23, 22, 30)).toISOString(), 'Africa/Kigali') === '24/09/26 00:30', 'a late-evening order lands on the right date in the store’s zone');
+expect(POSTER.includes('ORDER ONLINE') && POSTER.includes('Nyama &amp; Co.') && POSTER.includes('vendlyfy.example/nyama') && POSTER.includes('background:#C6F432') && POSTER.includes('color:#17160F') && POSTER.includes('Mon–Sun 10:00–22:00') && POSTER.includes('078 812 3456'), 'the poster: brand band, text that reads on it, the address and the hours');
+expect(POSTER.includes('<svg') && POSTER.includes('@page{size:A5'), 'the QR code is an inline vector and the page is A5');
+expect(qrSvg('https://a.test/x') !== qrSvg('https://a.test/y') && qrSvg('https://a.test/x').startsWith('<svg'), 'a different address is a different code');
+expect(esc('<a href="x">&\'</a>') === '&lt;a href=&quot;x&quot;&gt;&amp;&#39;&lt;/a&gt;' && esc(null) === '', 'escaping');
+
+// Export.
+expect(m28At(12).includes('Export orders') && m28At(12).includes('Last 7 days') && m28At(12).includes('This month') && m28At(12).includes('Items and options') && m28At(12).includes('Customer phone') && m28At(12).includes('About 540 rows. Opens in Excel or Google Sheets.'), 'export: period, columns and a real estimate');
+expect(m28At(12).includes('Phone numbers are personal data. Downloading this file is logged.'), 'export: says it is logged');
+expect(m28At(13).includes('45,000 orders is more than one file holds. Choose a shorter period.') && m28Html[13]!.includes('disabled'), 'export: too big is said before a click, and the button is off');
+expect(m28At(14).includes('Your download has started') && m28At(14).includes('It’s logged who downloaded it.') && m28At(14).includes('Export something else'), 'export: done');
+expect(estimate(0) === 'No orders. Opens in Excel or Google Sheets.' && estimate(1).startsWith('About 1 row.') && estimate(null) === 'Counting…' && MAX_ROWS === 20000, 'estimates');
+expect(exportUrl('s1', 'week', ['items', 'phone']) === '/api/stores/s1/exports/orders?range=week&cols=items%2Cphone' && exportUrl('s1', 'today', [], true).endsWith('&count=1'), 'export URLs');
+
+// Message templates.
+expect(m28At(15).includes('Emails and SMS, in each store’s colours') && m28At(15).includes('Customer · email + SMS') && m28At(15).includes('Merchant and rider · SMS only') && m28At(15).includes('Rider on the way'), 'messages: the board’s gallery');
+expect(m28At(15).includes('Nyama & Co.: Eric (RAD 482 K) is on the way with #1026. Pay 9,000 RWF cash. Call: 078 455 9012') && m28At(15).includes('/ 160') && m28At(15).includes('Fits one SMS') && m28At(15).includes('NYAMACO'), 'messages: the SMS as it will read, with its count and sender');
+expect(m28Html[15]!.includes('srcDoc=') && /background:#[0-9A-Fa-f]{6}/.test(m28Html[15]!.slice(m28Html[15]!.indexOf('srcDoc='))), 'messages: the email is the real document, in the store’s colour');
+expect(m28At(15).includes('no provider connected') && m28At(15).includes('12 messages are waiting') && m28At(15).includes('Skipped') && m28At(15).includes('No email address on file.') && m28At(15).includes('250 ••• 0001') && !m28At(15).includes('250781110001'), 'messages: what is waiting, what was skipped and why, recipients masked');
+expect(m28At(16).includes('No email for this message.') && m28At(16).includes('VENDLYFY') && m28At(16).includes('Vendlyfy: new delivery #1026 from Run Rwanda to Kacyiru. Collect 9,000 RWF cash. Open app.') && m28At(16).includes('development transport'), 'messages: an SMS-only template says so, and is signed Vendlyfy');
+expect(m28At(17).includes('dark') && m28Html[17]!.includes('color:#17160F') && m28Html[17]!.includes('background:#C6F432'), 'messages: on a light brand colour the button text flips to dark');
+for (const store of SAMPLE_STORES) {
+  for (const k of [...CUSTOMER_MESSAGES, ...SMS_ONLY_MESSAGES]) expect(smsFitOf(renderSms(k, sampleMessageContext(store.name))).count <= SMS_LIMIT, `${k} for ${store.name} fits one SMS`);
+}
+expect(emailColoursOf('#C6F432').onButton === '#17160F' && emailColoursOf('#1D6B47').onButton === '#FFFFFF' && OUTBOX_STATUS['queued']!.label === 'Waiting', 'message helpers');
 
 
 // --- Settings: the rules that live outside the JSX ---------------------------------

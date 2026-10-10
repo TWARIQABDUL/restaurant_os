@@ -19,7 +19,7 @@ import { adminApi, adminMoneyApi } from './adminApi.ts';
 import type { Me } from './adminApi.ts';
 import { NAV, initial, mayOpen } from './adminLines.ts';
 
-export type AdminView = 'overview' | 'merchants' | 'kyc' | 'payouts' | 'disputes' | 'currencies' | 'payments' | 'orders' | 'audit' | 'settings' | 'team' | 'plans' | 'industries' | 'soon';
+export type AdminView = 'overview' | 'merchants' | 'kyc' | 'payouts' | 'disputes' | 'currencies' | 'payments' | 'orders' | 'audit' | 'settings' | 'team' | 'plans' | 'industries' | 'messages' | 'soon';
 
 type AdminContextValue = {
   me: Me;

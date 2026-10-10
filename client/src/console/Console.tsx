@@ -28,7 +28,10 @@ import { Categories } from './Categories.tsx';
 import { Complaints } from './Complaints.tsx';
 import { Customers } from './Customers.tsx';
 import { Customize } from './Customize.tsx';
+import { MobileLook } from './MobileLook.tsx';
+import { MobileMore } from './MobileMore.tsx';
 import { Settings } from './Settings.tsx';
+import { useNarrow } from './useNarrow.ts';
 import { Verify } from './Verify.tsx';
 import { Dashboard } from './Dashboard.tsx';
 import { NotificationsPanel } from './NotificationsPanel.tsx';
@@ -69,7 +72,8 @@ export type ConsoleView =
   | { kind: 'settings' }
   | { kind: 'design' }
   | { kind: 'theme' }
-  | { kind: 'verify' };
+  | { kind: 'verify' }
+  | { kind: 'more' };
 
 /** The sidebar highlights the list while its editor is open: the editor is Products, one level down. */
 export function activeItem(view: ConsoleView): string {
@@ -90,7 +94,7 @@ export function Console({ slug, view, navigate }: Props): ReactNode {
   if (view.kind === 'design' || view.kind === 'theme' || view.kind === 'verify') {
     return (
       <ShellProvider slug={slug} fallback={(state, retry) => <ShellFallback state={state} retry={retry} navigate={navigate} />}>
-        {view.kind === 'design' ? <Customize navigate={navigate} /> : view.kind === 'theme' ? <ThemeStudio navigate={navigate} /> : <Verify navigate={navigate} />}
+        {view.kind === 'design' ? <DesignScreen navigate={navigate} /> : view.kind === 'theme' ? <ThemeStudio navigate={navigate} /> : <Verify navigate={navigate} />}
       </ShellProvider>
     );
   }
@@ -100,6 +104,12 @@ export function Console({ slug, view, navigate }: Props): ReactNode {
       <ConsoleFrame view={view} navigate={navigate} />
     </ShellProvider>
   );
+}
+
+/** Store design on a phone is its own screen (MobileLook), not the desktop editor squeezed; on anything wider it is Customize. */
+function DesignScreen({ navigate }: { navigate: (to: string) => void }): ReactNode {
+  const narrow = useNarrow();
+  return narrow ? <MobileLook navigate={navigate} /> : <Customize navigate={navigate} />;
 }
 
 function ConsoleFrame({ view, navigate }: { view: ConsoleView; navigate: (to: string) => void }): ReactNode {
@@ -273,6 +283,8 @@ function ConsoleFrame({ view, navigate }: { view: ConsoleView; navigate: (to: st
           <Customers navigate={navigate} />
         ) : view.kind === 'analytics' ? (
           <Analytics />
+        ) : view.kind === 'more' ? (
+          <MobileMore navigate={navigate} onOpenNotifications={() => setPanelOpen(true)} />
         ) : view.kind === 'settings' ? (
           <Settings navigate={navigate} />
         ) : data === null ? (

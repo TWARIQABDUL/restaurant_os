@@ -20,12 +20,15 @@ export type ApiError = {
   code: string;
   message: string;
   hint?: string;
+  /** A support reference for a server error (ERR-XXXX-XXXX), so the person can read it out and it can be found in the log. */
+  reference?: string;
 };
 
 export class ApiFailure extends Error {
   readonly status: number;
   readonly code: string;
   readonly hint: string | undefined;
+  readonly reference: string | undefined;
 
   constructor(error: ApiError) {
     super(error.message);
@@ -33,6 +36,7 @@ export class ApiFailure extends Error {
     this.status = error.status;
     this.code = error.code;
     this.hint = error.hint;
+    this.reference = error.reference;
   }
 }
 
@@ -113,6 +117,7 @@ async function readResponse<T>(res: Response): Promise<T> {
       message:
         typeof payload['error'] === 'string' ? payload['error'] : 'Something went wrong. Please try again.',
       ...(typeof payload['hint'] === 'string' ? { hint: payload['hint'] } : {}),
+      ...(typeof payload['reference'] === 'string' ? { reference: payload['reference'] } : {}),
     });
   }
 
@@ -181,4 +186,9 @@ export type InviteResult = {
   };
   hasAccount: boolean;
   passwordRules: string[];
+};
+
+/** Milestone 28: the spell-checker behind "Did you mean …?" on a store address that does not exist. */
+export const lookupApi = {
+  nearStore: (slug: string): Promise<{ slug: string | null; name: string | null }> => api.get<{ slug: string | null; name: string | null }>(`/api/lookup/store?near=${encodeURIComponent(slug)}`),
 };

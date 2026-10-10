@@ -4,6 +4,7 @@
 //   GET  /audit · POST /audit/verify          audit.read
 //   GET  /orders                              merchants.read
 //   GET/PUT /settings                         platform_settings.manage
+//   GET  /messages                            platform_settings.manage — what is waiting to be sent, and what went
 //   GET/POST /team · PUT/DELETE /team/:id     platform_members.create   (only super_admin holds it — a member cannot make a bigger one)
 //   GET  /plans · PUT /plans/:key             plans.manage
 //   GET  /templates[/:key] · PUT /templates/:key · POST /templates/:key/publish     templates.manage
@@ -94,6 +95,16 @@ router.put(
     if (b['holdMinutes'] !== undefined) patch.holdMinutes = Number(b['holdMinutes']);
     if (typeof b['automaticPayoutAt'] === 'string') patch.automaticPayoutAt = b['automaticPayoutAt'];
     res.json({ settings: await settings.update(patch, actorOf(req)), health: await ops.health(), limits: { holdMin: settings.HOLD_MIN, holdMax: settings.HOLD_MAX } });
+  }),
+);
+
+// ---- messages --------------------------------------------------------------
+
+router.get(
+  '/messages',
+  requirePlatformPermission('platform_settings.manage'),
+  asyncHandler(async (_req, res) => {
+    res.json(await ops.messages());
   }),
 );
 

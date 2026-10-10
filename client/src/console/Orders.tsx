@@ -39,7 +39,9 @@ import {
 import type { StatusTone } from '../shared/ui/index.ts';
 import { orders as ordersApi } from './api.ts';
 import type { OrderDetail, OrderListItem, OrderStatus, RefundReasonCode, RiderOption } from './api.ts';
+import { ExportOrders } from './ExportOrders.tsx';
 import { relativeWhen } from './lines.ts';
+import { printHtml, receiptHtml } from './printables.ts';
 import { useShell } from './ShellProvider.tsx';
 
 type Props = {
@@ -195,6 +197,7 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
 
   const [cashAmount, setCashAmount] = useState('');
 
+  const [exporting, setExporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
@@ -340,6 +343,9 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        <Button variant="secondary" onClick={() => setExporting(true)}>
+          Export CSV
+        </Button>
         <div className="lg:w-[220px]">
           <Segmented
             label="View"
@@ -536,8 +542,23 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
               'That could not be sent.',
             )
           }
+          onPrint={() => {
+            if (detail === null) return;
+            // The store's CLOCK and CONTACT on the paper, not the printing device's: a counter tablet set to another zone still prints the right time.
+            printHtml(
+              receiptHtml({
+                store: { name: store.name, address: store.address, phone: store.phone, slug: store.slug },
+                host: window.location.host,
+                order: { number: detail.orderNumber, placedAt: detail.placedAt, fulfilment: detail.fulfilment, customer: detail.customer, address: detail.address, lines: detail.lines, total: detail.total, paymentMethod: detail.paymentMethod, paymentStatus: detail.paymentStatus, riderName: detail.riderName },
+                timeZone: store.timeZone,
+                currencyCode: currency.code,
+              }),
+            );
+          }}
         />
       )}
+
+      <ExportOrders storeId={store.id} open={exporting} onClose={() => setExporting(false)} />
 
       {toast === null ? null : (
         <div className="fixed bottom-6 left-1/2 z-30 -translate-x-1/2">
@@ -639,6 +660,7 @@ type DrawerProps = {
   onCloseReturn: () => void;
   onRetryDelivery: () => void;
   onSendRefund: () => void;
+  onPrint: () => void;
 };
 
 function OrderDrawer(props: DrawerProps): ReactNode {
@@ -690,6 +712,9 @@ function OrderDrawer(props: DrawerProps): ReactNode {
                   {detail.phone === null ? '' : ` · ${detail.phone}`} · {detail.fulfilment === 'pickup' ? 'Pickup' : 'Delivery'}
                 </span>
               </div>
+              <Button variant="text" tone="brand" onClick={props.onPrint}>
+                Print receipt
+              </Button>
               <CloseX onClose={onClose} />
             </header>
 

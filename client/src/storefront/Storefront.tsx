@@ -8,6 +8,7 @@
 
 import type { ReactNode } from 'react';
 import { ApiFailure } from '../app/api.ts';
+import { NoStore, SuspendedPage } from '../app/errorPages.tsx';
 import { Skeleton, StateCard } from '../shared/ui/index.ts';
 import { StoreProvider } from './StoreProvider.tsx';
 import type { LoadState } from './StoreProvider.tsx';
@@ -59,31 +60,12 @@ function fallback(slug: string, state: LoadState, retry: () => void): ReactNode 
   if (state.status !== 'failed') return null;
   const error: ApiFailure = state.error;
 
-  if (error.code === 'STORE_SUSPENDED') {
-    return (
-      <div className="px-4 py-16">
-        <StateCard
-          tone="warn"
-          icon="!"
-          headline="This shop is closed"
-          body={error.message}
-          {...(error.hint === undefined ? {} : { reference: error.hint })}
-        />
-      </div>
-    );
-  }
+  // Both of these are Vendlyfy's own pages (ErrorPages.dc.html): a store that is missing or suspended has no look of its own to show, and
+  // nothing about why a store was suspended is shown to a customer — `error.message` and `error.hint` are deliberately not rendered.
+  if (error.code === 'STORE_SUSPENDED') return <SuspendedPage asked={typeof window === 'undefined' ? undefined : `${window.location.host}/${slug}`} />;
 
   if (error.code === 'NO_SUCH_STORE' || error.code === 'INVALID_SLUG') {
-    return (
-      <div className="px-4 py-16">
-        <StateCard
-          tone="neutral"
-          icon="?"
-          headline="No shop at this address"
-          body={`We couldn’t find a store at “${slug}”. Check the link, or ask the store for it again.`}
-        />
-      </div>
-    );
+    return <NoStore slug={slug} onGo={(to) => window.location.assign(`/${to}`)} onStart={() => window.location.assign('/signup')} />;
   }
 
   return (
@@ -93,6 +75,7 @@ function fallback(slug: string, state: LoadState, retry: () => void): ReactNode 
         icon={error.code === 'OFFLINE' ? '⚡' : '!'}
         headline={error.code === 'OFFLINE' ? 'You’re offline' : 'That didn’t load'}
         body={error.message}
+        {...(error.reference === undefined ? {} : { reference: error.reference })}
         action={{ label: 'Retry now', onSelect: retry }}
       />
     </div>

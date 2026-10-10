@@ -114,3 +114,22 @@ export type {
   WordForm,
   WordKey,
 } from './config/index.ts';
+
+// Milestone 28: the email and SMS templates (project/Messages.dc.html) — pure, so the server renders the real message and the admin console previews the same one.
+export {
+  CUSTOMER_MESSAGES,
+  CUSTOMER_TEMPLATES,
+  MESSAGE_LABEL,
+  SMS_LIMIT,
+  SMS_ONLY_MESSAGES,
+  SMS_TEMPLATES,
+  emailColours,
+  isCustomerMessage,
+  renderCustomerEmail,
+  renderEmailHtml,
+  renderSms,
+  sampleContext,
+  senderId,
+  smsFit,
+} from './messages/index.ts';
+export type { CustomerEmail, CustomerMessage, EmailColours, EmailOrder, MessageContext, MessageKey, SmsOnlyMessage } from './messages/index.ts';

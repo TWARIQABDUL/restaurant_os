@@ -41,7 +41,11 @@ import {
   zoneAreasLine,
   zoneFeeLine,
 } from './settingsLines.ts';
+import { DEFAULT_INPUTS } from './lookDraft.ts';
+import { posterHtml, printHtml, qrSvg } from './printables.ts';
 import { useShell } from './ShellProvider.tsx';
+import { compileTheme } from '../app/core.ts';
+import { lookApi } from './api.ts';
 import { methodName } from './walletLines.ts';
 
 type Props = {
@@ -597,7 +601,7 @@ function DetailsPanel({ extra, flash, onChanged }: { extra: SettingsExtra; flash
   const [address, setAddress] = useState(extra.store.address ?? '');
   const [zone, setZone] = useState(extra.store.timeZone);
   const [week, setWeek] = useState(() => weekFrom(extra.hours));
-  const [busy, setBusy] = useState<'details' | 'hours' | null>(null);
+  const [busy, setBusy] = useState<'details' | 'hours' | 'poster' | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const zones = typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl ? (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf('timeZone') : ['Africa/Kigali'];
@@ -611,6 +615,23 @@ function DetailsPanel({ extra, flash, onChanged }: { extra: SettingsExtra; flash
       flash('Store details saved');
     } catch (cause) {
       setProblem(reason(cause, 'Those could not be saved.'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // "A5 or A4, brand colour band": the colours are the PUBLISHED theme's, compiled the way the storefront's are, so the band is exactly
+  // the colour customers see and the text on it is the one the compiler proved readable. A store that never published uses the default.
+  const printPoster = async (): Promise<void> => {
+    setBusy('poster');
+    setProblem(null);
+    try {
+      const look = await lookApi.load(store.id);
+      const colors = compileTheme((look.published ?? null)?.inputs ?? DEFAULT_INPUTS).colors;
+      const host = window.location.host;
+      printHtml(posterHtml({ store: { name: extra.store.name, address: extra.store.address, phone: extra.store.publicPhone, slug: extra.store.slug }, host, hours: extra.hours.length === 0 ? null : hoursSummary(extra.hours), brand: colors.primary, onBrand: colors.onPrimary }, qrSvg(`${window.location.protocol}//${host}/${extra.store.slug}`)));
+    } catch (cause) {
+      setProblem(reason(cause, 'The poster could not be prepared.'));
     } finally {
       setBusy(null);
     }
@@ -655,9 +676,12 @@ function DetailsPanel({ extra, flash, onChanged }: { extra: SettingsExtra; flash
           <span className="text-caption font-normal text-muted">This is how customers find you, so it can’t be changed here.</span>
         </div>
       </div>
-      <div>
+      <div className="flex flex-wrap gap-2">
         <Button tone="brand" type="button" busy={busy === 'details'} busyLabel="Saving…" disabled={name.trim().length < 2} onClick={() => void saveDetails()}>
           Save details
+        </Button>
+        <Button variant="secondary" type="button" busy={busy === 'poster'} busyLabel="Preparing…" onClick={() => void printPoster()}>
+          Print store QR poster
         </Button>
       </div>
 

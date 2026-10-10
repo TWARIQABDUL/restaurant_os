@@ -27,10 +27,12 @@ import sessionRoutes from '../routes/session.ts';
 import storeConfigRoutes from '../routes/storeConfig.ts';
 import storeThemeRoutes from '../routes/storeTheme.ts';
 import { storeKycRoutes } from '../routes/storeKyc.ts';
+import storeExportRoutes from '../routes/storeExports.ts';
 import onboardingRoutes from '../routes/onboarding.ts';
 import adminRoutes from '../routes/admin.ts';
 import adminMoneyRoutes from '../routes/adminMoney.ts';
 import adminOpsRoutes from '../routes/adminOps.ts';
+import lookupRoutes from '../routes/lookup.ts';
 import storefrontConfigRoutes from '../routes/storefrontConfig.ts';
 import storefrontThemeRoutes from '../routes/storefrontTheme.ts';
 import storefrontStoreRoutes from '../routes/storefrontStore.ts';
@@ -169,6 +171,8 @@ export function createApp(): Express {
   app.use('/api/session', sessionRoutes);
   // Milestone 26: a stranger becomes a merchant. Public by nature; rate-limited like sign-in. See the router's header.
   app.use('/api/onboarding', onboardingRoutes);
+  // Milestone 28: "Did you mean …?" for a mistyped store address. Public; offers at most one live store within two typos.
+  app.use('/api/lookup', lookupRoutes);
   // Milestone 27: the Vendlyfy team. Every route names a PLATFORM permission; none is reachable by a store role. See the router's header.
   app.use('/api/admin', adminRoutes);
   app.use('/api/admin', adminMoneyRoutes);
@@ -212,6 +216,8 @@ export function createApp(): Express {
   app.use('/api/stores/:storeId/config', storeConfigRoutes);
   app.use('/api/stores/:storeId/theme', storeThemeRoutes);
   app.use('/api/stores/:storeId/kyc', storeKycRoutes);
+  // Milestone 28: files that leave the screen. Audited.
+  app.use('/api/stores/:storeId/exports', storeExportRoutes);
 
   // Product photos, served from whichever ImageStore is configured. PUBLIC and GET-only: a storefront <img>
   // carries no session, and the name is 128 random bits.

@@ -27,6 +27,7 @@ import { assertSessionConfig } from '../auth/sessionToken.ts';
 import { assertPermissionsExist } from '../middleware/authorize.ts';
 import { startSettlementLoop, stopSettlementLoop } from '../jobs/settlement.ts';
 import { startKycRetentionLoop, stopKycRetentionLoop } from '../jobs/kycRetention.ts';
+import { startMessagingLoop, stopMessagingLoop } from '../jobs/messaging.ts';
 
 const PORT = Number(process.env.API_PORT ?? process.env.PORT ?? '5100');
 
@@ -60,6 +61,8 @@ async function main(): Promise<void> {
   startSettlementLoop();
   // Milestone 26: deletes face videos once a case is decided. See jobs/kycRetention.ts.
   startKycRetentionLoop();
+  // Milestone 28: writes down what happened as messages, and sends what is waiting if a transport is configured. See jobs/messaging.ts.
+  startMessagingLoop();
   const server = app.listen(PORT, () => {
     console.log(`[api] listening on ${PORT} — Postgres, no supabase-js`);
   });
@@ -82,6 +85,7 @@ async function main(): Promise<void> {
     forceExit.unref();
     stopSettlementLoop();
     stopKycRetentionLoop();
+    stopMessagingLoop();
 
     server.close(() => {
       void closePool()

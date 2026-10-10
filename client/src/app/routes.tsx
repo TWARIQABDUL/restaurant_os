@@ -21,9 +21,11 @@ import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from '
 import type { ReactNode } from 'react';
 import { AuthPage } from '../auth/AuthPage.tsx';
 import { Onboarding } from '../onboarding/Onboarding.tsx';
+import { NotFoundPage } from './errorPages.tsx';
 import { Admin, SoonPage } from '../admin/Admin.tsx';
 import type { AdminView } from '../admin/Admin.tsx';
 import { AdminOrders } from '../admin/AdminOrders.tsx';
+import { AdminMessages } from '../admin/AdminMessages.tsx';
 import { AdminSettings } from '../admin/AdminSettings.tsx';
 import { AuditLog } from '../admin/AuditLog.tsx';
 import { Currencies } from '../admin/Currencies.tsx';
@@ -131,12 +133,18 @@ function AdminRoute({ view, active }: { view: AdminView; active: string }): Reac
     team: <Team />,
     plans: <Plans />,
     industries: <Templates />,
+    messages: <AdminMessages />,
   };
   return (
     <Admin view={view} active={active} navigate={go}>
       {() => screens[view] ?? <SoonPage label="Page not found" />}
     </Admin>
   );
+}
+
+function NotFoundRoute(): ReactNode {
+  const navigate = useNavigate();
+  return <NotFoundPage onHome={() => void navigate('/signin')} />;
 }
 
 function SignupRoute(): ReactNode {
@@ -166,6 +174,7 @@ export function AppRoutes(): ReactNode {
         <Route path="/admin/team" element={<AdminRoute view="team" active="team" />} />
         <Route path="/admin/plans" element={<AdminRoute view="plans" active="plans" />} />
         <Route path="/admin/industries" element={<AdminRoute view="industries" active="industries" />} />
+        <Route path="/admin/messages" element={<AdminRoute view="messages" active="messages" />} />
         <Route path="/admin/:section" element={<AdminRoute view="soon" active="" />} />
 
         {/* The console, BEFORE the storefront's /:store — react-router prefers the more specific path either
@@ -183,6 +192,7 @@ export function AppRoutes(): ReactNode {
         <Route path="/app/:store/reviews" element={<ConsoleRoute view="reviews" />} />
         <Route path="/app/:store/customers" element={<ConsoleRoute view="customers" />} />
         <Route path="/app/:store/analytics" element={<ConsoleRoute view="analytics" />} />
+        <Route path="/app/:store/more" element={<ConsoleRoute view="more" />} />
         <Route path="/app/:store/settings" element={<ConsoleRoute view="settings" />} />
         <Route path="/app/:store/verify" element={<ConsoleRoute view="verify" />} />
         <Route path="/app/:store/store-design" element={<ConsoleRoute view="design" />} />
@@ -203,8 +213,8 @@ export function AppRoutes(): ReactNode {
             shopper always arrives at a store. Sign-in is the one thing here that is always somewhere. */}
         <Route path="/" element={<Navigate to="/signin" replace />} />
 
-        {/* Milestone 28 owns ErrorPages. Until then an unknown path goes where a person can act. */}
-        <Route path="*" element={<Navigate to="/signin" replace />} />
+        {/* A path no store could own (more segments than any route above): the platform's 404, not a bounce to sign-in. */}
+        <Route path="*" element={<NotFoundRoute />} />
       </Routes>
     </BrowserRouter>
   );

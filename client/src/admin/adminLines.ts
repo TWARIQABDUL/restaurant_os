@@ -26,6 +26,7 @@ export const NAV: readonly { label: string; items: readonly { id: string; label:
     label: 'Configuration',
     items: [
       { id: 'industries', label: 'Industry templates', path: '/admin/industries', icon: 'M4 6h16M4 12h16M4 18h10M18 16v4M16 18h4', built: true, needs: ['templates.manage'] },
+      { id: 'messages', label: 'Message templates', path: '/admin/messages', icon: 'M4 5h16v12H8l-4 3zM8 9h8M8 13h5', built: true, needs: ['platform_settings.manage'] },
       { id: 'plans', label: 'Plans & fees', path: '/admin/plans', icon: 'M4 4h16v16H4zM4 9h16M9 9v11', built: true, needs: ['plans.manage'] },
       { id: 'team', label: 'Admin team & roles', path: '/admin/team', icon: 'M16 19v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', built: true, needs: ['platform_members.create'] },
       { id: 'audit', label: 'Audit log', path: '/admin/audit', icon: 'M12 8v4l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', built: true, needs: ['audit.read'] },
@@ -380,3 +381,21 @@ export const TEMPLATE_WORDS = [
 export const templateMeta = (t: Pick<TemplateSummary, 'stores' | 'liveVersion'>): string => (t.stores > 0 ? `${t.stores.toLocaleString('en-US')} ${t.stores === 1 ? 'store' : 'stores'}` : t.liveVersion === null ? 'Not offered yet' : 'No stores yet');
 
 export const planSummary = (p: Pick<Plan, 'stores'>): string => `${p.stores.toLocaleString('en-US')} ${p.stores === 1 ? 'store' : 'stores'}`;
+
+// ---------------------------------------------------------------------------
+// Message templates (project/Messages.dc.html)
+// ---------------------------------------------------------------------------
+
+/** The board's three tweak stores — chosen because one is dark, one is bright and one is LIGHT, which is what proves the button text flips. */
+export const SAMPLE_STORES = [
+  { key: 'nyama', name: 'Nyama & Co.', mark: 'N', brand: '#1D6B47', item: 'Chicken burger' },
+  { key: 'kicks', name: 'Kigali Kicks', mark: 'KK', brand: '#E4572E', item: 'Runner 01 · 42' },
+  { key: 'run', name: 'Run Rwanda', mark: 'RR', brand: '#C6F432', item: 'Trail socks' },
+] as const;
+
+export const OUTBOX_STATUS: Record<string, { label: string; tone: string }> = {
+  queued: { label: 'Waiting', tone: 'bg-status-warn text-status-warn-fg' },
+  sent: { label: 'Sent', tone: 'bg-status-success text-status-success-fg' },
+  failed: { label: 'Failed', tone: 'bg-status-danger text-status-danger-fg' },
+  skipped: { label: 'Skipped', tone: 'bg-status-neutral text-status-neutral-fg' },
+};

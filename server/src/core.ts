@@ -27,6 +27,20 @@
 // and db/seeds have used since milestone 2.
 
 export {
+  CUSTOMER_MESSAGES,
+  CUSTOMER_TEMPLATES,
+  MESSAGE_LABEL,
+  SMS_LIMIT,
+  SMS_ONLY_MESSAGES,
+  SMS_TEMPLATES,
+  emailColours,
+  isCustomerMessage,
+  renderCustomerEmail,
+  renderEmailHtml,
+  renderSms,
+  sampleContext,
+  senderId,
+  smsFit,
   CARD_TREATMENTS,
   DEFAULT_DESIGN,
   HOMEPAGE_SECTIONS,
@@ -71,6 +85,7 @@ export {
   wordKeys,
 } from '../../packages/core/src/index.ts';
 
+export type { CustomerEmail, CustomerMessage, EmailColours, EmailOrder, MessageContext, MessageKey, SmsOnlyMessage } from '../../packages/core/src/index.ts';
 export type {
   Attribute,
   AttributePick,

@@ -290,3 +290,10 @@ export const adminOpsApi = {
   saveTemplate: (key: string, edit: TemplateEdit): Promise<TemplateDetail> => api.put<TemplateDetail>(`/api/admin/templates/${key}`, edit),
   publishTemplate: (key: string, rollout: 'new' | 'all'): Promise<{ template: TemplateDetail; updated: number }> => api.post<{ template: TemplateDetail; updated: number }>(`/api/admin/templates/${key}/publish`, { rollout }),
 };
+
+export type MessageQueue = Record<'sms' | 'email', { queued: number; oldestMinutes: number | null; configured: boolean }>;
+export type OutboxRow = { id: string; at: string; channel: 'sms' | 'email'; template: string; label: string; audience: string; recipient: string; store: string | null; status: string; error: string | null; provider: string | null };
+
+export const adminMessagesApi = {
+  messages: (): Promise<{ queue: MessageQueue; recent: OutboxRow[] }> => api.get<{ queue: MessageQueue; recent: OutboxRow[] }>('/api/admin/messages'),
+};

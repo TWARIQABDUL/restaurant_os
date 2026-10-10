@@ -16,7 +16,7 @@ import { MOBILE_TABS, NAV_GROUPS, hrefFor, iconPath, maySee } from './nav.ts';
 import type { BadgeKey, NavIcon } from './nav.ts';
 import { useShell } from './ShellProvider.tsx';
 
-function Icon({ icon, size = 20 }: { icon: NavIcon; size?: number }): ReactNode {
+export function Icon({ icon, size = 20 }: { icon: NavIcon; size?: number }): ReactNode {
   const path = iconPath(icon);
   if (path === '') {
     // "More" has no outline in the board — it is three dots, drawn as circles.

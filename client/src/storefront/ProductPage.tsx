@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ApiFailure } from '../app/api.ts';
+import { ItemGonePage } from '../app/errorPages.tsx';
 import { Button, Skeleton, StateCard, Toast } from '../shared/ui/index.ts';
 import { BottomSheet } from '../shared/ui/index.ts';
 import { storefront } from './api.ts';
@@ -64,7 +65,7 @@ type Props = {
 };
 
 export function ProductPage({ productId, onBack, onOpenCart, onSignIn }: Props): ReactNode {
-  const { face, money, setCart } = useStore();
+  const { face, money, setCart, t } = useStore();
 
   const [product, setProduct] = useState<ProductDetailData | null>(null);
   const [rating, setRating] = useState<RatingSummary | null>(null);
@@ -123,6 +124,11 @@ export function ProductPage({ productId, onBack, onOpenCart, onSignIn }: Props):
       })
       .finally(() => setLoadingMore(false));
   }, [cursor, loadingMore, face.store.slug, productId]);
+
+  // A product that is gone is not an outage: the store's own look, and the way back is its menu (ErrorPages.dc.html, "404 inside a store").
+  if (error !== null && error.code === 'NO_SUCH_PRODUCT') {
+    return <ItemGonePage storeName={face.store.name} mark={face.store.name.trim().charAt(0).toUpperCase() || 'S'} catalogWord={t('catalog')} onMenu={onBack} />;
+  }
 
   if (error !== null) {
     return (

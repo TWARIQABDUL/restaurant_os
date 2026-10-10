@@ -33,6 +33,7 @@ const ICONS = {
   analytics: 'M4 20V10M10 20V4M16 20v-8M22 20H2',
   settings: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M14 4v4M8 10v4M16 16v4',
   bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4',
+  verified: 'M4 5h16v14H4zM9 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM14 9h4M14 13h4',
   more: '',
 } as const;
 
@@ -145,8 +146,8 @@ export const MOBILE_TABS: readonly { id: string; label: string; icon: NavIcon; p
   { id: 'dashboard', label: 'Home', icon: 'dashboard', path: '', built: true },
   { id: 'orders', label: 'Orders', icon: 'orders', path: '/orders', built: true, badge: 'orders' },
   { id: 'products', label: 'Products', icon: 'products', path: '/products', built: true },
-  { id: 'store-design', label: 'Store', icon: 'store', path: '/store-design', built: false },
-  { id: 'more', label: 'More', icon: 'more', path: '/more', built: false },
+  { id: 'store-design', label: 'Store', icon: 'store', path: '/store-design', built: true },
+  { id: 'more', label: 'More', icon: 'more', path: '/more', built: true },
 ];
 
 /** Whether this role may see an item at all. An item it cannot reach is not shown, rather than shown failing. */
@@ -167,3 +168,26 @@ export function consoleHref(slug: string, route: string): string {
   const suffix = route.startsWith('/app/') ? route.slice('/app'.length) : route;
   return hrefFor(slug, suffix);
 }
+
+/**
+ * `MobileMore`'s three groups — Work, Store, Account — as references into the desktop sidebar's items, so a row's label, its path and
+ * WHO MAY SEE IT are written once. The phone's bar carries five things; this page is where the rest of the sidebar went, and a role
+ * that cannot reach a screen on the desktop must not find a way to it here.
+ *
+ * Two rows are not sidebar items. `notifications` opens the panel (the desktop keeps that in the bell), and `identity` is the owner's
+ * identity check, which the desktop reaches from Money's banner. Neither needs a role beyond the one that can see the money.
+ */
+export const MORE_GROUPS: readonly { label: string; rows: readonly { id: string; label?: string; special?: 'notifications' | 'identity'; icon: NavIcon; needs?: string; badge?: BadgeKey | 'notifications'; path?: string }[] }[] = [
+  {
+    label: 'Work',
+    rows: [
+      { id: 'money', icon: 'money' },
+      { id: 'notifications', special: 'notifications', label: 'Notifications', icon: 'bell', badge: 'notifications' },
+      { id: 'complaints', icon: 'complaints' },
+      { id: 'reviews', icon: 'reviews' },
+      { id: 'riders', icon: 'riders' },
+    ],
+  },
+  { label: 'Store', rows: [{ id: 'categories', icon: 'categories' }, { id: 'customers', icon: 'customers' }, { id: 'analytics', icon: 'analytics' }, { id: 'store-design', label: 'Store look', icon: 'store' }] },
+  { label: 'Account', rows: [{ id: 'identity', special: 'identity', label: 'Identity check', icon: 'verified', needs: 'settings.write', path: '/verify' }, { id: 'settings', icon: 'settings' }] },
+];

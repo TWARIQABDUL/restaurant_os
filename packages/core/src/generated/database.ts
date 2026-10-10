@@ -536,6 +536,50 @@ export interface KycSubmissionsRow {
   updated_at: Date;
 }
 
+/** `message_outbox.audience`, from its CHECK constraint. */
+export type MessageOutboxAudience =
+  | 'customer'
+  | 'merchant'
+  | 'rider';
+
+/** `message_outbox.channel`, from its CHECK constraint. */
+export type MessageOutboxChannel =
+  | 'sms'
+  | 'email';
+
+/** `message_outbox.status`, from its CHECK constraint. */
+export type MessageOutboxStatus =
+  | 'queued'
+  | 'sent'
+  | 'failed'
+  | 'skipped';
+
+/**
+ * Every SMS and email the system wants to send, rendered, with where it has got to. A transport picks up queued rows; with no provider chosen they wait, and the admin console counts them.
+ */
+export interface MessageOutboxRow {
+  id: string;
+  store_id: string | null;
+  order_id: string | null;
+  channel: MessageOutboxChannel;
+  template: string;
+  audience: MessageOutboxAudience;
+  recipient: string;
+  sender: string;
+  subject: string | null;
+  body: string;
+  body_html: string | null;
+  idempotency_key: string;
+  status: MessageOutboxStatus;
+  attempts: number;
+  last_error: string | null;
+  provider: string | null;
+  provider_ref: string | null;
+  queued_at: Date;
+  sent_at: Date | null;
+  updated_at: Date;
+}
+
 /**
  * Feature gates a template can switch on. has(module) reads these. Adding one is a migration because a module without code behind it does nothing.
  */
@@ -1707,6 +1751,7 @@ export interface Database {
   kyc_extracted_fields: KycExtractedFieldsRow;
   kyc_status_transitions: KycStatusTransitionsRow;
   kyc_submissions: KycSubmissionsRow;
+  message_outbox: MessageOutboxRow;
   modules: ModulesRow;
   momo_transactions: MomoTransactionsRow;
   notification_devices: NotificationDevicesRow;
@@ -1790,6 +1835,7 @@ export const TABLE_NAMES = [
   'kyc_extracted_fields',
   'kyc_status_transitions',
   'kyc_submissions',
+  'message_outbox',
   'modules',
   'momo_transactions',
   'notification_devices',

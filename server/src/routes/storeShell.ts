@@ -49,8 +49,12 @@ router.get(
     const view = await readConsistent(async (tx) => {
       const store = await stores.findById(storeId, tx);
       if (store === null) return null;
+      // The contact line a printed receipt and a QR poster carry. Read here, not added to the shared StoreSummary, because that
+      // summary is also what the PUBLIC storefront is built from.
+      const contact = (await tx.query<{ address: string | null; public_phone: string | null }>(`SELECT address, public_phone FROM stores WHERE id = $1`, [storeId])).rows[0];
       return {
         store,
+        contact: { address: contact?.address ?? null, phone: contact?.public_phone ?? null },
         currency: await themes.findCurrencyByStoreId(storeId, tx),
         config: await configRepo.inputsByStoreId(storeId, tx),
         theme: await themes.findByStatus(storeId, 'published', tx),
@@ -75,6 +79,8 @@ router.get(
         country: view.store.country,
         // The store's own zone, so the console's clock is the store's clock. See stores.ts.
         timeZone: view.store.time_zone,
+        address: view.contact.address,
+        phone: view.contact.phone,
         currency: view.currency,
       },
       me: {

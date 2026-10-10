@@ -12,6 +12,7 @@
 //      that did not go out. A 500 whose cause is only in the response body is a 500
 //      nobody can fix.
 
+import { randomBytes } from 'node:crypto';
 import type { ErrorRequestHandler } from 'express';
 import { AppError, isPgError, toAppError } from '../db/index.ts';
 
@@ -84,8 +85,13 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   const status = fromParser === null ? appError.status : fromParser.status;
   const where = `${req.method} ${req.originalUrl}`;
 
+  // A REFERENCE FOR EVERY SERVER ERROR (AdminStates: "Errors always give a reference so support can find the failed request"). Random, not
+  // derived from anything private, printed in the log line AND returned to the person — so what they read out over the phone is a string
+  // a grep finds. 4xx are the caller's to fix and get none.
+  const reference = status >= 500 ? `ERR-${randomBytes(2).toString('hex').toUpperCase()}-${randomBytes(2).toString('hex').toUpperCase()}` : null;
+
   if (status >= 500) {
-    console.error(`[api] ${status} ${where} — ${appError.message}`, {
+    console.error(`[api] ${status} ${where} — ${appError.message} [${reference}]`, {
       code: appError.code,
       detail: appError.detail,
       cause: appError.cause instanceof Error ? appError.cause.stack : appError.cause,
@@ -95,7 +101,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
     console.warn(`[api] ${status} ${where} — ${appError.code}: ${appError.detail}`);
   }
 
-  const body: { error: string; code: string; hint?: string } =
+  const body: { error: string; code: string; hint?: string; reference?: string } =
     fromParser === null
       ? {
           error: appError.expose ? appError.message : 'Something went wrong on our side.',
@@ -104,6 +110,8 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
       : { error: fromParser.message, code: fromParser.code };
 
   if (fromParser === null && appError.expose && appError.hint !== undefined) body.hint = appError.hint;
+
+  if (reference !== null) body.reference = reference;
 
   res.status(status).json(body);
 };
