@@ -41,6 +41,8 @@ jobs:
       - run: npm ci
         working-directory: client
       - run: npm run typecheck
+      # Milestone 31's bars, executable: no supabase-js, no SELECT *, no unmeasured OFFSET paging.
+      - run: npm run check:bars
 
       # packages/core is pure functions — the config resolver, and from milestone 13 the theme
       # compiler and the money formatter. No database and no server, so it runs here rather

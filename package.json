@@ -23,6 +23,7 @@
     "etl:rehearse": "bash db/scripts/etl-rehearse.sh",
     "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p packages/core/tsconfig.test.json && tsc -p server && tsc -p client && tsc -p client/tsconfig.check.json",
     "check:styles": "node scripts/check-styles.ts",
+    "check:bars": "node scripts/check-bars.ts",
     "ui:check": "npm --prefix client run ui:check"
   },
   "engines": {
