@@ -11,5 +11,5 @@
     "types": ["node"],
     "allowImportingTsExtensions": true
   },
-  "include": ["db/scripts/**/*.ts", "db/seeds/**/*.ts", "scripts/**/*.ts"]
+  "include": ["db/scripts/**/*.ts", "db/seeds/**/*.ts", "db/etl/**/*.ts", "scripts/**/*.ts"]
 }

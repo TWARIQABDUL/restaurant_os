@@ -20,6 +20,7 @@
     "api:test": "bash scripts/api-test.sh",
     "core:test": "node --test packages/core/test/*.test.ts",
     "db:profile": "bash db/scripts/profile-old-db.sh",
+    "etl:rehearse": "bash db/scripts/etl-rehearse.sh",
     "typecheck": "tsc -p tsconfig.json && tsc -p packages/core && tsc -p packages/core/tsconfig.test.json && tsc -p server && tsc -p client && tsc -p client/tsconfig.check.json",
     "check:styles": "node scripts/check-styles.ts",
     "ui:check": "npm --prefix client run ui:check"

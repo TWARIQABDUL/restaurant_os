@@ -536,6 +536,19 @@ export interface KycSubmissionsRow {
   updated_at: Date;
 }
 
+/**
+ * Rows and columns from the pre-rewrite database that have no home in this schema, kept with the reason. Written by db/etl, never updated. Not summable: the old ledger in particular misstates two movements.
+ */
+export interface LegacyRowsRow {
+  id: string;
+  source_table: string;
+  source_id: string | null;
+  store_id: string | null;
+  reason: string;
+  row: unknown;
+  imported_at: Date;
+}
+
 /** `message_outbox.audience`, from its CHECK constraint. */
 export type MessageOutboxAudience =
   | 'customer'
@@ -1751,6 +1764,7 @@ export interface Database {
   kyc_extracted_fields: KycExtractedFieldsRow;
   kyc_status_transitions: KycStatusTransitionsRow;
   kyc_submissions: KycSubmissionsRow;
+  legacy_rows: LegacyRowsRow;
   message_outbox: MessageOutboxRow;
   modules: ModulesRow;
   momo_transactions: MomoTransactionsRow;
@@ -1835,6 +1849,7 @@ export const TABLE_NAMES = [
   'kyc_extracted_fields',
   'kyc_status_transitions',
   'kyc_submissions',
+  'legacy_rows',
   'message_outbox',
   'modules',
   'momo_transactions',
