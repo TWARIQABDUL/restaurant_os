@@ -47,7 +47,7 @@ export function CheckoutPage({ onBack, onHome, onTrack, onAccount }: Props): Rea
   const { face, money, has, cart, setCart, refreshCart } = useStore();
 
   const [fulfilment, setFulfilment] = useState<'delivery' | 'pickup'>(
-    has('delivery') ? 'delivery' : 'pickup',
+    has('delivery') && face.delivery !== null ? 'delivery' : 'pickup',
   );
   const [zone, setZone] = useState<string | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -349,7 +349,9 @@ export function CheckoutPage({ onBack, onHome, onTrack, onAccount }: Props): Rea
               <Segmented
                 label="How you want it"
                 options={[
-                  ...(has('delivery') ? [{ value: 'delivery', label: 'Delivery' }] : []),
+                  ...(has('delivery') && face.delivery !== null
+                    ? [{ value: 'delivery', label: 'Delivery' }]
+                    : []),
                   ...(has('pickup') && face.pickup !== null ? [{ value: 'pickup', label: 'Pickup' }] : []),
                 ]}
                 value={fulfilment}
