@@ -15,6 +15,7 @@ import { authOf, isUuid, requireSession, requireStorePermission, storeIdOf } fro
 import { checkPassword, firstPasswordProblem } from '../auth/password.ts';
 import { clearSessionCookie, setSessionCookie, signSessionToken, ttlFor } from '../auth/sessionToken.ts';
 import { authLimiter } from '../middleware/rateLimit.js';
+import { sendCodeEmail } from '../messaging/otp.ts';
 import * as auth from '../repositories/auth.ts';
 import * as memberships from '../repositories/memberships.ts';
 import * as stores from '../repositories/stores.ts';
@@ -37,9 +38,10 @@ passwordRouter.get(
 /**
  * POST /api/password/reset — ask for a code.
  *
- * Answers the same thing either way. When the identifier does match, a code is issued and logged
- * (delivery is milestone 28's) — replacing any live one, which V016's partial unique index requires so
- * that "Send again" replaces the window rather than widening it.
+ * Answers the same thing either way. When the identifier does match, a code is issued and emailed —
+ * replacing any live one, which V016's partial unique index requires so that "Send again" replaces the
+ * window rather than widening it. The send happens after the transaction commits: it is a network call
+ * to SendGrid, and holding a database transaction open for the duration of one would be wrong.
  */
 passwordRouter.post(
   '/reset',
@@ -47,19 +49,20 @@ passwordRouter.post(
   asyncHandler(async (req, res) => {
     const identifier = requiredString(bodyOf(req.body), 'identifier', { max: 254 });
 
-    await withTransaction(
+    const issued = await withTransaction(
       async (tx) => {
         const candidates = await auth.findLoginCandidates(identifier, tx);
         // With several accounts on one address, the most privileged is the one a reset means — the same
         // rank the sign-in uses, so the two agree about which account an identifier refers to.
         const target = [...candidates].sort((a, b) => auth.rank(a) - auth.rank(b))[0];
-        if (target === undefined) return;
+        if (target === undefined) return null;
 
         const { code, expiresAt } = await auth.issueCode(target.id, 'password_reset', tx);
-        console.log(`[auth] reset code for ${target.email}: ${code} (expires ${expiresAt.toISOString()})`);
+        return { email: target.email, code, expiresAt };
       },
       { label: 'POST /api/password/reset' },
     );
+    if (issued !== null) await sendCodeEmail(issued.email, 'password reset code', issued.code, issued.expiresAt);
 
     res.json({
       // Deliberately not "we sent a code to X". The response says what was done, not to whom.

@@ -213,6 +213,6 @@ export async function queueState(on: Queryable = db): Promise<Record<'sms' | 'em
     const row = r.rows.find((x) => x.channel === c);
     return { queued: row === undefined ? 0 : Number(row.n), oldestMinutes: row?.oldest == null ? null : Math.round(Number(row.oldest)) };
   };
-  const configured = (c: 'sms' | 'email'): boolean => ['log'].includes((process.env[c === 'sms' ? 'MESSAGING_SMS' : 'MESSAGING_EMAIL'] ?? 'none').trim().toLowerCase());
+  const configured = (c: 'sms' | 'email'): boolean => (c === 'sms' ? ['log', 'twilio'] : ['log', 'sendgrid']).includes((process.env[c === 'sms' ? 'MESSAGING_SMS' : 'MESSAGING_EMAIL'] ?? 'none').trim().toLowerCase());
   return { sms: { ...get('sms'), configured: configured('sms') }, email: { ...get('email'), configured: configured('email') } };
 }

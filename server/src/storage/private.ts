@@ -18,6 +18,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { open, seal } from '../crypto/kyc.ts';
+import { ensureBucket, minioClient } from './minio.ts';
 
 export interface PrivateStore {
   /** Seals and stores. Returns the opaque key to keep in a row and the name of the key that sealed it. */
@@ -61,10 +62,46 @@ export function localPrivateStore(root = process.env['PRIVATE_DIR'] ?? resolve(h
   };
 }
 
+export const PRIVATE_BUCKET = process.env['MINIO_PRIVATE_BUCKET'] ?? 'vendlyfy-private';
+
+/** Production driver, decided 2026-10-20. Bytes are sealed here, same as the local driver — MinIO never sees
+ * plaintext, so which store holds the object changes nothing about what crypto/kyc.ts guarantees. No sharding
+ * subdirectory (the local driver's 2-char prefix exists only to keep one filesystem directory from holding too
+ * many entries; a bucket has no such limit). */
+export function minioPrivateStore(bucket = PRIVATE_BUCKET): PrivateStore {
+  return {
+    async put(bytes) {
+      await ensureBucket(bucket);
+      const key = `${randomUUID().replaceAll('-', '')}.bin`;
+      const sealed = seal(bytes);
+      await minioClient().putObject(bucket, key, Buffer.from(sealed.bytes));
+      return { key, keyId: sealed.keyId };
+    },
+    async read(key, keyId) {
+      if (!PRIVATE_KEY.test(key)) throw new Error('not a private-store key');
+      try {
+        const stream = await minioClient().getObject(bucket, key);
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(chunk as Buffer);
+        return open(Buffer.concat(chunks), keyId);
+      } catch (cause) {
+        if ((cause as { code?: string }).code === 'NoSuchKey' || (cause as { code?: string }).code === 'NotFound') return null;
+        throw cause;
+      }
+    },
+    async delete(key) {
+      if (!PRIVATE_KEY.test(key)) throw new Error('not a private-store key');
+      await minioClient().removeObject(bucket, key);
+    },
+  };
+}
+
 let current: PrivateStore | null = null;
 
+/** PRIVATE_STORE=minio switches it; anything else (including unset) is local. Independent of MEDIA_STORE on
+ * purpose — the two stores' production-readiness decisions were never coupled (see the header above). */
 export function privateStore(): PrivateStore {
-  current ??= localPrivateStore();
+  if (current === null) current = (process.env['PRIVATE_STORE'] ?? 'local').trim().toLowerCase() === 'minio' ? minioPrivateStore() : localPrivateStore();
   return current;
 }
 

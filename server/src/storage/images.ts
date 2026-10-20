@@ -23,6 +23,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ensureBucket, minioClient } from './minio.ts';
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -89,11 +90,41 @@ export function localImageStore(root = process.env['MEDIA_DIR'] ?? resolve(here,
   };
 }
 
+export const MEDIA_BUCKET = process.env['MINIO_MEDIA_BUCKET'] ?? 'vendlyfy-media';
+
+/** Production driver, decided 2026-10-20. The object key is the same `<storeId>/<name>` shape put() has always
+ * returned in the URL — only where the bytes physically live changes; mediaRouter's read-and-stream behaviour
+ * (storeUploads.ts) does not, so this is a drop-in swap behind the same ImageStore seam. */
+export function minioImageStore(bucket = MEDIA_BUCKET): ImageStore {
+  return {
+    async put(storeId, bytes, kind) {
+      await ensureBucket(bucket);
+      const name = `${randomBytes(16).toString('hex')}.${kind}`;
+      const key = `${storeId}/${name}`;
+      await minioClient().putObject(bucket, key, bytes, bytes.length, { 'Content-Type': CONTENT_TYPE[kind] });
+      return `${MEDIA_PATH}/${storeId}/${name}`;
+    },
+    async read(storeId, name) {
+      const m = IMAGE_NAME.exec(name);
+      if (m === null) return null;
+      try {
+        const stream = await minioClient().getObject(bucket, `${storeId}/${name}`);
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(chunk as Buffer);
+        return { bytes: Buffer.concat(chunks), kind: m[1] as ImageKind };
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
 let current: ImageStore | null = null;
 
-/** One store per process, chosen once. Tests swap it with setImageStore(). */
+/** One store per process, chosen once. MEDIA_STORE=minio switches it; anything else (including unset) is local —
+ * same "explicit, no auto-detect" rule the messaging transport seam uses. Tests swap it with setImageStore(). */
 export function imageStore(): ImageStore {
-  current ??= localImageStore();
+  if (current === null) current = (process.env['MEDIA_STORE'] ?? 'local').trim().toLowerCase() === 'minio' ? minioImageStore() : localImageStore();
   return current;
 }
 

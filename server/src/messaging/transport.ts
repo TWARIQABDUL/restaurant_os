@@ -4,12 +4,17 @@
 // whoever carried it or throws. Nothing about templates, recipients or retries lives here: those are the outbox's. Choosing an SMS gateway
 // later means writing one of these for it and naming it in MESSAGING_SMS; nothing else in the system changes.
 //
-//   MESSAGING_SMS / MESSAGING_EMAIL = none   (the default)  nothing is sent; rows stay queued and the admin console counts them
-//                                   = log                    development: prints the message and marks it sent (provider "log")
+//   MESSAGING_SMS / MESSAGING_EMAIL = none       (the default)  nothing is sent; rows stay queued and the admin console counts them
+//                                   = log                        development: prints the message and marks it sent (provider "log")
+//                                   = sendgrid (MESSAGING_EMAIL only, decided 2026-10-20)  real email via SendGrid; see sendgridTransport.ts
+//                                   = twilio   (MESSAGING_SMS only, decided 2026-10-20)    real SMS via Twilio; see twilioTransport.ts
 //
 // "none" IS THE DEFAULT AND IT IS DELIBERATE. A server that comes up with no provider configured must not pretend messages left —
 // a customer who is never told their order was accepted is a real failure, and the only honest signal is a queue that is visibly
 // not draining. (Part 9: "No SMS provider exists … SMS is an unmade vendor decision.")
+
+import { sendgridTransport } from './sendgridTransport.ts';
+import { twilioTransport } from './twilioTransport.ts';
 
 export type Outgoing = { id: string; channel: 'sms' | 'email'; recipient: string; sender: string; subject: string | null; body: string; bodyHtml: string | null };
 
@@ -41,5 +46,7 @@ export function transportFor(channel: 'sms' | 'email'): Transport | null {
   if (forced !== undefined) return forced;
   const name = (process.env[channel === 'sms' ? 'MESSAGING_SMS' : 'MESSAGING_EMAIL'] ?? 'none').trim().toLowerCase();
   if (name === 'log') return logTransport;
+  if (name === 'sendgrid' && channel === 'email') return sendgridTransport;
+  if (name === 'twilio' && channel === 'sms') return twilioTransport;
   return null;
 }

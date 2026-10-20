@@ -111,6 +111,38 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # MinIO — local stand-in for the production object store, decided 2026-10-20 (see server/src/storage/images.ts
+  # and server/src/storage/private.ts for the two seams it backs). Not started by `db:up`; the app defaults to
+  # the local-disk drivers (MEDIA_STORE/PRIVATE_STORE unset), so this is opt-in for whoever is testing the minio
+  # path specifically. Credentials here are the same "deliberately local and worthless" rule as postgres's above.
+  minio:
+    image: minio/minio:latest
+    container_name: vendlyfy-minio
+    environment:
+      MINIO_ROOT_USER: vendlyfy_minio
+      MINIO_ROOT_PASSWORD: localdev_minio
+    command: server /data --console-address ":9001"
+    # API on 9000, the web console on 9001 — both loopback-only, same reasoning as postgres's port binding above.
+    ports:
+      - "127.0.0.1:59000:9000"
+      - "127.0.0.1:59001:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      start_period: 20s
+      start_interval: 2s
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   pgdata:
     name: vendlyfy_pgdata
+  miniodata:
+    name: vendlyfy_miniodata
