@@ -61,9 +61,19 @@ export async function reconcile(ctx: Ctx): Promise<Line[]> {
   push('Orders', 'Σ total_amount', await n(src, 'SELECT COALESCE(sum(total_amount),0)::numeric(14,2) AS v FROM public.orders'), await n(tgt, 'SELECT COALESCE(sum(total_amount),0)::numeric(14,2) AS v FROM orders'));
   push('Orders', 'orders paid', await n(src, `SELECT count(*) AS v FROM public.orders WHERE payment_status <> 'unpaid'`), await n(tgt, `SELECT count(*) AS v FROM orders WHERE payment_status <> 'unpaid'`));
   push('Orders', 'Σ total of paid orders', await n(src, `SELECT COALESCE(sum(total_amount),0)::numeric(14,2) AS v FROM public.orders WHERE payment_status <> 'unpaid'`), await n(tgt, `SELECT COALESCE(sum(total_amount),0)::numeric(14,2) AS v FROM orders WHERE payment_status <> 'unpaid'`));
-  // Refunded: the only legitimate difference is a refund recorded against an UNPAID order, which the new schema refuses.
-  const unpaidRefunded = await n(src, `SELECT COALESCE(sum(refunded_amount),0)::numeric(14,2) AS v FROM public.orders WHERE payment_status = 'unpaid'`);
-  push('Orders', 'Σ refunded_amount (excluding refunds recorded on unpaid orders)', await n(src, `SELECT COALESCE(sum(refunded_amount),0)::numeric(14,2) AS v FROM public.orders WHERE payment_status <> 'unpaid'`), await n(tgt, 'SELECT COALESCE(sum(refunded_amount),0)::numeric(14,2) AS v FROM orders'));
+  // Refunded: orders.refunded_amount is dead in the old app (always 0 — see orders/refunded-amount-derived in the
+  // decisions below), so "what the old system actually refunded" is the sum of its approved/completed
+  // refund_requests, not that column. The only legitimate difference from that figure is a refund recorded against
+  // an UNPAID order, which the new schema refuses.
+  const unpaidRefunded = await n(src, `
+    SELECT COALESCE(sum(CASE WHEN r.amount IS NOT NULL THEN r.amount ELSE o.total_amount END),0)::numeric(14,2) AS v
+    FROM public.refund_requests r JOIN public.orders o ON o.id = r.order_id
+    WHERE r.status IN ('approved','completed') AND o.payment_status = 'unpaid'`);
+  const refundedOldPaid = await n(src, `
+    SELECT COALESCE(sum(CASE WHEN r.amount IS NOT NULL THEN r.amount ELSE o.total_amount END),0)::numeric(14,2) AS v
+    FROM public.refund_requests r JOIN public.orders o ON o.id = r.order_id
+    WHERE r.status IN ('approved','completed') AND o.payment_status <> 'unpaid'`);
+  push('Orders', 'Σ refunded_amount (excluding refunds recorded on unpaid orders)', refundedOldPaid, await n(tgt, 'SELECT COALESCE(sum(refunded_amount),0)::numeric(14,2) AS v FROM orders'));
   if (cents(unpaidRefunded) !== 0n) {
     lines.push({ section: 'Orders', check: 'refunds recorded on UNPAID orders', source: unpaidRefunded, target: '0.00', status: 'explained',
       note: 'The old bug in plan §5.1: the merchant was debited for money never received. The new schema refuses it, so it is not carried; the debit is already inside the wallet balance. Listed in legacy_rows; finance decides whether to credit it back.' });
@@ -144,8 +154,10 @@ export async function reconcile(ctx: Ctx): Promise<Line[]> {
               COALESCE(customer_user_id::text, 'guest:' || guest_name) AS who FROM orders WHERE id = $1`, [o['id']]);
     const row = t.rows[0];
     const keys = ['tenant_id', 'total', 'status', 'settlement_status', 'who'] as const;
-    // created_at prints in each server's zone; compare instants instead
-    const instants = await one<boolean>(tgt, `SELECT $1::timestamptz = $2::timestamptz AS v`, [o['created'], row?.['created'] ?? null]);
+    // created_at prints in each server's zone; compare to the millisecond, not the microsecond — the ETL reads
+    // timestamptz through node-postgres as a JS Date, which is ms-resolution, so sub-ms is lost on every row by
+    // construction (decided: harmless for an order's placed time, not worth threading raw strings through every step).
+    const instants = await one<boolean>(tgt, `SELECT date_trunc('milliseconds', $1::timestamptz) = date_trunc('milliseconds', $2::timestamptz) AS v`, [o['created'], row?.['created'] ?? null]);
     const differs = row === undefined || !instants || keys.some((k) => row[k] !== o[k]);
     if (differs) { mismatched += 1; wrong.push(String(o['id']).slice(0, 8)); }
   }

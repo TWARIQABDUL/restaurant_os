@@ -71,3 +71,26 @@ Exactly two findings are expected, both from plan §5.1, and the report refuses 
    It must be exactly that pattern; any one-sided difference is a `FAIL`.
 2. **A refund recorded against an unpaid order**: the merchant was debited for money never received. Finance decides
    whether to credit it back.
+
+## The real rehearsal (2026-10-20) found two things, both now fixed
+
+Run against the live Supabase data (via the project's connection pooler, session mode — the direct `db.<ref>.supabase.co`
+host is IPv6-only and unreachable from a network without IPv6 egress):
+
+1. **`orders.refunded_amount` is dead in the old app.** It reads `0.00` on every single order in production, including
+   orders with a genuinely completed refund — nothing in the old code ever writes to it. `db/etl/steps/orders.ts` now
+   derives "how much was refunded" from `refund_requests` (summing `status IN ('approved','completed')`, same rule
+   `money.ts`'s `refunds()` uses) instead of trusting that column; `report.ts`'s "Σ refunded_amount" check was changed
+   to compare against the same derived figure on the old side, not the dead column. Decision recorded as
+   `orders/refunded-amount-derived`.
+2. **Every migrated timestamp loses sub-millisecond precision.** `node-postgres` parses `timestamptz` into a JS `Date`,
+   which is millisecond-resolution, so any microseconds on `created_at`/`updated_at`/`paid_at` are silently dropped on
+   the way through. Harmless for an order's placed time, and not worth threading raw timestamp strings through every
+   step to preserve microseconds nobody needs — so the spot check in `report.ts` now compares instants truncated to
+   the millisecond instead of exact equality.
+
+Both are now covered by the rehearsal and by `db/scripts/test-etl.sh`'s 45 synthetic checks (still green). The
+synthetic fixture never exercised either bug: it doesn't generate a completed refund whose order survives with
+`refunded_amount` unset, and its timestamps happen not to carry sub-millisecond noise. **Any future real rehearsal
+should still be read end-to-end, not just checked for exit code 0** — this is exactly the kind of thing a synthetic
+fixture can't surface.

@@ -31,6 +31,7 @@ type Order = {
 };
 type Line = { id: string; order_id: string; menu_item_id: string; quantity: number; unit_price: string };
 type LineAddOn = { id: string; order_item_id: string; add_on_id: string; quantity: number; unit_price: string };
+type RefundRow = { order_id: string; status: string; amount: string | null };
 
 const STATUS: Record<string, string> = {
   pending: 'pending', approved: 'approved', preparing: 'preparing', ready: 'ready', assigned: 'assigned', delivered: 'delivered', rejected: 'rejected',
@@ -47,6 +48,17 @@ export async function orders(ctx: Ctx, cat: Catalogue): Promise<Map<string, Migr
   ], 'tenant_id, created_at, id');
   const lines = await read<Line>(ctx, 'order_items', ['id', 'order_id', 'menu_item_id', 'quantity', 'unit_price'], 'order_id, id');
   const addOns = await read<LineAddOn>(ctx, 'order_item_addons', ['id', 'order_item_id', 'add_on_id', 'quantity', 'unit_price'], 'order_item_id, id');
+  // orders.refunded_amount is dead in the old app — it is 0 on every row, including orders with a completed
+  // refund_request. What was actually refunded is the sum of approved/completed refund_requests, not this column.
+  const refundRows = await read<RefundRow>(ctx, 'refund_requests', ['order_id', 'status', 'amount'], 'order_id');
+  const approvedRefundsByOrder = new Map<string, RefundRow[]>();
+  for (const r of refundRows) {
+    if (r.status !== 'approved' && r.status !== 'completed') continue;
+    const a = approvedRefundsByOrder.get(r.order_id) ?? [];
+    a.push(r);
+    approvedRefundsByOrder.set(r.order_id, a);
+  }
+  let refundedAmountColumnWrongCount = 0;
 
   const linesByOrder = new Map<string, Line[]>();
   for (const l of lines) { const a = linesByOrder.get(l.order_id) ?? []; a.push(l); linesByOrder.set(l.order_id, a); }
@@ -164,7 +176,9 @@ export async function orders(ctx: Ctx, cat: Catalogue): Promise<Map<string, Migr
 
     // ---- payment ----
     let paymentStatus = o.payment_status;
-    let refunded = cents(o.refunded_amount);
+    let refunded = 0n;
+    for (const r of approvedRefundsByOrder.get(o.id) ?? []) refunded += r.amount !== null ? cents(r.amount) : oldTotal;
+    if (refunded !== cents(o.refunded_amount)) refundedAmountColumnWrongCount += 1;
     if (refunded > 0n && paymentStatus === 'unpaid') {
       ctx.decide('orders', 'refund-on-unpaid', o.id, `This order was never paid but ${fromCents(refunded)} was refunded (and debited from the merchant's wallet) — the old bug described in plan §5.1. The new schema refuses a refund on an unpaid order, so refunded_amount is 0 here; the wallet's opening balance already includes the debit. Finance should decide whether to credit it back.`);
       await ctx.archive('orders', o.id, o.tenant_id, 'refund recorded against an unpaid order (old bug)', { refunded_amount: o.refunded_amount, payment_status: o.payment_status });
@@ -251,6 +265,7 @@ export async function orders(ctx: Ctx, cat: Catalogue): Promise<Map<string, Migr
       [store, next + 1],
     );
   }
+  if (refundedAmountColumnWrongCount > 0) ctx.decide('orders', 'refunded-amount-derived', 'all', `${refundedAmountColumnWrongCount} order(s) had a stale orders.refunded_amount (the old app never wrote to it — it is 0 on every row in this source, including orders with a completed refund_request). The amount actually refunded is derived from approved/completed refund_requests instead.`);
   if (placeholderAddresses > 0) ctx.decide('orders', 'placeholder-address', 'all', `${placeholderAddresses} order(s) had no delivery address (the old code stored one only for guests) and carry the stated placeholder.`);
   ctx.decide('orders', 'status-map', 'all', 'pending, approved, preparing, ready, delivered, rejected map to themselves; assigned stays assigned (nothing says a rider had picked it up, so none become "out"). Orders carry one history event, "migrated". New tracking codes replace the old short ones; the old code and the new are kept together in legacy_rows, because links customers hold will not carry over.');
   ctx.decide('orders', 'currency', 'all', 'Every order is in RWF.');
