@@ -19,7 +19,10 @@ step "Starting ${PG_IMAGE} (project 'vendlyfy', volume 'vendlyfy_pgdata')"
 info "the first run pulls the image and initialises the data directory; that takes a minute"
 # --wait-timeout must exceed the healthcheck start_period in docker-compose.yml,
 # or a slow first run reports a failure that isn't one.
-compose up -d --wait --wait-timeout 300 \
+# Scoped to "$SERVICE" (postgres) on purpose: docker-compose.yml also has an opt-in minio
+# service (decided 2026-10-20), and an unscoped `up --wait` would wait on it too — the whole
+# point of "not started by db:up" in its own header comment.
+compose up -d --wait --wait-timeout 300 "$SERVICE" \
     || die "the container did not become healthy within 300s. Run: npm run db:logs"
 
 exec bash "$(dirname "$0")/verify.sh" "$@"

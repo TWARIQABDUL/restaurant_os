@@ -124,7 +124,7 @@ export function Verify({ navigate, initial }: Props): ReactNode {
     }
   };
 
-  const usePhoto = async (part: Part): Promise<void> => {
+  const confirmPhoto = async (part: Part): Promise<void> => {
     if (prepared?.blob === undefined) return;
     if (await sendPart(part, prepared.blob)) {
       if (prepared.previewUrl !== undefined) setPreviews((p) => ({ ...p, [part]: prepared.previewUrl }));
@@ -238,7 +238,7 @@ export function Verify({ navigate, initial }: Props): ReactNode {
           busy={busy}
           onFile={(f) => void choose(f)}
           onRetake={() => setPrepared(null)}
-          onUse={(part) => void usePhoto(part)}
+          onUse={(part) => void confirmPhoto(part)}
         />
       ) : null}
 

@@ -37,6 +37,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
+      # tsc -p server needs its own deps (express, pg, @sendgrid/mail, minio, …) — no workspaces
+      # yet (deferred to milestone 30, §4.6), so a root-only install cannot resolve them. This was
+      # missing from day one; discovered 2026-10-20 on this workflow's first-ever run.
+      - run: npm ci
+        working-directory: server
       # tsc -p client needs @types/react, which lives in client/node_modules.
       - run: npm ci
         working-directory: client
