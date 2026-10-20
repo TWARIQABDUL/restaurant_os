@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { resolveTenant } from './middleware/tenant.js';
 import { globalLimiter, webhookLimiter } from './middleware/rateLimit.js';
+import { writeFreeze } from './middleware/writeFreeze.ts';
 
 import authRoutes from './routes/auth.js';
 import menuRoutes from './routes/menu.js';
@@ -55,6 +56,10 @@ app.use(cors({
 // of a DoS, so keep the ceiling low.
 app.use(express.json({ limit: '200kb' }));
 app.use(cookieParser());
+
+// Milestone 30's cutover switch: WRITE_FREEZE=on refuses every mutating request while this is THE
+// system cutover freezes writes on. See middleware/writeFreeze.ts.
+app.use(writeFreeze);
 
 // Backstop limiter for every route. Tighter per-route limiters are applied at
 // their own mount points below and run first.

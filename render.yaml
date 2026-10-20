@@ -81,7 +81,114 @@ services:
         sync: false
 
   # ------------------------------------------------------------
-  # 2. The Frontend — NOT DEPLOYED HERE
+  # 2. The NEW Backend API (milestone 30 cutover candidate)
+  # ------------------------------------------------------------
+  # server/src/api — the pg-only server (milestone 11), not the legacy one above. A SECOND service,
+  # not a repoint of restaurant-os-api's startCommand, on purpose: it needs to serve real traffic
+  # against the production Postgres and be validated before anything is switched over, with the
+  # legacy service staying up as the instant rollback the whole time. Once validated, cutover is:
+  # update client/vercel.json's /backend rewrite + CSP to THIS service's hostname, then (after one
+  # full settlement cycle) retire restaurant-os-api.
+  - type: web
+    name: restaurant-os-api-new
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm run api:start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: 10000
+      - key: CLIENT_URL
+        sync: false
+
+      # Milestone 30's freeze switch (middleware/writeFreeze.ts). Leave unset/off outside the actual
+      # cutover window — flip to "on" to freeze writes while the final ETL run and report happen, then
+      # back to "off" (or remove it) once DNS/the Vercel rewrite has moved. Takes effect without a
+      # redeploy — Render's env var change is enough, since it's read live on every request.
+      - key: WRITE_FREEZE
+        value: 'off'
+
+      # The APPLICATION role, never the owner's — same distinction server/db:up draws locally. Must
+      # point at the production database the real ETL run writes into, not the dev/rehearsal one.
+      - key: APP_DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+
+      # Messaging (milestone 28) — see messaging-email-vendor in project memory for the decisions.
+      - key: MESSAGING_EMAIL
+        value: sendgrid
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # Leave MESSAGING_SMS=none until the Twilio account is actually funded — see twilioTransport.ts.
+      - key: MESSAGING_SMS
+        value: none
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+
+      # Storage (milestone 22/26) — decided 2026-10-20, MinIO; see storage-vendor in project memory.
+      - key: MEDIA_STORE
+        value: minio
+      - key: PRIVATE_STORE
+        value: minio
+      - key: MINIO_ENDPOINT
+        sync: false
+      - key: MINIO_PORT
+        sync: false
+      - key: MINIO_USE_SSL
+        value: 'true'
+      - key: MINIO_ACCESS_KEY
+        sync: false
+      - key: MINIO_SECRET_KEY
+        sync: false
+      - key: MINIO_MEDIA_BUCKET
+        sync: false
+      - key: MINIO_PRIVATE_BUCKET
+        sync: false
+
+      # Identity verification (milestone 26) — losing KYC_ENCRYPTION_KEY makes every stored document
+      # unreadable. Must be the SAME key the real ETL run (or the live system before it) sealed
+      # documents with — never generate a fresh one for this service.
+      - key: KYC_ENCRYPTION_KEY
+        sync: false
+      - key: KYC_FINGERPRINT_PEPPER
+        sync: false
+
+      # MoMo — same live values as the legacy service's block above; both talk to the same provider
+      # account, so these are not independent per-service secrets.
+      - key: MOMO_ENVIRONMENT
+        sync: false
+      - key: MOMO_BASE_URL
+        sync: false
+      - key: MOMO_TARGET_ENVIRONMENT
+        sync: false
+      - key: MOMO_CURRENCY
+        sync: false
+      - key: MOMO_DEFAULT_COUNTRY_CODE
+        value: 250
+      - key: MOMO_COLLECTION_SUBSCRIPTION_KEY
+        sync: false
+      - key: MOMO_COLLECTION_API_USER
+        sync: false
+      - key: MOMO_COLLECTION_API_KEY
+        sync: false
+      - key: MOMO_DISBURSEMENT_SUBSCRIPTION_KEY
+        sync: false
+      - key: MOMO_DISBURSEMENT_API_USER
+        sync: false
+      - key: MOMO_DISBURSEMENT_API_KEY
+        sync: false
+
+  # ------------------------------------------------------------
+  # 3. The Frontend — NOT DEPLOYED HERE
   # ------------------------------------------------------------
   # The client is hosted on Vercel (restaurant-os-liart-rho.vercel.app), not
   # Render. Its config lives in client/vercel.json, which also carries the

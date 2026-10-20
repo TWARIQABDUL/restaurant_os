@@ -21,6 +21,7 @@ import express from 'express';
 import type { Express } from 'express';
 import helmet from 'helmet';
 import { globalLimiter } from '../middleware/rateLimit.js';
+import { writeFreeze } from '../middleware/writeFreeze.ts';
 import { issueCsrfToken, requireCsrf } from '../auth/csrf.ts';
 import { errorHandler, unmatchedRoute } from './errorHandler.ts';
 import sessionRoutes from '../routes/session.ts';
@@ -142,6 +143,10 @@ export function createApp(): Express {
   // URL, and an oversized body is the cheap half of a denial of service.
   app.use(express.json({ limit: '200kb' }));
   app.use(cookieParser());
+
+  // Milestone 30's cutover switch. Ahead of everything else so a frozen write never reaches a rate
+  // limiter, CSRF, or a route — see middleware/writeFreeze.ts for why it's shared with the legacy app.
+  app.use(writeFreeze);
 
   // Backstop. Per-route limiters, where a route needs one, run before it.
   app.use('/api', globalLimiter);
