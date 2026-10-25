@@ -20,7 +20,7 @@
 
 import { badRequest, conflict, db, withTransaction } from '../db/index.ts';
 import type { Queryable, Tx } from '../db/index.ts';
-import * as momo from '../payments/momo.ts';
+import * as disbursements from '../payments/disbursements.ts';
 import * as platformSettings from './platformSettings.ts';
 
 export type Destination = {
@@ -80,7 +80,7 @@ export async function request(
   initiatedBy: 'manual' | 'automatic' = 'manual',
 ): Promise<Requested> {
   if (!MONEY.test(amount) || Number(amount) <= 0) throw badRequest('Enter an amount above zero.', 'INVALID_AMOUNT');
-  if (!momo.isDisbursementConfigured()) {
+  if (!disbursements.isDisbursementConfigured()) {
     throw conflict('Payouts are not available right now. Your balance is safe.', 'PAYOUTS_UNAVAILABLE');
   }
 
@@ -98,7 +98,7 @@ export async function request(
 
     const started = await tx.query<{ reference_id: string; created: boolean }>(
       `SELECT reference_id, created FROM start_withdrawal_disbursement($1, $2)`,
-      [withdrawalId, momo.newReferenceId()],
+      [withdrawalId, disbursements.newReferenceId()],
     );
     const s = started.rows[0]!;
     return { withdrawalId, dispatch: s.created ? s.reference_id : null };
@@ -118,9 +118,9 @@ export async function dispatch(referenceId: string, on: Queryable = db): Promise
   if (attempt === undefined) return;
 
   try {
-    await momo.transfer({ amount: attempt.amount, phone: attempt.phone, referenceId, payerMessage: 'Vendlyfy payout', payeeNote: 'Vendlyfy payout' });
+    await disbursements.transfer({ amount: attempt.amount, phone: attempt.phone, referenceId, payerMessage: 'Vendlyfy payout', payeeNote: 'Vendlyfy payout' });
   } catch (cause) {
-    if (cause instanceof momo.DisbursementRefused) {
+    if (cause instanceof disbursements.DisbursementRefused) {
       await on.query(`SELECT resolve_disbursement($1, 'failed', $2)`, [referenceId, refusalReason(cause)]);
       return;
     }
@@ -129,7 +129,7 @@ export async function dispatch(referenceId: string, on: Queryable = db): Promise
 }
 
 /** What a merchant reads on the Withdrawals tab. MoMo's own body is for the log, not for them. */
-function refusalReason(e: momo.DisbursementRefused): string {
+function refusalReason(e: disbursements.DisbursementRefused): string {
   return e.status === 404 || e.status === 400
     ? 'MoMo didn’t accept the transfer: check that the number is a registered MTN MoMo account.'
     : 'MoMo didn’t accept the transfer.';
@@ -150,7 +150,7 @@ export async function refresh(referenceId: string, on: Queryable = db): Promise<
   if (attempt === undefined) return null;
   if (attempt.status !== 'pending') return { status: attempt.status, resolved: false };
 
-  const real = await momo.transferStatus(referenceId);
+  const real = await disbursements.transferStatus(referenceId);
 
   if (real.status === 'UNKNOWN') {
     // MoMo has never heard of it: the process died between writing the attempt and sending it. The reference id

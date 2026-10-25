@@ -1,5 +1,12 @@
 // server/src/payments/momo.ts — milestone 17.
 //
+// THE COLLECTION HALF (requestToPay, collectionStatus) IS ORPHANED since 2026-10-25 — checkout moved to
+// Urubuto Pay (payments/urubuto.ts, repositories/collections.ts). Kept, not deleted: routes/momoWebhook.ts
+// still imports isConfigured() for its now-dead collection callback (see that file's header), and deleting
+// working, tested code that costs nothing to keep is not this change's job. The DISBURSEMENT half below is
+// very much alive — payouts stay on MTN MoMo; see payments/disbursements.ts for the provider-selection
+// shim that will let that move later without a deploy.
+//
 // The MTN MoMo Collections client, carried across from server/src/services/momoClient.js.
 //
 // §1.2 lists this under what DOES NOT CHANGE: "the MTN MoMo integration including the webhook that

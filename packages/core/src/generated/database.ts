@@ -608,6 +608,11 @@ export type MomoTransactionsDirection =
   | 'collection'
   | 'disbursement';
 
+/** `momo_transactions.gateway`, from its CHECK constraint. */
+export type MomoTransactionsGateway =
+  | 'mtn_direct'
+  | 'urubuto';
+
 /** `momo_transactions.status`, from its CHECK constraint. */
 export type MomoTransactionsStatus =
   | 'pending'
@@ -634,6 +639,10 @@ export interface MomoTransactionsRow {
   withdrawal_id: string | null;
   /** Which provider this attempt went through. The old schema assumed MTN; with Airtel and M-Pesa in the same table, reconciliation needs to know. */
   payment_method_key: string | null;
+  /** Which integration handled this attempt — mtn_direct (the legacy MTN Open API client) or urubuto (Urubuto Pay). Not the same as payment_methods.key, which is customer-facing. */
+  gateway: MomoTransactionsGateway;
+  /** Urubuto Pay's invoice number for a collection attempt, the payer_code on /v2/payment/initiate. Null for mtn_direct rows and for any row before its invoice exists. */
+  invoice_number: string | null;
 }
 
 /**

@@ -45,6 +45,7 @@ import storeSettingsRoutes from '../routes/storeSettings.ts';
 import { payoutsRouter, walletRouter } from '../routes/storeWallet.ts';
 import healthRoutes from '../routes/health.ts';
 import momoWebhookRoutes from '../routes/momoWebhook.ts';
+import urubutoWebhookRoutes from '../routes/urubutoWebhook.ts';
 import storefrontCheckoutRoutes from '../routes/storefrontCheckout.ts';
 import storefrontAccountRoutes from '../routes/storefrontAccount.ts';
 import storeDashboardRoutes from '../routes/storeDashboard.ts';
@@ -155,11 +156,15 @@ export function createApp(): Express {
   // nothing.
   app.use('/api/health', healthRoutes);
 
-  // THE PAYMENT WEBHOOK, also outside the CSRF layer, which is the exception the note below anticipates.
-  // MTN cannot echo a double-submit cookie. It is safe because the callback GRANTS NOTHING: the body is
-  // ignored and the real status is re-read from MoMo's authenticated endpoint, so a forged call only makes
-  // the server ask a question it already knew the answer to. See routes/momoWebhook.ts.
+  // THE PAYMENT WEBHOOK(S), also outside the CSRF layer, which is the exception the note below anticipates.
+  // Neither provider can echo a double-submit cookie. momoWebhook is safe because its callback GRANTS
+  // NOTHING: the body is ignored and the real status is re-read from MoMo's authenticated endpoint — still
+  // mounted, because disbursements (payouts) stay on MoMo (see payments/momo.ts's header). urubutoWebhook
+  // (decided 2026-10-25, collections only) hands out a JWT on /auth, which the one place here that DOES
+  // need its own secret, because unlike MoMo's it grants access to a callback endpoint. See
+  // routes/momoWebhook.ts and routes/urubutoWebhook.ts.
   app.use('/api/momo', momoWebhookRoutes);
+  app.use('/api/urubuto', urubutoWebhookRoutes);
 
   // CSRF. §2.5: "Cookie-borne credentials are sent automatically, so every state-changing request needs
   // a token or a strict same-origin check."

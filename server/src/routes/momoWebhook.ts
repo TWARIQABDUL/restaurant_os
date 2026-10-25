@@ -1,5 +1,12 @@
 // server/src/routes/momoWebhook.ts — milestone 17.
 //
+// COLLECTIONS MOVED TO URUBUTO PAY 2026-10-25 (routes/urubutoWebhook.ts). The /callback/collection/
+// endpoint below is now DEAD for anything new — every collection attempt since has `gateway = 'urubuto'`
+// and MTN was never told about it, so MTN will never call this. Left in place rather than deleted: it is
+// harmless (collections.refresh() just finds no attempt and no-ops), and removing it would also mean
+// re-deriving the "answers 200 always" test coverage for a corner nothing exercises in production any
+// more. /callback/disbursement/:referenceId below it is NOT dead — payouts stay on MTN MoMo for now.
+//
 // POST /api/momo/callback/collection/:referenceId
 //
 // Carried across from server/src/routes/momoWebhook.js, which §1.2 names explicitly: "the MTN MoMo

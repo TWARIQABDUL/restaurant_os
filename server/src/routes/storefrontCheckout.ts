@@ -31,7 +31,7 @@ import * as carts from '../repositories/carts.ts';
 import * as checkout from '../repositories/checkout.ts';
 import * as collections from '../repositories/collections.ts';
 import * as orders from '../repositories/orders.ts';
-import { isConfigured } from '../payments/momo.ts';
+import { isConfigured } from '../payments/urubuto.ts';
 
 const router = Router();
 
