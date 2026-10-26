@@ -145,6 +145,21 @@ export function createApp(): Express {
   app.use(express.json({ limit: '200kb' }));
   app.use(cookieParser());
 
+  // NO-STORE BY DEFAULT, for every response this app sends. Found the hard way at milestone 30's
+  // cutover: routes with no Cache-Control of their own (71 routes DID set one explicitly; this one
+  // hadn't) left Vercel's edge free to apply ITS OWN default ("public, max-age=0, must-revalidate")
+  // to an authenticated, per-user response proxied through /backend/* — confirmed live by curling the
+  // ORIGIN directly and finding no Cache-Control header at all on an endpoint that crashed the client
+  // with a different field missing/undefined on each request, consistent with a shared cache serving
+  // one user's response to another. A JSON API with no public, cacheable content (this app's own
+  // description above: "it serves no HTML and embeds nothing") has nothing to gain from ever being
+  // cached and a real cross-user data leak to lose, so this is the floor, not a per-route opt-in. The
+  // explicit `no-store` calls already in routes are now redundant but harmless.
+  app.use((_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
+
   // Milestone 30's cutover switch. Ahead of everything else so a frozen write never reaches a rate
   // limiter, CSRF, or a route — see middleware/writeFreeze.ts for why it's shared with the legacy app.
   app.use(writeFreeze);
