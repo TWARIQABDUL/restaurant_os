@@ -45,16 +45,17 @@ function serveNewApp() {
 export default defineConfig({
   plugins: [react(), tailwindcss(), ...(process.env.VENDLYFY_APP === '1' ? [serveNewApp()] : [])],
 
-  // Two entries, deliberately.
+  // index.html DROPPED FROM THE PRODUCTION BUILD at milestone 30's cutover, exactly as this
+  // comment always said it would ("the new app... replaces index.html at cutover"). It still
+  // exists on disk for `npm run dev` (VENDLYFY_APP unset) to serve the legacy app locally, but it
+  // is no longer part of `rollupOptions.input` — Vercel's routing gives a literal file at the build
+  // root priority over vercel.json's rewrites, so as long as index.html was EMITTED, "/" resolved
+  // to it directly and skipped the /app.html rewrite entirely, no matter how the rewrite was
+  // written. With no built index.html, "/" has no matching file and falls through to the rewrite
+  // like every other path.
   //
-  // index.html is the live app: it loads src/main.jsx, which imports
-  // src/index.css — the legacy stylesheet whose 84 semantic classes 31 of the old
-  // pages still depend on (542 uses). It is deleted page by page through Stage D.
-  //
-  // gallery.html loads ONLY src/styles/tokens.css, the new L0 token layer. Two
-  // documents means two CSS graphs, which is what makes "no legacy CSS reachable"
-  // a property of the new page rather than a hope. The UI kit gallery lands in it
-  // at milestone 14.
+  // gallery.html loads ONLY src/styles/tokens.css, the new L0 token layer — kept, since nothing
+  // about it is affected by the cutover.
   //
   // Paths are relative so they resolve against Vite's `root` on any host, rather
   // than through import.meta.dirname, which needs Node 20.11 and would tie the
@@ -62,9 +63,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: 'index.html',
         gallery: 'gallery.html',
-        // The new app, milestone 15 onward. Replaces index.html at cutover.
         app: 'app.html',
       },
     },
