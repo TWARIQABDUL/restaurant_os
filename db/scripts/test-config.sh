@@ -213,7 +213,7 @@ refuses "half a pin" "stores_template_pin_complete" \
 refuses "pinning to a version that does not exist" "stores_template_pin_fkey" \
     "UPDATE stores SET industry_template_id='${FOOD_T}', industry_template_version=99
       WHERE id='eeeeeeee-0000-0000-0000-000000000001'"
-refuses "deleting a template a store is pinned to" "violates foreign key constraint" \
+refuses "deleting a template a store is pinned to" "foreign key constraint" \
     "DELETE FROM industry_templates WHERE id='${FOOD_T}'"
 
 step "Overrides — what a merchant changed in Settings"

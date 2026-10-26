@@ -32,7 +32,7 @@ services:
     # Debian-based on purpose, not Alpine: musl and glibc collate text
     # differently, which changes ORDER BY results and index behaviour against
     # a glibc-based managed instance.
-    image: postgres:17
+    image: postgres:18
     container_name: vendlyfy-postgres
     shm_size: 256mb
 
@@ -54,7 +54,10 @@ services:
       - "127.0.0.1:55432:5432"
 
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # PG 18's image declares its volume at /var/lib/postgresql (PGDATA moved to
+      # /var/lib/postgresql/18/docker inside it), not /var/lib/postgresql/data like 17 — the
+      # exact path change db/README.md's "bump means a db:reset" warning was written for.
+      - pgdata:/var/lib/postgresql
       # Runs ONCE, only on an empty data directory. Deployment never runs it,
       # so nothing the schema depends on may live here alone — see the header
       # of that file.

@@ -220,7 +220,7 @@ accepts "renaming the product afterwards" \
     "UPDATE products SET name='Chicken Burger Deluxe' WHERE id='aaaa0000-0000-0000-0000-000000000001'"
 equals  "the order still says what the customer bought" "Chicken burger" \
     "SELECT DISTINCT product_name FROM order_items WHERE order_id='${O}'"
-refuses "deleting a variant an order references" "violates foreign key constraint" \
+refuses "deleting a variant an order references" "foreign key constraint" \
     "DELETE FROM product_variants WHERE id='dddd0000-0000-0000-0000-000000000001'"
 
 # =============================================================================

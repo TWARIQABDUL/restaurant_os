@@ -188,7 +188,8 @@ the drift surfacing at milestone 11.
 
 ## The Postgres version
 
-**Pinned to major version 17**, in `docker-compose.yml`.
+**Pinned to major version 18**, in `docker-compose.yml`. Bumped from 17 on 2026-10-26 to match the
+production instance (Aiven), decided together in the same commit as this note, per the rule below.
 
 > **This must equal the deployed instance's major version.** Pick both together and move both in one
 > commit. A container one major ahead of production is a class of bug that only shows up after
@@ -198,9 +199,11 @@ the drift surfacing at milestone 11.
 The image is **Debian-based on purpose, not Alpine**: musl and glibc collate text differently, which
 changes `ORDER BY` results and index behaviour against a glibc-based managed instance.
 
-If the major version is ever bumped, note that the data directory path inside the official image
-changed after 17 — the volume mount in `docker-compose.yml` is version-dependent, and a bump means
-a `db:reset`, not an in-place upgrade.
+If the major version is ever bumped, note that the data directory path inside the official image is
+version-dependent — 18's image declares its volume at `/var/lib/postgresql` (PGDATA moved to
+`/var/lib/postgresql/18/docker` inside it), where 17's was `/var/lib/postgresql/data` — so the volume
+mount in `docker-compose.yml` has to move with it, and a bump means a `db:reset`, not an in-place
+upgrade.
 
 ---
 

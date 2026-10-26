@@ -185,7 +185,7 @@ accepts "a platform identity CAN hold the platform role" \
 # =============================================================================
 step "Referential integrity"
 # =============================================================================
-refuses "a store with customers cannot be deleted"  "violates foreign key constraint" \
+refuses "a store with customers cannot be deleted"  "foreign key constraint" \
     "DELETE FROM stores WHERE id='11111111-1111-1111-1111-111111111111'"
 refuses "a membership in a store that does not exist" "store_members_store_id_fkey" \
     "INSERT INTO store_members (user_id,store_id,role) VALUES

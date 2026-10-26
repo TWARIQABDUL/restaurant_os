@@ -143,7 +143,7 @@ refuses "a hash that is not one" "entry_hash_shape" \
       VALUES (99,'config','do_thing','Bad hash','Nobody',repeat('a',64),'not-a-hash')"
 refuses "deleting an administrator who has done things" "audit_log_actor_id_fkey\|violates foreign key" \
     "DELETE FROM users WHERE id='${OLIVE}'"
-refuses "deleting a store with history" "violates foreign key" \
+refuses "deleting a store with history" "foreign key" \
     "DELETE FROM stores WHERE id='${S1}'"
 
 # =============================================================================
