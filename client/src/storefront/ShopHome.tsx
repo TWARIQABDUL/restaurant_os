@@ -35,9 +35,10 @@ const SEARCH_DEBOUNCE_MS = 250;
 type Props = {
   onOpenProduct: (productId: string) => void;
   onOpenCart: () => void;
+  onAccount: () => void;
 };
 
-export function ShopHome({ onOpenProduct, onOpenCart }: Props): ReactNode {
+export function ShopHome({ onOpenProduct, onOpenCart, onAccount }: Props): ReactNode {
   const { face, money, has, t, cart, setCart, refreshCart, design } = useStore();
 
   const [query, setQuery] = useState('');
@@ -176,6 +177,7 @@ export function ShopHome({ onOpenProduct, onOpenCart }: Props): ReactNode {
         onSearch={setQuery}
         cartCount={cart.itemCount}
         onCart={onOpenCart}
+        onAccount={onAccount}
         today={today}
       />
 

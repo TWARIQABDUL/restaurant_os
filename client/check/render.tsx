@@ -478,7 +478,7 @@ function inStore(node: ReactNode): ReactNode {
 }
 
 const storefrontParts: readonly (readonly [string, ReactNode])[] = [
-  ['Shop · header', inStore(<StoreHeader query="" onSearch={noop} cartCount={3} onCart={noop} today={1} />)],
+  ['Shop · header', inStore(<StoreHeader query="" onSearch={noop} cartCount={3} onCart={noop} onAccount={noop} today={1} />)],
   ['Shop · search', <SearchField value="" onChange={noop} placeholder="Search the menu" />],
   ['Shop · promo banner', <PromoBanner title={FACE.banner?.title ?? null} subtitle={FACE.banner?.subtitle ?? null} />],
   ['Shop · categories', <CategoryNav categories={FACE.categories} active={null} onPick={noop} allLabel="Menu" totalCount={null} />],

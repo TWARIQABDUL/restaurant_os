@@ -89,6 +89,7 @@ export function Storefront({ slug, view, navigate }: Props): ReactNode {
         <ShopHome
           onOpenProduct={(productId) => navigate(`/${slug}/p/${productId}`)}
           onOpenCart={() => navigate(`/${slug}/cart`)}
+          onAccount={() => navigate(`/${slug}/account`)}
         />
       ) : view.kind === 'product' ? (
         <ProductPage

@@ -187,6 +187,31 @@ services:
       - key: MOMO_DISBURSEMENT_API_KEY
         sync: false
 
+      # Urubuto Pay (decided 2026-10-25, see payment-provider in project memory) — checkout
+      # collections only. Disbursements stay on MoMo above; DISBURSEMENT_PROVIDER defaults to
+      # momo when unset, so leaving it out here is deliberate, not an oversight.
+      - key: URUBUTO_BASE_URL
+        sync: false
+      - key: URUBUTO_API_KEY
+        sync: false
+      - key: URUBUTO_MERCHANT_CODE
+        sync: false
+      - key: URUBUTO_SERVICE_CODE
+        sync: false
+      - key: URUBUTO_HTTP_TIMEOUT_MS
+        value: 15000
+      # Credentials THIS server issues to Urubuto Pay for the webhook handshake — generate fresh
+      # for production, never reuse the sandbox values from server/.env (same reasoning as the
+      # sandbox/live split documented in payment-provider.md).
+      - key: URUBUTO_WEBHOOK_USERNAME
+        sync: false
+      - key: URUBUTO_WEBHOOK_PASSWORD_HASH
+        sync: false
+      - key: URUBUTO_JWT_SECRET
+        sync: false
+      - key: URUBUTO_WEBHOOK_TOKEN_TTL
+        value: 24h
+
   # ------------------------------------------------------------
   # 3. The Frontend — NOT DEPLOYED HERE
   # ------------------------------------------------------------

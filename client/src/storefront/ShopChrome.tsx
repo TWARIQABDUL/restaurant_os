@@ -129,12 +129,14 @@ export function StoreHeader({
   query,
   cartCount,
   onCart,
+  onAccount,
   today,
 }: {
   query: string;
   onSearch: (value: string) => void;
   cartCount: number;
   onCart: () => void;
+  onAccount: () => void;
   today: number;
 }): ReactNode {
   const { face, t, design } = useStore();
@@ -176,9 +178,21 @@ export function StoreHeader({
 
         <button
           type="button"
+          onClick={onAccount}
+          aria-label="Your account"
+          className="ml-auto flex size-11 shrink-0 items-center justify-center rounded-control border border-store-border bg-store-surface p-0 lg:ml-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="8" r="3.5" />
+            <path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
           onClick={onCart}
           aria-label={cartCount === 0 ? 'Cart, empty' : `Cart, ${cartCount} ${cartCount === 1 ? 'item' : 'items'}`}
-          className="relative ml-auto flex size-11 shrink-0 items-center justify-center rounded-control border border-store-border bg-store-surface p-0 lg:ml-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+          className="relative flex size-11 shrink-0 items-center justify-center rounded-control border border-store-border bg-store-surface p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M6 7h12l-1 13H7L6 7z" />
