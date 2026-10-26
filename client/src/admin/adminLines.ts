@@ -282,8 +282,16 @@ export const unthousands = (s: string): number | null => (s.trim() === '' ? null
 // Part C — audit log, all orders, platform settings, admin team, plans, industry templates
 // ---------------------------------------------------------------------------
 
-/** Whether this person's permissions open a destination: any one of the listed is enough. */
-export const mayOpen = (needs: readonly string[], held: readonly string[]): boolean => needs.some((n) => held.includes(n));
+/**
+ * Whether this person's permissions open a destination: any one of the listed is enough.
+ *
+ * `held` is typed as always an array, but a response the client can't fully account for — a stale
+ * cache, a proxy that drops a field — should not take the whole console down over a sidebar filter.
+ * Same rule nav.ts's maySee states for the merchant console: an item it cannot reach is not shown,
+ * rather than shown failing.
+ */
+export const mayOpen = (needs: readonly string[], held: readonly string[] | null | undefined): boolean =>
+  needs.some((n) => (held ?? []).includes(n));
 
 export const AUDIT_FILTERS: readonly { id: AuditCategory | 'all'; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'sensitive', label: 'Sensitive views' }, { id: 'money', label: 'Money' }, { id: 'store', label: 'Stores' }, { id: 'config', label: 'Settings' }, { id: 'access', label: 'Access' },

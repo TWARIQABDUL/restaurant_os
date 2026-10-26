@@ -151,8 +151,8 @@ export const MOBILE_TABS: readonly { id: string; label: string; icon: NavIcon; p
 ];
 
 /** Whether this role may see an item at all. An item it cannot reach is not shown, rather than shown failing. */
-export function maySee(item: { needs?: string }, permissions: readonly string[]): boolean {
-  return item.needs === undefined || permissions.includes(item.needs);
+export function maySee(item: { needs?: string }, permissions: readonly string[] | null | undefined): boolean {
+  return item.needs === undefined || (permissions ?? []).includes(item.needs);
 }
 
 /** The console path for an item, with the store's slug in front of it. */
