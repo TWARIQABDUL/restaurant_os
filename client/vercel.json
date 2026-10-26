@@ -5,6 +5,10 @@
       "destination": "https://restaurant-os-1.onrender.com/api/:path*"
     },
     {
+      "source": "/api/:path((?!sitemap|robots|seo).*)",
+      "destination": "https://restaurant-os-1.onrender.com/api/:path"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"
     },
