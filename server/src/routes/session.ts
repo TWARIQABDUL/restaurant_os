@@ -23,7 +23,7 @@ import {
   signSessionToken,
   ttlFor,
 } from '../auth/sessionToken.ts';
-import { sendCodeEmail } from '../messaging/otp.ts';
+import { sendCode } from '../messaging/otp.ts';
 import * as auth from '../repositories/auth.ts';
 import * as memberships from '../repositories/memberships.ts';
 import * as permissions from '../repositories/permissions.ts';
@@ -192,8 +192,8 @@ router.post(
         (tx) => auth.issueCode(user.id, 'platform_two_step', tx),
         { label: 'issue two-step code' },
       );
-      // Emailed, never returned in the response: putting it there would make the second factor a formality.
-      await sendCodeEmail(user.email, 'two-step code', code, expiresAt);
+      // Sent, never returned in the response: putting it there would make the second factor a formality.
+      await sendCode({ email: user.email, phone: user.phone }, 'two-step code', code, expiresAt);
 
       res.json({
         next: 'two-step',

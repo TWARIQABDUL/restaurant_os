@@ -15,7 +15,7 @@ import { authOf, isUuid, requireSession, requireStorePermission, storeIdOf } fro
 import { checkPassword, firstPasswordProblem } from '../auth/password.ts';
 import { clearSessionCookie, setSessionCookie, signSessionToken, ttlFor } from '../auth/sessionToken.ts';
 import { authLimiter } from '../middleware/rateLimit.js';
-import { sendCodeEmail } from '../messaging/otp.ts';
+import { sendCode } from '../messaging/otp.ts';
 import * as auth from '../repositories/auth.ts';
 import * as memberships from '../repositories/memberships.ts';
 import * as stores from '../repositories/stores.ts';
@@ -58,11 +58,12 @@ passwordRouter.post(
         if (target === undefined) return null;
 
         const { code, expiresAt } = await auth.issueCode(target.id, 'password_reset', tx);
-        return { email: target.email, code, expiresAt };
+        return { email: target.email, phone: target.phone, code, expiresAt };
       },
       { label: 'POST /api/password/reset' },
     );
-    if (issued !== null) await sendCodeEmail(issued.email, 'password reset code', issued.code, issued.expiresAt);
+    if (issued !== null)
+      await sendCode({ email: issued.email, phone: issued.phone }, 'password reset code', issued.code, issued.expiresAt);
 
     res.json({
       // Deliberately not "we sent a code to X". The response says what was done, not to whom.
