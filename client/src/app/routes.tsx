@@ -20,6 +20,7 @@
 import { BrowserRouter, Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { AuthPage } from '../auth/AuthPage.tsx';
+import { LandingPage } from './LandingPage.tsx';
 import { Onboarding } from '../onboarding/Onboarding.tsx';
 import { NotFoundPage } from './errorPages.tsx';
 import { Admin, SoonPage } from '../admin/Admin.tsx';
@@ -209,9 +210,10 @@ export function AppRoutes(): ReactNode {
         {/* The tracking code is the credential, so this route is openable cold from an SMS link. */}
         <Route path="/:store/orders/:code" element={<StoreRoute view="track" />} />
 
-        {/* Nothing at the root yet: the platform's own marketing page is not part of this rewrite, and a
-            shopper always arrives at a store. Sign-in is the one thing here that is always somewhere. */}
-        <Route path="/" element={<Navigate to="/signin" replace />} />
+        {/* Milestone 30's cutover gap: with index.html (the legacy marketing page) dropped from the build,
+            "/" had nothing of its own and fell through to /signin. LandingPage.tsx is the platform's real
+            marketing page now — no design board covers it; built from the token layer and shared/ui kit. */}
+        <Route path="/" element={<LandingPage />} />
 
         {/* A path no store could own (more segments than any route above): the platform's 404, not a bounce to sign-in. */}
         <Route path="*" element={<NotFoundRoute />} />
