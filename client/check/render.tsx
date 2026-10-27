@@ -108,7 +108,7 @@ import { RiderApp } from '../src/rider/Rider.tsx';
 import type { RiderHome } from '../src/rider/api.ts';
 import { Console } from '../src/console/Console.tsx';
 import { MOBILE_TABS, NAV_GROUPS, consoleHref, hrefFor, maySee } from '../src/console/nav.ts';
-import { dateline, greeting, notificationLine, relativeWhen, toneClasses, waitingClock } from '../src/console/lines.ts';
+import { ageLabel, dateline, greeting, notificationLine, relativeWhen, toneClasses, waitingClock } from '../src/console/lines.ts';
 import { DEFAULT_DESIGN, compileTheme, formatMoney } from '../src/app/core.ts';
 import type { Design, ThemeInputs } from '../src/app/core.ts';
 
@@ -757,6 +757,14 @@ for (const [name, node] of [...checkoutParts, ...accountParts]) {
   expect(dateline('2026-09-27', 'Africa/Kigali') === 'Sunday, 27 September', `the dateline: ${dateline('2026-09-27', 'Africa/Kigali')}`);
   expect(waitingClock(7) === '0:07', 'the alert counts 0:07');
   expect(waitingClock(605) === '10:05', 'and past ten minutes');
+  // A stale pending order (weeks old) must not print a six-digit minute count — it steps up instead.
+  // 6,815,930s is the real figure that used to render as the reported "113598:50".
+  expect(waitingClock(6_815_930) === '78 d', `a weeks-old order no longer prints six digits of minutes: ${waitingClock(6_815_930)}`);
+  expect(waitingClock(10_800) === '3 h 00 min', `past 100 minutes it steps to hours: ${waitingClock(10_800)}`);
+
+  expect(ageLabel(5) === '5 min', 'ageLabel under an hour');
+  expect(ageLabel(125) === '2 h', `ageLabel under a day: ${ageLabel(125)}`);
+  expect(ageLabel(2900) === '2 d', `ageLabel past a day, no six-digit minute count: ${ageLabel(2900)}`);
 }
 
 // The navigation table. What is asserted is its RULES, not its contents — a milestone that adds a screen changes

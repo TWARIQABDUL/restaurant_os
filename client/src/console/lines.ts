@@ -258,9 +258,26 @@ export function greeting(timeZone: string, now: Date = new Date()): string {
   return 'Good evening';
 }
 
-/** The alert's "0:07", counting up. */
+/**
+ * The alert's "0:07", counting up. A pending order can be genuinely weeks old (a stale row nobody
+ * closed out), not just a few minutes — past 100 minutes the mm:ss shape stops being readable (it was
+ * printing things like "113598:50"), so it steps up to "H h MM min" and then "D d" the same way
+ * ageLabel() below does, instead of growing the minutes side forever.
+ */
 export function waitingClock(seconds: number): string {
   const whole = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(whole / 60);
-  return `${minutes}:${String(whole % 60).padStart(2, '0')}`;
+  if (minutes < 100) return `${minutes}:${String(whole % 60).padStart(2, '0')}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours} h ${String(minutes % 60).padStart(2, '0')} min`;
+  return `${Math.floor(hours / 24)} d`;
+}
+
+/** "3 min", "2 h", "5 d" — Orders.tsx's elapsed-time labels, so a stale order doesn't print a six-digit minute count. */
+export function ageLabel(minutes: number): string {
+  const whole = Math.max(0, Math.floor(minutes));
+  if (whole < 60) return `${whole} min`;
+  const hours = Math.floor(whole / 60);
+  if (hours < 24) return `${hours} h`;
+  return `${Math.floor(hours / 24)} d`;
 }

@@ -40,7 +40,7 @@ import type { StatusTone } from '../shared/ui/index.ts';
 import { orders as ordersApi } from './api.ts';
 import type { OrderDetail, OrderListItem, OrderStatus, RefundReasonCode, RiderOption } from './api.ts';
 import { ExportOrders } from './ExportOrders.tsx';
-import { relativeWhen } from './lines.ts';
+import { ageLabel, relativeWhen } from './lines.ts';
 import { printHtml, receiptHtml } from './printables.ts';
 import { useShell } from './ShellProvider.tsx';
 
@@ -175,6 +175,9 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
   void navigate; // reserved: every action stays on this screen today, nothing here leaves it yet.
 
   const [view, setView] = useState<'board' | 'list'>('board');
+  // The phone-width board shows one status at a time (a tab strip, not every column stacked vertically) —
+  // COLUMNS[0] is 'new', the status a merchant opens this screen to see first.
+  const [activeColumn, setActiveColumn] = useState<string>(COLUMNS[0]?.id ?? '');
   const [q, setQ] = useState('');
   const [list, setList] = useState<OrderListItem[] | null>(initialOrders ?? null);
   const [listError, setListError] = useState<string | null>(null);
@@ -360,22 +363,63 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
       </header>
 
       {view === 'board' ? (
-        <div className="grid grid-cols-1 gap-2.5 overflow-x-auto pb-2 sm:grid-cols-2 lg:grid-cols-6">
-          {columns.map((c) => (
-            <section key={c.id} className="flex min-h-[160px] flex-col gap-2 rounded-card bg-status-neutral p-2">
-              <div className="flex items-center gap-1.5 px-1 pb-1">
-                <strong className="grow text-[13px]">{c.label}</strong>
-                <span className="text-[12px] font-bold text-muted">{c.rows.length}</span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {c.rows.map((o) => (
-                  <OrderCard key={o.id} order={o} money={money} onOpen={() => openOrder(o.id)} />
-                ))}
-                {c.rows.length === 0 ? <p className="px-1 text-[12px] text-muted">Nothing here</p> : null}
-              </div>
-            </section>
-          ))}
-        </div>
+        <>
+          {/* Phone: one status at a time via a tab strip, instead of scrolling past every column stacked. */}
+          <div className="sm:hidden">
+            <div role="tablist" aria-label="Order status" className="flex gap-2 overflow-x-auto pb-2.5">
+              {columns.map((c) => {
+                const on = c.id === activeColumn;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={on}
+                    onClick={() => setActiveColumn(c.id)}
+                    className={`flex h-11 shrink-0 items-center gap-1.5 rounded-pill border px-3.5 text-[13px] font-semibold ${
+                      on ? 'border-store-primary bg-store-primary text-store-on-primary' : 'border-control-line bg-surface text-ink-2'
+                    }`}
+                  >
+                    {c.label}
+                    <span className={on ? 'text-[12px] font-bold' : 'text-[12px] font-bold text-muted'}>{c.rows.length}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {(() => {
+              const active = columns.find((c) => c.id === activeColumn) ?? columns[0];
+              if (active === undefined) return null;
+              return (
+                <section className="flex min-h-[160px] flex-col gap-2 rounded-card bg-status-neutral p-2">
+                  <div className="flex flex-col gap-2">
+                    {active.rows.map((o) => (
+                      <OrderCard key={o.id} order={o} money={money} onOpen={() => openOrder(o.id)} />
+                    ))}
+                    {active.rows.length === 0 ? <p className="px-1 text-[12px] text-muted">Nothing here</p> : null}
+                  </div>
+                </section>
+              );
+            })()}
+          </div>
+
+          {/* Tablet and up: every status column side by side. */}
+          <div className="hidden gap-2.5 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 lg:grid-cols-6">
+            {columns.map((c) => (
+              <section key={c.id} className="flex min-h-[160px] flex-col gap-2 rounded-card bg-status-neutral p-2">
+                <div className="flex items-center gap-1.5 px-1 pb-1">
+                  <strong className="grow text-[13px]">{c.label}</strong>
+                  <span className="text-[12px] font-bold text-muted">{c.rows.length}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {c.rows.map((o) => (
+                    <OrderCard key={o.id} order={o} money={money} onOpen={() => openOrder(o.id)} />
+                  ))}
+                  {c.rows.length === 0 ? <p className="px-1 text-[12px] text-muted">Nothing here</p> : null}
+                </div>
+              </section>
+            ))}
+          </div>
+        </>
       ) : (
         <div className="overflow-auto rounded-card border border-line bg-surface">
           <div className="grid grid-cols-[80px_minmax(0,1.4fr)_minmax(0,1fr)_100px_130px_minmax(0,1.2fr)_70px] gap-2.5 border-b border-line bg-status-neutral px-3.5 py-2.5 text-[12px] font-semibold text-muted">
@@ -404,7 +448,7 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
                 <span className={`${CHIP} justify-self-start ${TONE_CHIP[meta.tone]}`}>
                   {meta.label}
                 </span>
-                <span className="text-caption text-muted">{o.ageMinutes} min</span>
+                <span className="text-caption text-muted">{ageLabel(o.ageMinutes)}</span>
               </button>
             );
           })}
@@ -598,7 +642,7 @@ function OrderCard({
       <span className="flex items-center justify-between">
         <span className="font-mono text-[13px] text-mono">#{order.orderNumber}</span>
         <span className={`text-[12px] font-semibold ${isNew && order.ageMinutes > 3 ? 'text-status-danger-fg' : 'text-muted'}`}>
-          {order.ageMinutes} min
+          {isNew && order.ageMinutes > 3 ? `Overdue · ${ageLabel(order.ageMinutes)}` : ageLabel(order.ageMinutes)}
         </span>
       </span>
       <span className="truncate text-[14px] font-semibold">{order.customer}</span>
@@ -885,7 +929,7 @@ function StepsBar({ status }: { status: OrderStatus }): ReactNode {
 function Banner({ detail }: { detail: OrderDetail }): ReactNode {
   if (detail.status === 'pending' && detail.ageMinutes > 3) {
     return (
-      <Alert tone="danger" headline={`Waiting ${detail.ageMinutes} min.`}>
+      <Alert tone="danger" headline={`Overdue · waiting ${ageLabel(detail.ageMinutes)}.`}>
         The customer sees “waiting for the store” until you accept.
       </Alert>
     );

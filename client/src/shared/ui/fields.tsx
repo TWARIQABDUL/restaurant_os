@@ -144,7 +144,7 @@ export function Segmented<T extends string>({
             role="radio"
             aria-checked={on}
             onClick={() => onChange(option.value)}
-            className={`h-[38px] flex-1 rounded-chip px-4 text-body font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${
+            className={`h-11 flex-1 rounded-chip px-4 text-body font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${
               on ? 'bg-surface text-ink shadow-menu' : 'bg-transparent text-ink-2'
             }`}
           >

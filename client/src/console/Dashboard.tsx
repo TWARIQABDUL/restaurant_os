@@ -131,7 +131,7 @@ export function Dashboard({ data, onChanged, navigate }: Props): ReactNode {
       </div>
 
       {/* --- open, and the pause switch ----------------------------------- */}
-      <section className="hidden items-center gap-3.5 rounded-card border border-line bg-surface px-4.5 py-3.5 lg:flex">
+      <section className="flex flex-wrap items-center gap-3.5 rounded-card border border-line bg-surface px-4.5 py-3.5">
         <span
           aria-hidden="true"
           className={`size-2.5 rounded-pill ${
@@ -141,12 +141,12 @@ export function Dashboard({ data, onChanged, navigate }: Props): ReactNode {
         <span className="grow">
           <strong>{openHeadline}</strong> <span className="text-muted">· {openLine}</span>
         </span>
-        {pauseError === null ? null : <span className="text-caption text-status-danger-fg">{pauseError}</span>}
+        {pauseError === null ? null : <span className="w-full text-caption text-status-danger-fg">{pauseError}</span>}
         <button
           type="button"
           onClick={togglePause}
           disabled={pausing}
-          className="h-10 rounded-control border border-control-line bg-surface px-3.5 text-caption font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-60"
+          className="h-11 rounded-control border border-control-line bg-surface px-3.5 text-caption font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-60"
         >
           {counts.acceptingOrders ? 'Pause new orders' : 'Start taking orders'}
         </button>
@@ -394,7 +394,7 @@ function SalesWeek({
   const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   return (
-    <section className="hidden flex-col rounded-card border border-line bg-surface p-5 lg:flex">
+    <section className="flex flex-col rounded-card border border-line bg-surface p-3.5 lg:p-5">
       <div className="flex items-baseline justify-between">
         <h2 className="m-0 text-[18px]">Sales this week</h2>
         <span className="font-bold tabular-nums">{money(total.toFixed(2))}</span>
@@ -462,12 +462,13 @@ function RecentOrders({
   money: (value: string) => string;
 }): ReactNode {
   return (
-    <section className="hidden rounded-card border border-line bg-surface px-5 pb-2 pt-5 lg:block">
+    <section className="rounded-card border border-line bg-surface px-3.5 pb-2 pt-3.5 lg:px-5 lg:pt-5">
       <h2 className="m-0 mb-2 text-[18px]">Recent orders</h2>
       {rows.length === 0 ? (
         <p className="py-6 text-center text-caption text-muted">No orders yet.</p>
       ) : (
-        <table className="w-full border-collapse text-caption">
+        <div className="-mx-3.5 overflow-x-auto px-3.5 lg:mx-0 lg:px-0">
+        <table className="w-full min-w-[520px] border-collapse text-caption">
           <caption className="sr-only">The most recent orders at this store</caption>
           <thead>
             <tr className="text-left text-muted">
@@ -497,6 +498,7 @@ function RecentOrders({
             })}
           </tbody>
         </table>
+        </div>
       )}
     </section>
   );

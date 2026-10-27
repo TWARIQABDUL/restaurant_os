@@ -14,6 +14,7 @@
 // board, rider dispatch, and the merchant console's own screens — no invented numbers, no feature that
 // isn't built.
 
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../shared/ui/Button.tsx';
@@ -60,28 +61,66 @@ const roles = [
 ];
 
 function Header(): ReactNode {
+  const [open, setOpen] = useState(false);
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-line bg-surface/90 px-5 backdrop-blur">
-      <span className="flex items-center gap-2.5">
-        <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-chip bg-ink font-display text-body font-bold text-ground">
-          {MARK}
+    <header className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur">
+      <div className="flex h-14 items-center justify-between px-5">
+        <span className="flex items-center gap-2.5">
+          <span aria-hidden="true" className="flex size-8 items-center justify-center rounded-chip bg-ink font-display text-body font-bold text-ground">
+            {MARK}
+          </span>
+          <strong className="font-display text-[18px]">{BRAND}</strong>
         </span>
-        <strong className="font-display text-[18px]">{BRAND}</strong>
-      </span>
-      <nav className="flex items-center gap-2">
-        <a href="#how-it-works" className="hidden px-3 text-body font-semibold text-ink-2 no-underline sm:inline">
-          How it works
-        </a>
-        <a href="#features" className="hidden px-3 text-body font-semibold text-ink-2 no-underline sm:inline">
-          Features
-        </a>
-        <Link to="/signin" className="flex h-9 items-center rounded-control px-3 text-body font-semibold text-ink no-underline">
-          Sign in
-        </Link>
-        <Link to="/signup">
-          <Button tone="brand">Get started</Button>
-        </Link>
-      </nav>
+
+        {/* Tablet and up: the full nav, every link a real 44px target. */}
+        <nav className="hidden items-center gap-1 sm:flex">
+          <a href="#how-it-works" className="flex h-11 items-center px-3 text-body font-semibold text-ink-2 no-underline">
+            How it works
+          </a>
+          <a href="#features" className="flex h-11 items-center px-3 text-body font-semibold text-ink-2 no-underline">
+            Features
+          </a>
+          <Link to="/signin" className="flex h-11 items-center rounded-control px-3 text-body font-semibold text-ink no-underline">
+            Sign in
+          </Link>
+          <Link to="/signup">
+            <Button tone="brand">Get started</Button>
+          </Link>
+        </nav>
+
+        {/* Phone: the two anchor links move into a menu instead of disappearing. */}
+        <div className="flex items-center gap-2 sm:hidden">
+          <Link to="/signup">
+            <Button tone="brand">Get started</Button>
+          </Link>
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls="landing-menu"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            onClick={() => setOpen((v) => !v)}
+            className="flex size-11 shrink-0 items-center justify-center rounded-control border border-control-line bg-surface"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" className="size-5" aria-hidden="true">
+              {open ? <path d="M6 6l12 12M18 6 6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {open ? (
+        <nav id="landing-menu" className="flex flex-col border-t border-line px-5 py-1.5 sm:hidden">
+          <a href="#how-it-works" onClick={() => setOpen(false)} className="flex h-11 items-center text-body font-semibold text-ink-2 no-underline">
+            How it works
+          </a>
+          <a href="#features" onClick={() => setOpen(false)} className="flex h-11 items-center text-body font-semibold text-ink-2 no-underline">
+            Features
+          </a>
+          <Link to="/signin" onClick={() => setOpen(false)} className="flex h-11 items-center text-body font-semibold text-ink no-underline">
+            Sign in
+          </Link>
+        </nav>
+      ) : null}
     </header>
   );
 }
