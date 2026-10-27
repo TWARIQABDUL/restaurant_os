@@ -7,7 +7,8 @@
 //   MESSAGING_SMS / MESSAGING_EMAIL = none       (the default)  nothing is sent; rows stay queued and the admin console counts them
 //                                   = log                        development: prints the message and marks it sent (provider "log")
 //                                   = sendgrid (MESSAGING_EMAIL only, decided 2026-10-20)  real email via SendGrid; see sendgridTransport.ts
-//                                   = twilio   (MESSAGING_SMS only, decided 2026-10-20)    real SMS via Twilio; see twilioTransport.ts
+//                                   = twilio   (MESSAGING_SMS only, decided 2026-10-20, never funded/live) real SMS via Twilio; see twilioTransport.ts
+//                                   = custom   (MESSAGING_SMS only, decided 2026-10-27)    real SMS via a self-built service; see customSmsTransport.ts
 //
 // "none" IS THE DEFAULT AND IT IS DELIBERATE. A server that comes up with no provider configured must not pretend messages left —
 // a customer who is never told their order was accepted is a real failure, and the only honest signal is a queue that is visibly
@@ -15,6 +16,7 @@
 
 import { sendgridTransport } from './sendgridTransport.ts';
 import { twilioTransport } from './twilioTransport.ts';
+import { customSmsTransport } from './customSmsTransport.ts';
 
 export type Outgoing = { id: string; channel: 'sms' | 'email'; recipient: string; sender: string; subject: string | null; body: string; bodyHtml: string | null };
 
@@ -48,5 +50,6 @@ export function transportFor(channel: 'sms' | 'email'): Transport | null {
   if (name === 'log') return logTransport;
   if (name === 'sendgrid' && channel === 'email') return sendgridTransport;
   if (name === 'twilio' && channel === 'sms') return twilioTransport;
+  if (name === 'custom' && channel === 'sms') return customSmsTransport;
   return null;
 }

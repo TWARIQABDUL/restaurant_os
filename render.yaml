@@ -124,9 +124,14 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
-      # Leave MESSAGING_SMS=none until the Twilio account is actually funded — see twilioTransport.ts.
+      # SMS (decided 2026-10-27) — a self-built service, see customSmsTransport.ts. Replaced the Twilio
+      # decision below, which never got funded; TWILIO_* kept wired but unused in case of a future switch.
       - key: MESSAGING_SMS
-        value: none
+        value: custom
+      - key: SMS_API_URL
+        value: https://sms-intergration.onrender.com/api/sms/send
+      - key: SMS_API_KEY
+        sync: false
       - key: TWILIO_ACCOUNT_SID
         sync: false
       - key: TWILIO_AUTH_TOKEN
