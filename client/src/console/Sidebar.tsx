@@ -102,7 +102,11 @@ export function Sidebar({ active, unread, onOpenNotifications, navigate }: Props
   return (
     <nav
       aria-label="Merchant navigation"
-      className="hidden w-[248px] shrink-0 flex-col border-r border-line bg-surface px-3 py-5 lg:flex"
+      // lg:h-dvh + lg:overflow-y-auto, same pattern as <main> in Console.tsx: without its own height and
+      // scroll, a long enough nav list (many permissions) overflows the flex-stretched box with nothing
+      // to contain it, stretching the whole document past the viewport — the outer page scrolls AND
+      // <main>'s own inner scroll both exist at once, and <main>'s box ends up short of the visible area.
+      className="hidden w-[248px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface px-3 py-5 lg:flex lg:h-dvh"
     >
       <div className="flex items-center gap-2.5 px-2 pb-4">
         <span
