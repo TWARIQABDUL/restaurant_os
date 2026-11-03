@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { resolveTenant } from './middleware/tenant.js';
 import { globalLimiter, webhookLimiter } from './middleware/rateLimit.js';
 import { writeFreeze } from './middleware/writeFreeze.ts';
+import { allowedOrigins } from './auth/csrf.ts';
 
 import authRoutes from './routes/auth.js';
 import menuRoutes from './routes/menu.js';
@@ -46,7 +47,10 @@ app.use(helmet({
 }));
 
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  // The same list the new server's CORS and csrf.ts's Origin check trust — CLIENT_URL plus any
+  // CSRF_ALLOWED_ORIGINS extras, so a staging domain running alongside the main one is never
+  // trusted by one app and refused by the other.
+  origin: allowedOrigins(),
   credentials: true,
 }));
 

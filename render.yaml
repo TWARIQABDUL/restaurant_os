@@ -21,7 +21,13 @@ services:
       # arrive via the Vercel rewrite and are same-origin from the browser's view.
       - key: CLIENT_URL
         sync: false
-      
+      # Extra origins to trust ALONGSIDE CLIENT_URL (comma-separated), e.g. a staging domain running at
+      # the same time rather than replacing it — vendly.me, decided 2026-11-03. Read by the same
+      # auth/csrf.ts allowedOrigins() this app's CORS and the new server's both share, so it is never
+      # set on only one service.
+      - key: CSRF_ALLOWED_ORIGINS
+        sync: false
+
       # The following variables will show up as blank in your Render dashboard.
       # You must fill them in manually before the first deploy succeeds!
       - key: DATABASE_URL
@@ -101,6 +107,12 @@ services:
       - key: API_PORT
         value: 10000
       - key: CLIENT_URL
+        sync: false
+      # Extra origins to trust alongside CLIENT_URL (comma-separated) — vendly.me, decided 2026-11-03,
+      # staged alongside the existing *.vercel.app URL rather than replacing it. Shared by this
+      # service's CORS, the legacy service's CORS and Socket.io, and the CSRF Origin check, all via
+      # auth/csrf.ts's allowedOrigins() — set it once here, not per-service.
+      - key: CSRF_ALLOWED_ORIGINS
         sync: false
 
       # Milestone 30's freeze switch (middleware/writeFreeze.ts). Leave unset/off outside the actual

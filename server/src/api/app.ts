@@ -22,7 +22,7 @@ import type { Express } from 'express';
 import helmet from 'helmet';
 import { globalLimiter } from '../middleware/rateLimit.js';
 import { writeFreeze } from '../middleware/writeFreeze.ts';
-import { issueCsrfToken, requireCsrf } from '../auth/csrf.ts';
+import { allowedOrigins, issueCsrfToken, requireCsrf } from '../auth/csrf.ts';
 import { errorHandler, unmatchedRoute } from './errorHandler.ts';
 import sessionRoutes from '../routes/session.ts';
 import storeConfigRoutes from '../routes/storeConfig.ts';
@@ -133,7 +133,10 @@ export function createApp(): Express {
 
   app.use(
     cors({
-      origin: process.env.CLIENT_URL ?? 'http://localhost:5173',
+      // The same list the CSRF Origin check trusts (csrf.ts's allowedOrigins) — CLIENT_URL plus any
+      // CSRF_ALLOWED_ORIGINS extras, so a staging domain running alongside the main one is trusted by
+      // both checks or neither, never one without the other.
+      origin: allowedOrigins(),
       // The session is an httpOnly cookie (§2.5 — no browser storage), so the browser
       // only sends it when credentials are allowed.
       credentials: true,

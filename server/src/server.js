@@ -21,6 +21,7 @@ const { Server } = await import('socket.io');
 const { default: app } = await import('./app.js');
 const { setupSocketHandlers } = await import('./socket/handler.js');
 const settlementScheduler = await import('./services/settlementScheduler.js');
+const { allowedOrigins } = await import('./auth/csrf.ts');
 
 const PORT = process.env.PORT || 5000;
 
@@ -30,7 +31,9 @@ const server = createServer(app);
 // Attach Socket.io
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    // Same trusted-origins list as app.js's CORS and csrf.ts's Origin check — a staging domain
+    // running alongside the main one must be trusted by all three or none.
+    origin: allowedOrigins(),
     methods: ['GET', 'POST'],
     credentials: true,
   },

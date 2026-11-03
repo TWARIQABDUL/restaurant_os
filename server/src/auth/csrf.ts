@@ -34,7 +34,14 @@ export const CSRF_HEADER = 'x-csrf-token';
 /** Methods that cannot change state, so they need none of this. */
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-function allowedOrigins(): string[] {
+/**
+ * Every origin this deployment trusts: CLIENT_URL plus CSRF_ALLOWED_ORIGINS (comma-separated extras).
+ * Exported so app.ts/app.js/server.js's CORS and Socket.io setups share ONE list with this file's own
+ * Origin check — added 2026-11-03 for the vendly.me staging domain, which needs to work ALONGSIDE the
+ * existing *.vercel.app URL rather than replacing it, and a CORS/CSRF mismatch (one trusting an origin
+ * the other refuses) is exactly the kind of drift a single list prevents.
+ */
+export function allowedOrigins(): string[] {
   const client = process.env.CLIENT_URL ?? 'http://localhost:5173';
   const extra = (process.env.CSRF_ALLOWED_ORIGINS ?? '')
     .split(',')
