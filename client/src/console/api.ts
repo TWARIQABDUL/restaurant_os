@@ -226,6 +226,8 @@ export type OrderListItem = {
   paymentStatus: 'unpaid' | 'paid' | 'refunded';
   /** Cash only: whether confirm_cash_payment() has run. Always true for an online method. */
   cashConfirmed: boolean;
+  /** momo_manual only: whether confirm_manual_momo_payment() has run. Always true for any other method. */
+  momoManualConfirmed: boolean;
   riderName: string | null;
   hasLiveRefund: boolean;
   placedAt: string;
@@ -325,6 +327,9 @@ export const orders = {
 
   confirmCash: (storeId: string, orderId: string, reportedAmount: string): Promise<TransitionOutcome> =>
     post(storeId, orderId, 'confirm-cash', { reportedAmount }),
+
+  confirmManualMomo: (storeId: string, orderId: string, note: string): Promise<TransitionOutcome> =>
+    post(storeId, orderId, 'confirm-manual-momo', note.trim() === '' ? {} : { note: note.trim() }),
 
   closeReturn: (storeId: string, orderId: string, restock: boolean): Promise<TransitionOutcome> =>
     post(storeId, orderId, 'close-return', { restock }),

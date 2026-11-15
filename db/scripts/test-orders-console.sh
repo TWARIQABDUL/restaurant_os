@@ -60,6 +60,7 @@ O_RETURNED_CASH="dddddddd-1000-4000-8000-000000000009"
 O_RETURNED_WITH_LIVE_REFUND="dddddddd-1000-4000-8000-00000000000a"
 O_DELIVERED_PAID="dddddddd-1000-4000-8000-00000000000b"
 O_CANCEL_TEST="dddddddd-1000-4000-8000-00000000000c"
+O_RETURNED_MOMO_MANUAL="dddddddd-1000-4000-8000-00000000000f"
 
 printf '\nOrders board acceptance tests\n'
 info "database  : ${TEST_DB}"
@@ -218,6 +219,20 @@ equals "a cash return moves no money — it was never paid" "t" \
 equals "still 0.00 refunded and still unpaid" "0.00|unpaid" \
     "SELECT refunded_amount || '|' || payment_status FROM orders WHERE id = '$O_RETURNED_CASH'"
 equals "not restocked, because false was asked" "10" "SELECT stock_quantity FROM product_variants WHERE id = '$VARIANT'"
+
+# V037's own regression: momo_manual is ALSO offline (no provider, no ledger entry ever posted — see
+# confirm_manual_momo_payment()), but it is NOT cash — a close_return() still reading `<> 'cash'` would
+# have tried to refund this from the store's wallet, which never held this money at all.
+step "Closing a return for a CONFIRMED manual-MoMo order also moves no money — it never reached the wallet"
+neworder "$O_RETURNED_MOMO_MANUAL" 1015 returned delivery momo_manual paid "$RIDER_A"
+accepts "released, as a delivered-then-returned order's escrow really would be by the time it comes back" \
+    "UPDATE orders SET settlement_status = 'released' WHERE id = '$O_RETURNED_MOMO_MANUAL'"
+equals "close_return succeeds" "t" \
+    "SELECT close_return('$O_RETURNED_MOMO_MANUAL', '$STORE', '$OWNER', 'owner', false)"
+equals "still 0.00 refunded and still reads paid — the customer paid the merchant directly, nothing to reverse" "0.00|paid" \
+    "SELECT refunded_amount || '|' || payment_status FROM orders WHERE id = '$O_RETURNED_MOMO_MANUAL'"
+equals "and no refund row was ever inserted" "0" \
+    "SELECT count(*) FROM refunds WHERE order_id = '$O_RETURNED_MOMO_MANUAL'"
 
 # THE BUG THIS SUITE WAS WRITTEN AROUND: a returned order that already carries a PENDING refund (from a
 # complaint, say) must not let close_return() double-claim against refunds_total_check().

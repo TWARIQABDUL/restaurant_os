@@ -489,6 +489,12 @@ function PaymentsPanel({ extra, base, flash, onChanged, initialOpen }: { extra: 
   const [password, setPassword] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
 
+  const existingMomoManual = base.paymentMethods.find((m) => m.key === 'momo_manual');
+  const [momoOpen, setMomoOpen] = useState(false);
+  const [momoNumber, setMomoNumber] = useState(existingMomoManual?.manualMomoNumber ?? '');
+  const [momoWhatsapp, setMomoWhatsapp] = useState(existingMomoManual?.manualMomoWhatsapp ?? '');
+  const [momoProblem, setMomoProblem] = useState<string | null>(null);
+
   const connectedKeys = new Set(base.paymentMethods.filter((m) => m.isConnected).map((m) => m.key));
   const payoutMethods = extra.catalogue.filter((m) => m.kind === 'online' && m.status === 'live');
 
@@ -499,6 +505,21 @@ function PaymentsPanel({ extra, base, flash, onChanged, initialOpen }: { extra: 
       await onChanged();
     } catch (cause) {
       flash(reason(cause, 'That could not be changed.'));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveMomoManual = async (): Promise<void> => {
+    setBusy('momo_manual');
+    setMomoProblem(null);
+    try {
+      await settingsApi.setMethod(store.id, 'momo_manual', true, { momoNumber, whatsappNumber: momoWhatsapp || undefined });
+      setMomoOpen(false);
+      await onChanged();
+      flash('MoMo (manual) connected');
+    } catch (cause) {
+      setMomoProblem(reason(cause, 'That could not be changed.'));
     } finally {
       setBusy(null);
     }
@@ -540,12 +561,23 @@ function PaymentsPanel({ extra, base, flash, onChanged, initialOpen }: { extra: 
               {state === 'connected' ? (
                 <span className="flex items-center gap-2">
                   <span className="rounded-pill bg-status-success px-2.5 py-[3px] text-[12px] font-semibold text-status-success-fg">Connected</span>
+                  {m.key !== 'momo_manual' ? null : (
+                    <Button variant="text" type="button" onClick={() => setMomoOpen(true)}>
+                      Change number
+                    </Button>
+                  )}
                   <Button variant="text" type="button" disabled={busy === m.key} onClick={() => void set(m.key, false)}>
                     Turn off
                   </Button>
                 </span>
               ) : state === 'connectable' ? (
-                <Button tone="brand" type="button" busy={busy === m.key} busyLabel="Connecting…" onClick={() => void set(m.key, true)}>
+                <Button
+                  tone="brand"
+                  type="button"
+                  busy={busy === m.key}
+                  busyLabel="Connecting…"
+                  onClick={() => (m.key === 'momo_manual' ? setMomoOpen(true) : void set(m.key, true))}
+                >
                   Connect
                 </Button>
               ) : (
@@ -583,6 +615,29 @@ function PaymentsPanel({ extra, base, flash, onChanged, initialOpen }: { extra: 
           </Button>
           <Button tone="brand" type="button" busy={busy === 'payout'} busyLabel="Saving…" disabled={phone.trim() === '' || password === ''} onClick={() => void savePayout()}>
             Change number
+          </Button>
+        </div>
+      </FormDialog>
+
+      <FormDialog open={momoOpen} title="MoMo (manual)" onClose={() => setMomoOpen(false)}>
+        <p className="m-0 text-body text-ink-2">
+          Customers dial a USSD code to this number, then send you their payment proof on WhatsApp. No password needed — this doesn’t move money out.
+        </p>
+        {momoProblem === null ? null : <Alert tone="danger" headline={momoProblem} />}
+        <TextField label="MoMo number to receive payment" inputMode="tel" value={momoNumber} onChange={(e) => setMomoNumber(e.target.value)} placeholder="078 123 4567" />
+        <TextField
+          label="WhatsApp number for proof (optional)"
+          inputMode="tel"
+          value={momoWhatsapp}
+          onChange={(e) => setMomoWhatsapp(e.target.value)}
+          placeholder="Same as above if left blank"
+        />
+        <div className="flex justify-end gap-2">
+          <Button variant="text" tone="brand" type="button" onClick={() => setMomoOpen(false)}>
+            Cancel
+          </Button>
+          <Button tone="brand" type="button" busy={busy === 'momo_manual'} busyLabel="Saving…" disabled={momoNumber.trim() === ''} onClick={() => void saveMomoManual()}>
+            Connect
           </Button>
         </div>
       </FormDialog>

@@ -61,6 +61,7 @@ const PAYMENT_COPY: Record<string, { mark: string; desc: string; tone: string }>
   airtel_money: { mark: 'AIRTEL', desc: 'Customers approve on their phone.', tone: 'bg-status-danger text-status-danger-fg' },
   mpesa: { mark: 'M-PESA', desc: 'Customers approve on their phone.', tone: 'bg-status-success text-status-success-fg' },
   cash: { mark: 'CASH', desc: 'Riders collect cash. Marked unpaid until delivered.', tone: 'bg-brand-tint text-brand-strong' },
+  momo_manual: { mark: 'MOMO', desc: 'Customers dial a code and send proof on WhatsApp. Marked unpaid until you confirm it.', tone: 'bg-status-info text-status-info-fg' },
 };
 
 export function paymentCopy(key: string): { mark: string; desc: string; tone: string } {

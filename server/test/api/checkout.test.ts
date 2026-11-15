@@ -12,9 +12,9 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { closePool, sql } from '../../src/db/index.ts';
-import { boot, call } from './client.ts';
+import { boot, call, tokenFor } from './client.ts';
 import type { Api } from './client.ts';
-import { CATALOGUE, STORE, USER, cleanup, seedFixtures, seedStorefront } from './support.ts';
+import { CATALOGUE, STORE, USER, cleanup, seedConsole, seedFixtures, seedStorefront } from './support.ts';
 
 let api: Api;
 const SLUG = 'escalation-store-a';
@@ -33,6 +33,7 @@ before(async () => {
   api = await boot();
   await seedFixtures();
   await seedStorefront();
+  await seedConsole();
   const { rows } = await sql<{ id: string; fee_amount: string }>(
     `SELECT id, fee_amount::text FROM delivery_zones WHERE store_id = $1 ORDER BY fee_amount`,
     [STORE.a],
@@ -677,6 +678,98 @@ describe('cash rounding', () => {
       '8000.00',
       'and the cash due followed the total rather than staying at the old rounding',
     );
+    await who.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe('momo_manual — USSD + WhatsApp proof, confirmed by a person', () => {
+  const owner = (): string => tokenFor(USER.ownerA);
+
+  before(async () => {
+    await sql(
+      `INSERT INTO store_payment_methods (store_id, payment_method_key, is_connected, connected_at, manual_momo_number, manual_momo_whatsapp)
+            VALUES ($1, 'momo_manual', true, now(), '0788123456', '0788123456')
+       ON CONFLICT (store_id, payment_method_key) DO UPDATE
+          SET is_connected = true, manual_momo_number = EXCLUDED.manual_momo_number, manual_momo_whatsapp = EXCLUDED.manual_momo_whatsapp`,
+      [STORE.a],
+    );
+    // One GET so `api`'s cookie jar holds a csrf token, which the confirm-manual-momo POST below echoes.
+    await call(api, 'GET', `/api/stores/${STORE.a}/orders`, { token: owner() });
+  });
+  after(async () => {
+    await sql(`DELETE FROM store_payment_methods WHERE store_id = $1 AND payment_method_key = 'momo_manual'`, [STORE.a]);
+  });
+
+  it('needs no provider — placed straight to unpaid, no collections attempt', async () => {
+    const who = await shopper();
+    await add(who, JUICE_VARIANT, 1);
+    const quote = await quoteFor(who, { fulfilment: 'pickup' });
+    assert.ok(
+      (quote['paymentMethods'] as { key: string }[]).some((m) => m.key === 'momo_manual'),
+      'the quote offers it once the store connected it',
+    );
+
+    const placed = await call(who, 'POST', `/api/storefront/${SLUG}/orders`, {
+      body: cashOrder(String(quote['total']), freshKey(), {
+        fulfilment: 'pickup',
+        address: null,
+        zone: null,
+        paymentMethod: 'momo_manual',
+      }),
+    });
+    assert.equal(placed.status, 201, JSON.stringify(placed.body));
+    assert.equal(placed.body['needsPayment'], false, 'no provider to ask — kind-aware, not the old `!== \'cash\'` check');
+    const order = placed.body['order'] as Record<string, unknown>;
+    assert.deepEqual(order['manualMomo'], { number: '0788123456', whatsapp: '0788123456' });
+    const code = String(order['trackingCode']);
+
+    const read = await call(who, 'GET', `/api/storefront/${SLUG}/orders/${code}`);
+    assert.equal((read.body['order'] as Record<string, unknown>)['paymentStatus'], 'unpaid');
+
+    // The /payment route (the automated-MoMo path) must refuse it too — there is no provider to call.
+    const refused = await call(who, 'POST', `/api/storefront/${SLUG}/orders/${code}/payment`, { body: { phone: '078 000 0001' } });
+    assert.equal(refused.status, 409);
+    assert.equal(refused.body['code'], 'NO_PROVIDER_FOR_METHOD');
+    await who.close();
+  });
+
+  it('a manager confirms it by matching the WhatsApp proof, idempotently', async () => {
+    const who = await shopper();
+    await add(who, JUICE_VARIANT, 1);
+    const quote = await quoteFor(who, { fulfilment: 'pickup' });
+    const placed = await call(who, 'POST', `/api/storefront/${SLUG}/orders`, {
+      body: cashOrder(String(quote['total']), freshKey(), {
+        fulfilment: 'pickup',
+        address: null,
+        zone: null,
+        paymentMethod: 'momo_manual',
+      }),
+    });
+    const { rows } = await sql<{ id: string }>(
+      `SELECT id FROM orders WHERE tracking_code = $1`,
+      [String((placed.body['order'] as Record<string, unknown>)['trackingCode'])],
+    );
+    const id = rows[0]?.id ?? '';
+
+    const confirm = await call(api, 'POST', `/api/stores/${STORE.a}/orders/${id}/confirm-manual-momo`, {
+      token: owner(),
+      body: { note: 'proof from +250788123456 on WhatsApp' },
+    });
+    assert.equal(confirm.status, 200, JSON.stringify(confirm.body));
+    assert.equal(confirm.body['ok'], true);
+
+    const { rows: after2 } = await sql<{ payment_status: string; momo_manual_confirmed_at: Date | null }>(
+      `SELECT payment_status, momo_manual_confirmed_at FROM orders WHERE id = $1`,
+      [id],
+    );
+    assert.equal(after2[0]?.payment_status, 'paid');
+    assert.ok(after2[0]?.momo_manual_confirmed_at !== null);
+
+    // Confirming twice is a no-op, reported rather than errored — same contract as confirm-cash.
+    const again = await call(api, 'POST', `/api/stores/${STORE.a}/orders/${id}/confirm-manual-momo`, { token: owner() });
+    assert.equal(again.status, 200);
+    assert.equal(again.body['ok'], false, 'nothing left unconfirmed');
     await who.close();
   });
 });

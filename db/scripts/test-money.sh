@@ -393,6 +393,28 @@ equals "a cash order is not in escrow" "not_applicable" \
     "SELECT settlement_status FROM orders WHERE id='${OC}'"
 
 # =============================================================================
+step "Manual MoMo (USSD + WhatsApp proof) never enters the wallet either — V036"
+# =============================================================================
+# Its own function, not cash's: confirm_manual_momo_payment() takes no reported amount (a WhatsApp proof
+# is the full total, no rounding ambiguity to reconcile) and is reachable at ANY order status.
+OM='eeee0000-0000-0000-0000-000000000005'
+accepts "a momo_manual order, still pending — unlike cash, confirmation needs no delivery to have happened" \
+    "INSERT INTO orders (id,store_id,order_number,tracking_code,idempotency_key,guest_name,guest_phone,
+        delivery_address,fulfilment_type,payment_method,currency,subtotal_amount)
+      VALUES ('${OM}','${ST}',next_order_number('${ST}'),'trk_momo_manual_0001','idem_momo_manual_00001',
+              'Aline Umutoni','072 811 4421','KN 4 Rd','delivery','momo_manual','RWF',9000);
+     INSERT INTO order_items (order_id,store_id,variant_id,product_name,unit_price_amount,quantity)
+      VALUES ('${OM}','${ST}','${V1}','Linen tee',9000,1)"
+BEFORE_AVAIL_MOMO="$(q "SELECT available_balance FROM wallets WHERE store_id='${ST}'")"
+equals "staff matches the WhatsApp proof and confirms it" "t" \
+    "SELECT confirm_manual_momo_payment('${OM}'::uuid, '${OWNER_USER}'::uuid, 'proof on WhatsApp')"
+equals "paid, with the note on record" "paid|proof on WhatsApp" \
+    "SELECT payment_status || '|' || momo_manual_note FROM orders WHERE id='${OM}'"
+equals "confirming twice does nothing" "f" "SELECT confirm_manual_momo_payment('${OM}'::uuid, NULL::uuid)"
+equals "and the wallet was never touched — this money never reached the platform either" "${BEFORE_AVAIL_MOMO}" \
+    "SELECT available_balance::text FROM wallets WHERE store_id='${ST}'"
+
+# =============================================================================
 step "After all of that, the books still add up"
 # =============================================================================
 equals "the pending pot equals the sum of its entries" "t" \

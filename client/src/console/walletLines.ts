@@ -33,6 +33,7 @@ export const METHODS: Record<string, string> = {
   mpesa: 'M-Pesa',
   card: 'card',
   cash: 'cash',
+  momo_manual: 'MoMo (manual)',
 };
 
 export const methodName = (key: string): string => METHODS[key] ?? key;

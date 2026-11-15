@@ -936,6 +936,7 @@ function listItem(overrides: Partial<OrderListItem> & Pick<OrderListItem, 'id' |
     paymentMethod: 'mtn_momo',
     paymentStatus: 'paid',
     cashConfirmed: true,
+    momoManualConfirmed: true,
     riderName: null,
     hasLiveRefund: false,
     placedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
@@ -958,6 +959,9 @@ const ORDER_LIST: OrderListItem[] = [
   listItem({ id: 'o11', orderNumber: 1002, status: 'closed_return' }),
   listItem({ id: 'o12', orderNumber: 1009, status: 'rejected' }),
   listItem({ id: 'o13', orderNumber: 1010, status: 'cancelled', fulfilment: 'pickup', address: null }),
+  // Appended, not inserted — every earlier index above is referenced positionally (DETAIL_CASH_UNCONFIRMED
+  // etc., below), and inserting in the middle would silently point one of those at the wrong order.
+  listItem({ id: 'o14', orderNumber: 1032, status: 'delivered', paymentMethod: 'momo_manual', paymentStatus: 'unpaid', momoManualConfirmed: false }),
 ];
 
 function orderDetail(item: OrderListItem, extra: Partial<OrderDetail> = {}): OrderDetail {
@@ -984,6 +988,7 @@ const DETAIL_READY_NO_RIDER = orderDetail(ORDER_LIST[3]!);
 const DETAIL_ASSIGNED = orderDetail(ORDER_LIST[4]!);
 const DETAIL_CASH_UNCONFIRMED = orderDetail(ORDER_LIST[6]!);
 const DETAIL_DELIVERED_PAID = orderDetail(ORDER_LIST[7]!);
+const DETAIL_MOMO_MANUAL_UNCONFIRMED = orderDetail(ORDER_LIST[13]!);
 const DETAIL_RETURNED = orderDetail(ORDER_LIST[8]!, {
   events: [
     { fromStatus: null, toStatus: 'pending', reason: null, note: 'Order placed', actorName: null, at: ORDER_LIST[8]!.placedAt },
@@ -995,17 +1000,28 @@ const DETAIL_RETURNED = orderDetail(ORDER_LIST[8]!, {
 // a screen scraped for text would only prove today's markup, where calling the exported functions proves the
 // LOGIC a future refactor of the JSX could otherwise silently break.
 {
-  expect(statusMeta({ status: 'pending', paymentMethod: 'mtn_momo', cashConfirmed: true }).label === 'New', 'pending reads New');
-  expect(statusMeta({ status: 'ready', paymentMethod: 'mtn_momo', cashConfirmed: true }).tone === 'success', 'ready is a success tone');
+  expect(statusMeta({ status: 'pending', paymentMethod: 'mtn_momo', cashConfirmed: true, momoManualConfirmed: true }).label === 'New', 'pending reads New');
+  expect(statusMeta({ status: 'ready', paymentMethod: 'mtn_momo', cashConfirmed: true, momoManualConfirmed: true }).tone === 'success', 'ready is a success tone');
   expect(
-    statusMeta({ status: 'delivered', paymentMethod: 'cash', cashConfirmed: false }).label === 'Delivered · cash unconfirmed',
+    statusMeta({ status: 'delivered', paymentMethod: 'cash', cashConfirmed: false, momoManualConfirmed: true }).label === 'Delivered · cash unconfirmed',
     'an unconfirmed cash delivery reads differently from a settled one — the one case that is not a straight status → label lookup',
   );
   expect(
-    statusMeta({ status: 'delivered', paymentMethod: 'cash', cashConfirmed: true }).label === 'Delivered',
+    statusMeta({ status: 'delivered', paymentMethod: 'cash', cashConfirmed: true, momoManualConfirmed: true }).label === 'Delivered',
     'once confirmed, the same status reads Delivered again',
   );
-  expect(statusMeta({ status: 'delivered', paymentMethod: 'mtn_momo', cashConfirmed: false }).label === 'Delivered', 'the cash caveat never applies to an online payment');
+  expect(
+    statusMeta({ status: 'delivered', paymentMethod: 'mtn_momo', cashConfirmed: false, momoManualConfirmed: true }).label === 'Delivered',
+    'the cash caveat never applies to an online payment',
+  );
+  expect(
+    statusMeta({ status: 'delivered', paymentMethod: 'momo_manual', cashConfirmed: true, momoManualConfirmed: false }).label === 'Delivered · MoMo unconfirmed',
+    'an unconfirmed manual-MoMo delivery reads its own caveat, independently of cash',
+  );
+  expect(
+    statusMeta({ status: 'delivered', paymentMethod: 'momo_manual', cashConfirmed: true, momoManualConfirmed: true }).label === 'Delivered',
+    'once confirmed, a manual-MoMo delivery reads Delivered again',
+  );
 
   expect(COLUMN_LABELS.length === 6, `the board draws six columns; found ${COLUMN_LABELS.length}`);
   expect(new Set(COLUMN_LABELS).size === 6, 'no column repeats another\'s label');
@@ -1021,6 +1037,7 @@ const DETAIL_RETURNED = orderDetail(ORDER_LIST[8]!, {
   expect(columnOf(ORDER_LIST[6]!) === 4, 'a delivered cash order still unconfirmed needs closing, not Done');
   expect(columnOf(ORDER_LIST[7]!) === 5, 'a delivered and settled order is Done today');
   expect(columnOf(ORDER_LIST[8]!) === 4, 'a return needs closing too');
+  expect(columnOf(ORDER_LIST[13]!) === 4, 'a delivered manual-MoMo order still unconfirmed needs closing too, independently of cash');
 }
 
 // --- Riders & cash, and the rider's own app — milestone 21 ---------------------------------------
@@ -1562,7 +1579,10 @@ expect(studioText.includes('Replace logo') || studioText.includes('Add logo'), '
 const SETTINGS_BASE: SettingsBase = {
   pickup: { address: 'KG 7 Ave, Kacyiru', readyMinutes: 15, instructions: null },
   payout: { methodKey: 'mtn_momo', phone: '0781234412', settlementMode: 'manual', automaticAt: null },
-  paymentMethods: [{ key: 'mtn_momo', isConnected: true, connectedAt: '2026-01-01T00:00:00Z' }, { key: 'cash', isConnected: true, connectedAt: '2026-01-01T00:00:00Z' }],
+  paymentMethods: [
+    { key: 'mtn_momo', isConnected: true, connectedAt: '2026-01-01T00:00:00Z', manualMomoNumber: null, manualMomoWhatsapp: null },
+    { key: 'cash', isConnected: true, connectedAt: '2026-01-01T00:00:00Z', manualMomoNumber: null, manualMomoWhatsapp: null },
+  ],
 };
 const SETTINGS_EXTRA: SettingsExtra = {
   store: { name: 'Nyama & Co.', slug: 'nyama', publicPhone: '0788000111', address: 'KG 7 Ave, Kacyiru', timeZone: 'Africa/Kigali', acceptingOrders: true },
@@ -1646,6 +1666,8 @@ const consoleParts: readonly (readonly [string, ReactNode])[] = [
   ['Orders · detail, ready with no rider yet', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_READY_NO_RIDER} />)],
   ['Orders · detail, assigned to a rider', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_ASSIGNED} />)],
   ['Orders · detail, delivered with cash unconfirmed', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_CASH_UNCONFIRMED} />)],
+  ['Orders · detail, delivered with manual MoMo unconfirmed', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_MOMO_MANUAL_UNCONFIRMED} />)],
+  ['Orders · momo manual panel', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_MOMO_MANUAL_UNCONFIRMED} initialMode="momo_manual" />)],
   ['Orders · detail, delivered and paid', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_DELIVERED_PAID} />)],
   ['Orders · detail, returned to the store', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_RETURNED} />)],
   ['Orders · decline panel', inConsole(<Orders navigate={noop} initialOrders={ORDER_LIST} initialDetail={DETAIL_PENDING} initialMode="decline" />)],

@@ -186,6 +186,8 @@ function methodLabel(method: string): string {
       return 'card';
     case 'cash':
       return 'cash';
+    case 'momo_manual':
+      return 'MoMo (manual)';
     default:
       return method.replace(/_/g, ' ');
   }

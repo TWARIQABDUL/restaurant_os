@@ -172,6 +172,8 @@ export type PlacedOrder = {
   total: string;
   cashDue: string | null;
   paymentMethod: string;
+  /** Only present for momo_manual, and only once the store has connected it with a number to dial. */
+  manualMomo: { number: string; whatsapp: string } | null;
 };
 
 export type PaymentState = {
@@ -214,6 +216,8 @@ export type CustomerOrder = {
   pickup: { address: string; readyMinutes: number; instructions: string | null } | null;
   delivery: { etaMinMinutes: number; etaMaxMinutes: number } | null;
   placedFor: string | null;
+  methodKind: 'online' | 'offline';
+  manualMomo: { number: string; whatsapp: string } | null;
 };
 
 // --- milestone 18: the customer's account -------------------------------------

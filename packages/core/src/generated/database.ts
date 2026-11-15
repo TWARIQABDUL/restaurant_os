@@ -927,6 +927,10 @@ export interface OrdersRow {
   rider_member_role: string | null;
   /** What the rider collects for a cash order: total_amount rounded to the currency's cash step. NULL for anything not paid in cash. MAINTAINED BY orders_cash_due_derive — no writer sets it. rider_cash_settlements reconciles against THIS, never against total_amount. */
   cash_due_amount: string | null;
+  /** When staff matched a WhatsApp payment proof to this order and confirmed it. Unlike cash, there is no automatic trigger point — this is always a human decision, at any order status. */
+  momo_manual_confirmed_at: Date | null;
+  momo_manual_confirmed_by: string | null;
+  momo_manual_note: string | null;
 }
 
 /**
@@ -1496,6 +1500,10 @@ export interface StorePaymentMethodsRow {
   connected_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  /** The MoMo number customers dial the USSD code to, for the momo_manual method only. Required once connected. */
+  manual_momo_number: string | null;
+  /** Where customers send payment proof, for the momo_manual method only. Falls back to manual_momo_number at the application layer when left blank — not defaulted here, so "the merchant never set one" stays a fact this column can still tell. */
+  manual_momo_whatsapp: string | null;
 }
 
 /** `store_payout_settings.settlement_mode`, from its CHECK constraint. */

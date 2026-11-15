@@ -74,6 +74,10 @@ export type CustomerOrder = {
   delivery: { etaMinMinutes: number; etaMaxMinutes: number } | null;
   /** A guest order shows the name it was placed under; an account order does not need to. */
   placedFor: string | null;
+  /** 'online' methods go through collections.ts and startPayment(); 'offline' ones (cash, momo_manual) never do. */
+  methodKind: 'online' | 'offline';
+  /** Only present for momo_manual, and only once the store has connected it with a number to dial. */
+  manualMomo: { number: string; whatsapp: string } | null;
 };
 
 export async function findByTrackingCode(
@@ -109,6 +113,9 @@ export async function findByTrackingCode(
     pickup_instructions: string | null;
     eta_min: number | null;
     eta_max: number | null;
+    method_kind: 'online' | 'offline';
+    manual_momo_number: string | null;
+    manual_momo_whatsapp: string | null;
   }>(
     `SELECT o.id, o.order_number, o.tracking_code, o.status, o.payment_status, o.payment_method,
             o.fulfilment_type, o.delivery_address, o.currency,
@@ -116,6 +123,7 @@ export async function findByTrackingCode(
             o.total_amount::text, o.cash_due_amount::text,
             o.placed_at, o.paid_at, o.delivered_at,
             s.slug, s.name AS store_name, s.public_phone,
+            pm.kind AS method_kind, spm.manual_momo_number, spm.manual_momo_whatsapp,
             o.guest_name,
             u.name AS customer_name,
             p.address AS pickup_address, p.ready_minutes AS pickup_ready, p.instructions AS pickup_instructions,
@@ -125,6 +133,8 @@ export async function findByTrackingCode(
             z.eta_min_minutes AS eta_min, z.eta_max_minutes AS eta_max
        FROM orders o
        JOIN stores s ON s.id = o.store_id
+       JOIN payment_methods pm ON pm.key = o.payment_method
+       LEFT JOIN store_payment_methods spm ON spm.store_id = o.store_id AND spm.payment_method_key = o.payment_method
        LEFT JOIN users u ON u.id = o.customer_user_id
        LEFT JOIN store_pickup_settings p ON p.store_id = o.store_id
        LEFT JOIN LATERAL (
@@ -211,6 +221,11 @@ export async function findByTrackingCode(
         ? null
         : { etaMinMinutes: row.eta_min, etaMaxMinutes: row.eta_max },
     placedFor: row.guest_name ?? row.customer_name,
+    methodKind: row.method_kind,
+    manualMomo:
+      row.manual_momo_number === null
+        ? null
+        : { number: row.manual_momo_number, whatsapp: row.manual_momo_whatsapp ?? row.manual_momo_number },
   };
 }
 
@@ -306,6 +321,8 @@ export type OrderListItem = {
   paymentStatus: 'unpaid' | 'paid' | 'refunded';
   /** Cash only: whether confirm_cash_payment() has run. Always true for an online method. */
   cashConfirmed: boolean;
+  /** momo_manual only: whether confirm_manual_momo_payment() has run. Always true for any other method. */
+  momoManualConfirmed: boolean;
   riderName: string | null;
   hasLiveRefund: boolean;
   placedAt: Date;
@@ -319,7 +336,7 @@ const ORDER_ROW_COLUMNS = `
     COALESCE(o.guest_phone, u.phone) AS phone,
     o.fulfilment_type, o.delivery_address,
     (SELECT COALESCE(sum(i.quantity), 0)::text FROM order_items i WHERE i.order_id = o.id) AS item_count,
-    o.total_amount::text, o.payment_method, o.payment_status, o.cash_confirmed_at,
+    o.total_amount::text, o.payment_method, o.payment_status, o.cash_confirmed_at, o.momo_manual_confirmed_at,
     r.name AS rider_name,
     EXISTS (SELECT 1 FROM refunds f WHERE f.order_id = o.id AND f.status IN ('pending', 'queued')) AS has_live_refund,
     o.placed_at`;
@@ -341,6 +358,7 @@ type OrderRow = {
   payment_method: string;
   payment_status: 'unpaid' | 'paid' | 'refunded';
   cash_confirmed_at: Date | null;
+  momo_manual_confirmed_at: Date | null;
   rider_name: string | null;
   has_live_refund: boolean;
   placed_at: Date;
@@ -362,6 +380,7 @@ function toListItem(r: OrderRow, now: number): OrderListItem {
     paymentMethod: r.payment_method,
     paymentStatus: r.payment_status,
     cashConfirmed: r.payment_method !== 'cash' || r.cash_confirmed_at !== null,
+    momoManualConfirmed: r.payment_method !== 'momo_manual' || r.momo_manual_confirmed_at !== null,
     riderName: r.rider_name,
     hasLiveRefund: r.has_live_refund,
     placedAt: r.placed_at,
@@ -603,6 +622,23 @@ export async function confirmCash(
   const { rows } = await tx.query<{ ok: boolean }>(
     `SELECT confirm_cash_payment($1, $2, $3) AS ok`,
     [orderId, reportedAmount, actor.userId],
+  );
+  return rows[0]?.ok ?? false;
+}
+
+/**
+ * Confirming a manual-MoMo payment — unlike cash, reachable at ANY order status: staff may see the
+ * WhatsApp proof before the order is even accepted, and there is no "delivered" moment to wait for.
+ */
+export async function confirmManualMomo(
+  orderId: string,
+  actor: Actor,
+  note: string | null,
+  tx: Queryable,
+): Promise<boolean> {
+  const { rows } = await tx.query<{ ok: boolean }>(
+    `SELECT confirm_manual_momo_payment($1, $2, $3) AS ok`,
+    [orderId, actor.userId, note],
   );
   return rows[0]?.ok ?? false;
 }

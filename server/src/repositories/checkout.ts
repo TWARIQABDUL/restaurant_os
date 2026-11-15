@@ -318,6 +318,10 @@ export type PlacedOrder = {
   cashDue: string | null;
   /** False when this was a retry and the order already existed. */
   created: boolean;
+  /** 'online' methods go through collections.ts/startPayment(); 'offline' ones (cash, momo_manual) never do. */
+  methodKind: 'online' | 'offline';
+  /** Only present for momo_manual, and only once the store has connected it with a number to dial. */
+  manualMomo: { number: string; whatsapp: string } | null;
 };
 
 /** place_order(), which is where every guarantee about not double-charging lives. See V019. */
@@ -363,6 +367,26 @@ export async function place(
   );
   const row = rows[0];
   if (row === undefined) throw new Error('place_order returned no row');
+
+  // A second, trivial PK lookup rather than widening place_order()'s own RETURNS TABLE: that function is
+  // the one thing in the system every money guarantee runs through, and its several RETURN QUERY sites
+  // (the idempotent-retry short-circuit included) are not worth touching for a field this cheap to fetch
+  // separately, on the same connection, right after.
+  const { rows: methodRows } = await on.query<{
+    kind: 'online' | 'offline';
+    manual_momo_number: string | null;
+    manual_momo_whatsapp: string | null;
+  }>(
+    `SELECT pm.kind, spm.manual_momo_number, spm.manual_momo_whatsapp
+       FROM payment_methods pm
+       LEFT JOIN store_payment_methods spm
+              ON spm.payment_method_key = pm.key
+             AND spm.store_id = (SELECT store_id FROM orders WHERE id = $2)
+      WHERE pm.key = $1`,
+    [input.paymentMethod, row.order_id],
+  );
+  const methodRow = methodRows[0];
+
   return {
     orderId: row.order_id,
     orderNumber: row.order_number,
@@ -370,5 +394,10 @@ export async function place(
     total: row.total_amount,
     cashDue: row.cash_due,
     created: row.created,
+    methodKind: methodRow?.kind ?? 'offline',
+    manualMomo:
+      methodRow?.manual_momo_number == null
+        ? null
+        : { number: methodRow.manual_momo_number, whatsapp: methodRow.manual_momo_whatsapp ?? methodRow.manual_momo_number },
   };
 }

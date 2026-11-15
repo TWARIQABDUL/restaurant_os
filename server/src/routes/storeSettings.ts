@@ -92,6 +92,8 @@ router.get(
         key: m.payment_method_key,
         isConnected: m.is_connected,
         connectedAt: m.connected_at,
+        manualMomoNumber: m.manual_momo_number,
+        manualMomoWhatsapp: m.manual_momo_whatsapp,
       })),
     });
   }),
@@ -222,10 +224,16 @@ router.put(
   asyncHandler(async (req, res) => {
     const storeId = storeIdOf(req);
     const key = req.params['key'];
-    const connected = bodyOf(req.body)['connected'];
+    const body = bodyOf(req.body);
+    const connected = body['connected'];
     if (typeof key !== 'string' || !/^[a-z_]{2,40}$/.test(key)) throw badRequest('That is not a payment method.', 'INVALID_METHOD');
     if (typeof connected !== 'boolean') throw badRequest('connected must be true or false.', 'INVALID');
-    await withTransaction((tx) => storeAdmin.setMethodConnected(storeId, key, connected, tx));
+    // Only momo_manual asks for these — every other method ignores them (see setMethodConnected).
+    const manualMomo =
+      key === 'momo_manual' && connected
+        ? { number: requiredString(body, 'momoNumber', { max: 20 }), whatsapp: optionalString(body, 'whatsappNumber', { max: 20 }) }
+        : undefined;
+    await withTransaction((tx) => storeAdmin.setMethodConnected(storeId, key, connected, tx, manualMomo));
     res.json({ ok: true });
   }),
 );

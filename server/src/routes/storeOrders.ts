@@ -293,6 +293,33 @@ router.post(
   }),
 );
 
+/**
+ * Confirming a manual-MoMo payment — matching a WhatsApp proof to this order. Unlike confirm-cash, this
+ * is reachable at any order status: there is no "delivered" moment to wait for, only "staff looked at
+ * WhatsApp and decided". Same shape as confirm-cash: `confirm_manual_momo_payment()` (V036) answers false
+ * when there is nothing unconfirmed to confirm, which is reported rather than 409'd.
+ */
+router.post(
+  '/:orderId/confirm-manual-momo',
+  requireStorePermission('orders.update'),
+  asyncHandler(async (req, res) => {
+    const storeId = storeIdOf(req);
+    const { context } = authOf(req);
+    const orderId = orderIdOf(req);
+    const note = optionalString(bodyOf(req.body), 'note', { max: 300 });
+
+    const confirmed = await withTransaction((tx) =>
+      orders.confirmManualMomo(orderId, { userId: context.userId, role: context.storeRole }, note, tx),
+    );
+
+    const current = await orders.get(storeId, orderId);
+    if (current === null) throw notFound('That order is not here.', 'NO_SUCH_ORDER');
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ ok: confirmed, status: current.status });
+  }),
+);
+
 /** A refund straight from the order, with no complaint behind it. Stays pending for Vendlyfy to decide. */
 router.post(
   '/:orderId/request-refund',

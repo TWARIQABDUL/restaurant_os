@@ -205,6 +205,34 @@ describe('Payments', () => {
     assert.equal(still.rows[0]!.is_connected, true);
     await call(api, 'PUT', `${base}/payments/cash`, { token: owner(), body: { connected: true } });
   });
+
+  it('momo_manual needs a number to dial — every other method ignores one', async () => {
+    const missing = await call(api, 'PUT', `${base}/payments/momo_manual`, { token: owner(), body: { connected: true } });
+    assert.equal(missing.status, 400, 'no momoNumber sent');
+
+    const ok = await call(api, 'PUT', `${base}/payments/momo_manual`, {
+      token: owner(),
+      body: { connected: true, momoNumber: '0788123456', whatsappNumber: '0788999999' },
+    });
+    assert.equal(ok.status, 200);
+    const row = await sql<{ is_connected: boolean; manual_momo_number: string; manual_momo_whatsapp: string }>(
+      `SELECT is_connected, manual_momo_number, manual_momo_whatsapp FROM store_payment_methods WHERE store_id = $1 AND payment_method_key = 'momo_manual'`,
+      [STORE.a],
+    );
+    assert.equal(row.rows[0]!.is_connected, true);
+    assert.equal(row.rows[0]!.manual_momo_number, '0788123456');
+    assert.equal(row.rows[0]!.manual_momo_whatsapp, '0788999999');
+
+    // Another method's own connect call must never pick up momo_manual's numbers.
+    await call(api, 'PUT', `${base}/payments/airtel_money`, { token: owner(), body: { connected: true } });
+    const other = await sql<{ manual_momo_number: string | null }>(
+      `SELECT manual_momo_number FROM store_payment_methods WHERE store_id = $1 AND payment_method_key = 'airtel_money'`,
+      [STORE.a],
+    );
+    assert.equal(other.rows[0]!.manual_momo_number, null);
+
+    await call(api, 'PUT', `${base}/payments/momo_manual`, { token: owner(), body: { connected: false } });
+  });
 });
 
 describe('Where payouts go', () => {

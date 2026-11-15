@@ -225,17 +225,43 @@ export async function setPickup(storeId: string, p: PickupInput | null, tx: Tx):
  * and the LAST connected method cannot be switched off: a store that accepts no payment at all cannot take an order, and
  * "my checkout went blank" is a worse way to find that out than a sentence here.
  */
-export async function setMethodConnected(storeId: string, key: string, connected: boolean, tx: Tx): Promise<void> {
+export async function setMethodConnected(
+  storeId: string,
+  key: string,
+  connected: boolean,
+  tx: Tx,
+  // Only meaningful for momo_manual — see V036's CHECK requiring a number once connected. Every other
+  // method ignores these, the same way setPayoutDestination ignores a phone for a method that isn't one.
+  manualMomo?: { number: string; whatsapp: string | null },
+): Promise<void> {
   const method = await tx.query<{ status: string; name: string }>(`SELECT status, name FROM payment_methods WHERE key = $1`, [key]);
   const m = method.rows[0];
   if (m === undefined) throw notFound('That payment method does not exist.', 'METHOD_NOT_FOUND');
 
   if (connected) {
     if (m.status !== 'live') throw conflict(`${m.name} is not available right now.`, 'METHOD_UNAVAILABLE');
+
+    if (key === 'momo_manual') {
+      const digits = (manualMomo?.number ?? '').replace(/\D/g, '');
+      if (digits.length < 9 || digits.length > 15) {
+        throw badRequest('That does not look like a mobile money number.', 'INVALID_PHONE');
+      }
+    }
+
     await tx.query(
-      `INSERT INTO store_payment_methods (store_id, payment_method_key, is_connected, connected_at) VALUES ($1, $2, true, now())
-       ON CONFLICT (store_id, payment_method_key) DO UPDATE SET is_connected = true, connected_at = COALESCE(store_payment_methods.connected_at, now())`,
-      [storeId, key],
+      `INSERT INTO store_payment_methods (store_id, payment_method_key, is_connected, connected_at, manual_momo_number, manual_momo_whatsapp)
+            VALUES ($1, $2, true, now(), $3, $4)
+       ON CONFLICT (store_id, payment_method_key) DO UPDATE
+          SET is_connected = true,
+              connected_at = COALESCE(store_payment_methods.connected_at, now()),
+              manual_momo_number = EXCLUDED.manual_momo_number,
+              manual_momo_whatsapp = EXCLUDED.manual_momo_whatsapp`,
+      [
+        storeId,
+        key,
+        key === 'momo_manual' ? manualMomo?.number.trim() : null,
+        key === 'momo_manual' ? (manualMomo?.whatsapp?.trim() || null) : null,
+      ],
     );
     return;
   }

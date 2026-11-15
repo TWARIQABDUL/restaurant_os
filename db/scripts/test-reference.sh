@@ -81,7 +81,7 @@ equals "each one's default currency" "BI:BIF,KE:KES,RW:RWF,TZ:TZS,UG:UGX" \
 # =============================================================================
 step "Payment methods"
 # =============================================================================
-equals "four methods, one of them offline" "4|1" \
+equals "five methods, two of them offline — momo_manual (V036) joined cash" "5|2" \
     "SELECT count(*) || '|' || count(*) FILTER (WHERE kind='offline') FROM payment_methods"
 equals "cash carries no provider and no webhook — there is nothing to integrate" "t" \
     "SELECT provider IS NULL AND webhook_url IS NULL FROM payment_methods WHERE key='cash'"

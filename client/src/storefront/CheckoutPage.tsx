@@ -22,6 +22,7 @@ import { ApiFailure } from '../app/api.ts';
 import { Alert, Button, Segmented, Spinner, StateCard, TextField } from '../shared/ui/index.ts';
 import { storefront } from './api.ts';
 import type { PlacedOrder, Quote, SavedAddress } from './api.ts';
+import { manualMomoTelHref, manualMomoUssd, manualMomoWhatsappHref } from './manualMomo.ts';
 import { useStore } from './StoreProvider.tsx';
 import { SignInSheet } from './SignInSheet.tsx';
 
@@ -582,6 +583,48 @@ function PendingScreen({ amount, phone }: { amount: string; phone: string }): Re
  * distinguishing them from a stranger is the code they were just given — which is why the endpoint requires it
  * rather than an order id.
  */
+/**
+ * The USSD code and WhatsApp link for a momo_manual order — the customer dials the first, then sends
+ * proof through the second. Both are real tap-to-act links, not just printed numbers: `tel:` for the
+ * USSD code (the same click-to-dial pattern TrackPage.tsx and ShopChrome.tsx already use for a phone
+ * number, just with the full `*...#` string instead of a bare number), `https://wa.me/` for WhatsApp.
+ */
+function ManualMomoInstructions({
+  momo,
+  total,
+  orderNumber,
+  money,
+}: {
+  momo: { number: string; whatsapp: string };
+  total: string;
+  orderNumber: number;
+  money: (amount: string) => string;
+}): ReactNode {
+  const ussd = manualMomoUssd(momo.number, total);
+
+  return (
+    <div className="flex w-full flex-col gap-2.5 rounded-card border border-store-border p-4 text-left text-body">
+      <strong>Pay by MoMo</strong>
+      <ol className="m-0 flex list-decimal flex-col gap-2 pl-4">
+        <li>
+          Dial this code to send {money(total)}:
+          <br />
+          <a href={manualMomoTelHref(momo.number, total)} className="font-mono font-semibold text-store-primary">
+            {ussd}
+          </a>
+        </li>
+        <li>
+          Then send your payment proof on WhatsApp, with order <strong>#{orderNumber}</strong> in the message:
+          <br />
+          <a href={manualMomoWhatsappHref(momo.whatsapp, orderNumber)} target="_blank" rel="noreferrer" className="font-semibold text-store-primary">
+            Open WhatsApp
+          </a>
+        </li>
+      </ol>
+    </div>
+  );
+}
+
 function SuccessScreen({
   order,
   storeName,
@@ -605,6 +648,10 @@ function SuccessScreen({
   onAccount: () => void;
 }): ReactNode {
   const cash = order.paymentMethod === 'cash';
+  const momoManual = order.paymentMethod === 'momo_manual';
+  // Nothing has actually been paid yet for either — cash is paid at delivery, momo_manual whenever the
+  // customer dials and sends proof — so both read as "confirmed", not "paid", same as the title above.
+  const unpaid = cash || momoManual;
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -649,7 +696,7 @@ function SuccessScreen({
           ✓
         </span>
         <h1 role="status" className="font-display text-heading">
-          {cash ? 'Order confirmed' : 'Payment successful'}
+          {unpaid ? 'Order confirmed' : 'Payment successful'}
         </h1>
         <span className="rounded-chip bg-store-bg px-2.5 py-1 font-mono text-body">
           Order #{order.orderNumber}
@@ -660,7 +707,7 @@ function SuccessScreen({
         <div className="flex w-full flex-col gap-2 rounded-card border border-store-border p-4 text-left text-body">
           <div className="flex justify-between">
             <span className="text-store-muted">Payment</span>
-            <span>{cash ? 'Cash on delivery' : 'Mobile money'}</span>
+            <span>{cash ? 'Cash on delivery' : momoManual ? 'MoMo (USSD + WhatsApp)' : 'Mobile money'}</span>
           </div>
           <div className="flex justify-between font-bold">
             <span>Total</span>
@@ -673,6 +720,10 @@ function SuccessScreen({
             </div>
           )}
         </div>
+
+        {!momoManual || order.manualMomo === null ? null : (
+          <ManualMomoInstructions momo={order.manualMomo} total={order.total} orderNumber={order.orderNumber} money={money} />
+        )}
 
         {/* The offer. Only to a guest, and only once. */}
         {!guest ? null : saved ? (

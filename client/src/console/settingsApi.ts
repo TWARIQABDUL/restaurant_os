@@ -34,7 +34,7 @@ export type SettingsExtra = {
 export type SettingsBase = {
   pickup: { address: string; readyMinutes: number; instructions: string | null } | null;
   payout: { methodKey: string; phone: string; settlementMode: 'manual' | 'automatic'; automaticAt: string | null } | null;
-  paymentMethods: { key: string; isConnected: boolean; connectedAt: string | null }[];
+  paymentMethods: { key: string; isConnected: boolean; connectedAt: string | null; manualMomoNumber: string | null; manualMomoWhatsapp: string | null }[];
 };
 
 export type ZoneInput = { name: string; fee: string; etaMin: number; etaMax: number; areas: string[] };
@@ -59,8 +59,9 @@ export const settingsApi = {
   savePickup: (storeId: string, p: { enabled: false } | { enabled: true; address: string; readyMinutes: number; instructions?: string }): Promise<{ ok: boolean }> =>
     api.put<{ ok: boolean }>(`${s(storeId)}/pickup`, p),
 
-  setMethod: (storeId: string, key: string, connected: boolean): Promise<{ ok: boolean }> =>
-    api.put<{ ok: boolean }>(`${s(storeId)}/payments/${encodeURIComponent(key)}`, { connected }),
+  /** `momoNumber`/`whatsappNumber` only matter when connecting `momo_manual` — every other method ignores them. */
+  setMethod: (storeId: string, key: string, connected: boolean, manualMomo?: { momoNumber: string; whatsappNumber?: string }): Promise<{ ok: boolean }> =>
+    api.put<{ ok: boolean }>(`${s(storeId)}/payments/${encodeURIComponent(key)}`, { connected, ...manualMomo }),
 
   /** Needs the signed-in person's password: this is the setting that redirects the store's money. */
   savePayout: (storeId: string, p: { methodKey: string; phone: string; password: string }): Promise<{ payout: SettingsBase['payout'] }> =>

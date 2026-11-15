@@ -71,7 +71,7 @@ export type StoreSettings = {
     StorePayoutSettingsRow,
     'payout_method_key' | 'payout_phone' | 'settlement_mode' | 'automatic_at'
   > | null;
-  paymentMethods: Pick<StorePaymentMethodsRow, 'payment_method_key' | 'is_connected' | 'connected_at'>[];
+  paymentMethods: Pick<StorePaymentMethodsRow, 'payment_method_key' | 'is_connected' | 'connected_at' | 'manual_momo_number' | 'manual_momo_whatsapp'>[];
 };
 
 export async function findSettings(storeId: string, on: Queryable = db): Promise<StoreSettings | null> {
@@ -99,7 +99,7 @@ export async function findSettings(storeId: string, on: Queryable = db): Promise
     [storeId],
   );
   const methods = await on.query<StoreSettings['paymentMethods'][number]>(
-    `SELECT payment_method_key, is_connected, connected_at
+    `SELECT payment_method_key, is_connected, connected_at, manual_momo_number, manual_momo_whatsapp
        FROM store_payment_methods
       WHERE store_id = $1
       ORDER BY payment_method_key`,

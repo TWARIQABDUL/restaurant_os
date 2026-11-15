@@ -92,10 +92,19 @@ const TONE_CHIP: Readonly<Record<StatusTone, string>> = {
   danger: 'bg-status-danger text-status-danger-fg',
 };
 
+/**
+ * The two payment methods that are confirmed by a PERSON, not a provider — cash at delivery, momo_manual
+ * whenever staff matches a WhatsApp proof. Both skip the platform wallet entirely either way, which is
+ * `payChip()`'s and `close_return()`'s own reasoning (V037); this is the Orders board's.
+ */
+function isUnconfirmedOffline(o: Pick<OrderListItem, 'paymentMethod' | 'cashConfirmed' | 'momoManualConfirmed'>): boolean {
+  return (o.paymentMethod === 'cash' && !o.cashConfirmed) || (o.paymentMethod === 'momo_manual' && !o.momoManualConfirmed);
+}
+
 /** Exported for the render gate: the board's status vocabulary, pinned directly rather than scraped from markup. */
-export function statusMeta(o: Pick<OrderListItem, 'status' | 'paymentMethod' | 'cashConfirmed'>): { label: string; tone: StatusTone } {
-  if (o.status === 'delivered' && o.paymentMethod === 'cash' && !o.cashConfirmed) {
-    return { label: 'Delivered · cash unconfirmed', tone: 'warn' };
+export function statusMeta(o: Pick<OrderListItem, 'status' | 'paymentMethod' | 'cashConfirmed' | 'momoManualConfirmed'>): { label: string; tone: StatusTone } {
+  if (o.status === 'delivered' && isUnconfirmedOffline(o)) {
+    return { label: o.paymentMethod === 'cash' ? 'Delivered · cash unconfirmed' : 'Delivered · MoMo unconfirmed', tone: 'warn' };
   }
   return STATUS_META[o.status];
 }
@@ -109,7 +118,7 @@ const COLUMNS: readonly { id: string; label: string; match: (o: OrderListItem) =
   {
     id: 'closing',
     label: 'Needs closing',
-    match: (o) => o.status === 'returned' || (o.status === 'delivered' && o.paymentMethod === 'cash' && !o.cashConfirmed),
+    match: (o) => o.status === 'returned' || (o.status === 'delivered' && isUnconfirmedOffline(o)),
   },
   {
     id: 'done',
@@ -119,7 +128,7 @@ const COLUMNS: readonly { id: string; label: string; match: (o: OrderListItem) =
       o.status === 'closed_return' ||
       o.status === 'rejected' ||
       o.status === 'cancelled' ||
-      (o.status === 'delivered' && (o.paymentMethod !== 'cash' || o.cashConfirmed)),
+      (o.status === 'delivered' && !isUnconfirmedOffline(o)),
   },
 ];
 
@@ -168,7 +177,7 @@ function match(o: OrderListItem, q: string): boolean {
   return hay.includes(q);
 }
 
-type Mode = null | 'decline' | 'cancel' | 'pick' | 'refund' | 'cash';
+type Mode = null | 'decline' | 'cancel' | 'pick' | 'refund' | 'cash' | 'momo_manual';
 
 export function Orders({ navigate, initialOrders, initialDetail, initialMode }: Props): ReactNode {
   const { store, currency, money, may, refreshBadges } = useShell();
@@ -199,6 +208,7 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
   const [refundNote, setRefundNote] = useState('');
 
   const [cashAmount, setCashAmount] = useState('');
+  const [momoManualNote, setMomoManualNote] = useState('');
 
   const [exporting, setExporting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -268,6 +278,7 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
       setRefundReason('');
       setRefundNote('');
       setCashAmount('');
+      setMomoManualNote('');
       void loadDetail(id);
     },
     [loadDetail],
@@ -483,6 +494,8 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
           setRefundNote={setRefundNote}
           cashAmount={cashAmount}
           setCashAmount={setCashAmount}
+          momoManualNote={momoManualNote}
+          setMomoManualNote={setMomoManualNote}
           may={may}
           money={money}
           currency={currency}
@@ -560,6 +573,13 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
               'There is nothing to confirm.',
             )
           }
+          onConfirmManualMomo={(note) =>
+            void act(
+              () => ordersApi.confirmManualMomo(store.id, selectedId, note),
+              'MoMo payment confirmed',
+              'There is nothing to confirm.',
+            )
+          }
           onCloseReturn={() =>
             void act(
               () => ordersApi.closeReturn(store.id, selectedId, restock),
@@ -613,11 +633,16 @@ export function Orders({ navigate, initialOrders, initialDetail, initialMode }: 
   );
 }
 
-function payChip(o: Pick<OrderListItem, 'paymentMethod' | 'paymentStatus' | 'cashConfirmed'>): { label: string; style: string } {
+function payChip(o: Pick<OrderListItem, 'paymentMethod' | 'paymentStatus' | 'cashConfirmed' | 'momoManualConfirmed'>): { label: string; style: string } {
   if (o.paymentMethod === 'cash') {
     return o.cashConfirmed
       ? { label: 'Cash · paid', style: 'bg-status-success text-status-success-fg' }
       : { label: 'Cash · unpaid', style: 'bg-status-warn text-status-warn-fg' };
+  }
+  if (o.paymentMethod === 'momo_manual') {
+    return o.momoManualConfirmed
+      ? { label: 'MoMo · paid', style: 'bg-status-success text-status-success-fg' }
+      : { label: 'MoMo · unpaid', style: 'bg-status-warn text-status-warn-fg' };
   }
   return { label: 'Paid', style: 'bg-status-success text-status-success-fg' };
 }
@@ -687,6 +712,8 @@ type DrawerProps = {
   setRefundNote: (n: string) => void;
   cashAmount: string;
   setCashAmount: (a: string) => void;
+  momoManualNote: string;
+  setMomoManualNote: (n: string) => void;
   may: (permission: string) => boolean;
   money: (v: string) => string;
   currency: { code: string };
@@ -701,6 +728,7 @@ type DrawerProps = {
   onDelivered: () => void;
   onCollected: () => void;
   onConfirmCash: (amount: string) => void;
+  onConfirmManualMomo: (note: string) => void;
   onCloseReturn: () => void;
   onRetryDelivery: () => void;
   onSendRefund: () => void;
@@ -820,6 +848,16 @@ function OrderDrawer(props: DrawerProps): ReactNode {
                   onCancel={() => setMode(null)}
                   onConfirm={() => props.onConfirmCash(props.cashAmount)}
                   money={props.money}
+                  busy={busy}
+                />
+              )}
+
+              {mode !== 'momo_manual' ? null : (
+                <MomoManualPanel
+                  note={props.momoManualNote}
+                  setNote={props.setMomoManualNote}
+                  onCancel={() => setMode(null)}
+                  onConfirm={() => props.onConfirmManualMomo(props.momoManualNote)}
                   busy={busy}
                 />
               )}
@@ -1087,6 +1125,44 @@ function CashPanel({
   );
 }
 
+/**
+ * Confirming a manual-MoMo payment — no amount to reconcile (the WhatsApp proof is the full total, no
+ * cash-rounding ambiguity), just an optional note for what staff saw ("proof from +2507... on WhatsApp").
+ */
+function MomoManualPanel({
+  note,
+  setNote,
+  onCancel,
+  onConfirm,
+  busy,
+}: {
+  note: string;
+  setNote: (n: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+  busy: boolean;
+}): ReactNode {
+  return (
+    <section className="flex flex-col gap-2 rounded-control bg-status-warn p-3 text-status-warn-fg">
+      <strong className="text-caption">Confirm MoMo payment</strong>
+      <TextField
+        label="Note (optional)"
+        placeholder="e.g. proof from +250 788 ••• ••• on WhatsApp"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
+      <div className="flex gap-2">
+        <Button variant="secondary" onClick={onCancel} disabled={busy}>
+          Cancel
+        </Button>
+        <Button tone="brand" onClick={onConfirm} disabled={busy} busy={busy}>
+          Confirm payment
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 function RefundPanel({
   total,
   mode,
@@ -1192,7 +1268,9 @@ function ReturnPanel({
       <p className="m-0 rounded-control bg-status-neutral p-2 text-caption">
         {paymentMethod === 'cash'
           ? 'Cash order: no money changed hands, so there’s nothing to refund.'
-          : `Paid online: closing this refunds ${money(total)} to the customer automatically.`}
+          : paymentMethod === 'momo_manual'
+            ? 'MoMo (manual) order: the customer paid you directly, not through Vendlyfy, so there’s nothing to refund from here.'
+            : `Paid online: closing this refunds ${money(total)} to the customer automatically.`}
       </p>
     </section>
   );
@@ -1205,6 +1283,25 @@ function Actions(props: DrawerProps): ReactNode {
 
   const secondaryBusy = props.busy;
 
+  // Unlike cash (confirmed only once delivered, below), a manual-MoMo payment can be confirmed at ANY
+  // status — staff may see the WhatsApp proof before the order is even accepted, and there is no
+  // "delivered" moment to wait for. So this sits ALONGSIDE whatever the status switch below renders,
+  // rather than inside one case of it.
+  const momoManualButton =
+    d.paymentMethod !== 'momo_manual' || d.momoManualConfirmed ? null : (
+      <Button tone="brand" onClick={() => props.setMode('momo_manual')} disabled={secondaryBusy}>
+        Confirm MoMo payment
+      </Button>
+    );
+
+  return (
+    <>
+      {momoManualButton}
+      {statusActions(d)}
+    </>
+  );
+
+  function statusActions(d: OrderDetail): ReactNode {
   switch (d.status) {
     case 'pending':
       return (
@@ -1279,6 +1376,9 @@ function Actions(props: DrawerProps): ReactNode {
           </Button>
         );
       }
+      // momo_manual's own confirm button is momoManualButton above, rendered regardless of status — but
+      // nothing has been paid yet from this screen's point of view, so no refund button alongside it.
+      if (d.paymentMethod === 'momo_manual' && !d.momoManualConfirmed) return null;
       return d.hasLiveRefund ? null : (
         <Button variant="secondary" onClick={() => props.setMode('refund')} disabled={secondaryBusy}>
           Request a refund
@@ -1297,5 +1397,6 @@ function Actions(props: DrawerProps): ReactNode {
       );
     default:
       return null;
+  }
   }
 }

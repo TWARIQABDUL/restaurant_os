@@ -160,10 +160,14 @@ router.post(
         total: placed.total,
         cashDue: placed.cashDue,
         paymentMethod,
+        manualMomo: placed.manualMomo,
       },
       created: placed.created,
-      // Cash needs no provider: the order is placed and the rider collects. Anything else needs a payment.
-      needsPayment: paymentMethod !== 'cash',
+      // Only an ONLINE method goes through a provider. Cash needs no provider: the order is placed and the
+      // rider collects. momo_manual needs none either — the customer pays by dialing a code themselves and
+      // sending proof, not through startPayment(). Kind-aware rather than `!== 'cash'`, which would have
+      // wrongly tried to start a provider payment for momo_manual.
+      needsPayment: placed.methodKind === 'online',
     });
   }),
 );
@@ -188,7 +192,8 @@ router.get(
     const order = await orders.findByTrackingCode(store.id, code);
     if (order === null) throw notFound('No order with that reference.', 'NO_SUCH_ORDER');
 
-    const attempt = order.paymentMethod === 'cash' ? null : await collections.latestForOrder(order.id);
+    // Only an online method ever has a collections attempt to poll — cash and momo_manual never do.
+    const attempt = order.methodKind === 'online' ? await collections.latestForOrder(order.id) : null;
 
     res.setHeader('Cache-Control', 'no-store');
     res.json({
@@ -221,8 +226,14 @@ router.post(
     const order = await orders.findByTrackingCode(store.id, code);
     if (order === null) throw notFound('No order with that reference.', 'NO_SUCH_ORDER');
 
+    // Neither offline method (cash, momo_manual) has a provider to call — kind-aware rather than
+    // `=== 'cash'`, which would have let a momo_manual order fall through to collections.start() below
+    // with no provider configured for it at all.
     if (order.paymentMethod === 'cash') {
       throw conflict('This order is paid in cash when it arrives.', 'CASH_ON_DELIVERY');
+    }
+    if (order.methodKind !== 'online') {
+      throw conflict('Pay by dialing the USSD code and sending proof on WhatsApp.', 'NO_PROVIDER_FOR_METHOD');
     }
     if (order.paymentStatus !== 'unpaid') {
       // Not an error the customer should see as a failure: their order is paid, and the client should show

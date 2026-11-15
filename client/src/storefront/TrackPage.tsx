@@ -25,6 +25,7 @@ import { Button, Skeleton, StateCard, Toast } from '../shared/ui/index.ts';
 import { ComplaintSheet } from './ComplaintSheet.tsx';
 import { storefront } from './api.ts';
 import type { CustomerOrder, PaymentState } from './api.ts';
+import { manualMomoTelHref, manualMomoUssd, manualMomoWhatsappHref } from './manualMomo.ts';
 import { useStore } from './StoreProvider.tsx';
 
 /** How often an order in flight is re-read. Slower than the payment poll: a kitchen moves in minutes. */
@@ -364,11 +365,19 @@ export function TrackPage({ code, onHome, onOpenCart }: Props): ReactNode {
               ? paid
                 ? 'Paid in cash'
                 : `Pay the rider ${money(order.cashDue ?? order.total)} when it arrives`
-              : paid
-                ? 'Paid by mobile money'
-                : (payment?.status === 'pending' ? 'Waiting for your approval' : 'Not paid yet')}
+              : order.paymentMethod === 'momo_manual'
+                ? paid
+                  ? 'MoMo payment confirmed'
+                  : 'Waiting for your MoMo payment proof'
+                : paid
+                  ? 'Paid by mobile money'
+                  : (payment?.status === 'pending' ? 'Waiting for your approval' : 'Not paid yet')}
           </span>
         </section>
+
+        {order.paymentMethod !== 'momo_manual' || paid || order.manualMomo === null ? null : (
+          <ManualMomoReminder momo={order.manualMomo} total={order.total} orderNumber={order.orderNumber} money={money} />
+        )}
 
         {order.store.phone === null ? null : (
           <a
@@ -410,6 +419,36 @@ export function TrackPage({ code, onHome, onOpenCart }: Props): ReactNode {
         </div>
       )}
     </div>
+  );
+}
+
+/** A reminder of how to pay, shown if the customer reloads this page before momo_manual is confirmed. */
+function ManualMomoReminder({
+  momo,
+  total,
+  orderNumber,
+  money,
+}: {
+  momo: { number: string; whatsapp: string };
+  total: string;
+  orderNumber: number;
+  money: (v: string) => string;
+}): ReactNode {
+  return (
+    <section className="flex flex-col gap-2 rounded-card border border-store-border p-4 text-body">
+      <strong>Still need to pay?</strong>
+      <span>
+        Dial{' '}
+        <a href={manualMomoTelHref(momo.number, total)} className="font-mono font-semibold text-store-primary">
+          {manualMomoUssd(momo.number, total)}
+        </a>{' '}
+        to send {money(total)}, then send proof on{' '}
+        <a href={manualMomoWhatsappHref(momo.whatsapp, orderNumber)} target="_blank" rel="noreferrer" className="font-semibold text-store-primary">
+          WhatsApp
+        </a>
+        , with order #{orderNumber} in the message.
+      </span>
+    </section>
   );
 }
 
